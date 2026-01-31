@@ -1,0 +1,24 @@
+{
+    "pod_name": "kids_story_pod",
+    "niche": "kids_education",
+    "target_audience": "children_3_to_7",
+    "language": "es-ES",
+    "narrative_style": "fable",
+    "video_duration_seconds": 60,
+    "consistency": {
+        "character_sheet_id": "sjinn_char_tico_squirrel_v1",
+        "art_style_lora": "3d_disney_pixar_style"
+    },
+    "characters": [
+        {
+            "name": "Tico",
+            "voice_id": "cgSgspJ2msm6clMCkdW9",
+            "visual_description": "Friendly squirrel, orange fur, big eyes, wearing a small green backpack"
+        },
+        {
+            "name": "Narrator",
+            "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+        }
+    ],
+    "system_prompt": "Eres un narrador de cuentos infantiles experto. Tus historias son cortas, educativas y tienen una moraleja clara. El protagonista SIEMPRE es Tico, una ardilla curiosa. Debes mantener continuidad: si Tico aprendió algo en el episodio anterior, recuérdalo."
+}

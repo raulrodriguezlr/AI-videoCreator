@@ -1,0 +1,15 @@
+{
+    "episodes": [
+        {
+            "title": "Tico y la Nuez Brillante",
+            "summary": "Tico encuentra una nuez mágica y aprende que la verdadera felicidad está en compartir con los demás."
+        },
+        {
+            "title": "Tico y el Pajarito Perdido",
+            "summary": "Tico utiliza su lección sobre compartir para ganar la confianza de un pajarito perdido y ayudarlo a regresar a su nido."
+        }
+    ],
+    "current_state": {
+        "characters": {}
+    }
+}
