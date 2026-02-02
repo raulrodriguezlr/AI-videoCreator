@@ -21,6 +21,8 @@ ELEVENLABS_SIMILARITY_BOOST = 0.75
 # --- VISUALS ---
 # Fallback mock mode if API Key is missing or for testing
 MOCK_VISUALS_ENABLED = True 
+# Set to True to attempt using Gemini/Imagen for mock images (if available)
+GEMINI_MOCK_IMAGES = True 
 # Image Generation Model (when we implement real API)
 SJINN_MODEL_QUALITY = "quality"
 

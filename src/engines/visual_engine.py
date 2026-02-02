@@ -47,21 +47,84 @@ class VisualGenerator:
 
     def _generate_mock_asset(self, prompt: str, path: str, index: int):
         """
-        Creates a dummy image with text using Pillow purely for testing pipeline flow.
+        Creates a dummy image. If GEMINI_MOCK_IMAGES is True, attempts to use Google Imagen API.
+        Otherwise uses Pillow.
         """
+        from src.variables import GEMINI_MOCK_IMAGES, GEMINI_MODEL_NAME
+        
+        if GEMINI_MOCK_IMAGES:
+            try:
+                print(f"[MOCK-GEMINI] Intentando generar imagen con API de Google para escena {index+1}...")
+                self._generate_google_image(prompt, path)
+                return
+            except Exception as e:
+                print(f"[WARN] Falló generación con Google ({e}). Usando Pillow.")
+
+        # ... Fallback to Pillow logic ...
         print(f"[MOCK] Generando asset para escena {index+1}: {prompt[:30]}...")
         try:
-            from PIL import Image, ImageDraw
+            from PIL import Image, ImageDraw, ImageFont
             # Create a colored image based on index to differentiate scenes
             color = ((index * 50) % 255, (index * 80) % 255, (index * 110) % 255)
             img = Image.new('RGB', (1280, 720), color=color)
             d = ImageDraw.Draw(img)
-            d.text((10, 10), f"ESCENA {index+1}\n{prompt[:50]}...", fill=(255, 255, 255))
+            # Try to load a font, otherwise default
+            try:
+                # MacOS standard font
+                font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 40)
+            except:
+                font = None
+                
+            d.text((50, 300), f"ESCENA {index+1}\n{prompt[:60]}...", fill=(255, 255, 255), font=font)
             img.save(path)
         except ImportError:
-            # Fallback if Pillow is missing (though it's in requirements)
             with open(path, 'w') as f:
                 f.write("Mock Image Content")
+
+    def _generate_google_image(self, prompt: str, path: str):
+        """
+        Uses REST API to call Imagen 3 (or 2) since capabilities check was ambiguous.
+        """
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise Exception("No Google API Key")
+            
+        # Try Imagen 2 endpoint (widely available in v1beta)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key={api_key}"
+        
+        headers = {'Content-Type': 'application/json'}
+        data = {
+            "instances": [
+                {"prompt": f"Cartoon style, 3d pixar style. {prompt}"}
+            ],
+            "parameters": {
+                "sampleCount": 1,
+                "aspectRatio": "16:9"
+            }
+        }
+        
+        response = requests.post(url, headers=headers, json=data)
+        
+        if response.status_code != 200:
+            # Try fallback to 'gemini-pro-vision'? No, that's input.
+            # Try fallback to 'imagen-2'
+            raise Exception(f"API Error {response.status_code}: {response.text}")
+            
+        # Parse response (It returns base64 string usually)
+        results = response.json().get('predictions')
+        if not results:
+             raise Exception("No predictions in response")
+             
+        import base64
+        # Depends on exact response format (bytesBase64Encoded or mimeType/bytes)
+        b64_data = results[0].get('bytesBase64Encoded')
+        
+        if b64_data:
+            with open(path, "wb") as f:
+                f.write(base64.b64decode(b64_data))
+            print(f"[MOCK-GEMINI] Imagen generada: {path}")
+        else:
+            raise Exception("No image data found in response")
 
     def _generate_real_asset(self, prompt: str, path: str):
         """
