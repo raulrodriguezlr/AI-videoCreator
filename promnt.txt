@@ -1,0 +1,45 @@
+Ultimamente no paran de salirme videos en redes sociales completamente generados por IA, lo curioso es que son persistentes. SOn los mismos personajes,
+mismos escenarios mismas apariencias. Es decir, de alguna manera se mantiene la consistencia entre videos. Por otro lado, hace tiempo que he visto la automatizacion
+con IA, usando n8n, automatizaciones de youtube. Gente que hace dinero con todo esto. Con monetizaciones, AdSense, etc. 
+El caso es que yo soy ingeniero informático, y tambien estoy cursando un master de IA aplicada a sistemas financieros. Por lo que tengo conocimientos de programacion
+y de IA. 
+
+he visto que paginas como sjinn permiten crear personajes persistentes, con sus mismas apariencias, etc. 
+
+Una vez que te he contado el contexto te digo lo que tenia pensado. 
+
+Crear varios canales, cada uno con temáticas diferente, "atacar" varios nichos que se que hay algunos que pagan mas que otros. 
+Por ej canales infantiles con contenido de cuentos, fabulas, personajes agradables para niños, educativos, etc. 
+
+Otras tematicas que se me ocurren son: 
+finanzas, bolsa, criptomonedas, etc. 
+
+Otras tematicas que se me ocurren son: 
+
+resumen de noticias, actualidad etc.
+
+Que hace falta para crear un video de estos? 
+
+1. Un guion
+2. Una voz
+3. Unos personajes
+4. Unos escenarios
+5. Crear el video
+6. Una edicion, unir los fragmentos, añadir efectos, etc. Los videos seran de segundos por lo que habra que unir muchos fragmentos. Para hacer uno grande
+7. Una subida a youtube
+
+y todo esto automatizado con n8n
+
+Programacion: 
+No se que lengaueje será mejor para esto, python quizas? java? ninguno de los dos? Elige tu el mejor para esto. Me valen todos.
+Habra que hacer cloud imagino, que usamos? aws? azure? google cloud? No tengo preferencia.
+crearse cuenta de adsense, etc. 
+Quiero que, me digas que necesitas, que necesitas que te de, etc. Empieces a programar, que me des una lista de cosas que tengo que hacer yo y otras que tienes que hacer tu
+Como son varios canales, creo que podemos crear varias instancias o pods. Es decir, que funcione todo para un nicho y lo otro lo parametrizamos.Al final imagino que sera un sistema que, 
+le metes un tema y te saca un video, o le metes una serie de parametros y te saca un video. Y lo importante será el promnt, por lo que habrá que hacer un template y parametrizarlo. Dar el system context y luego el user no?
+y claro, queremos que en cosas como cuentos o lo de niños, los episodios deben ser coherentes entre si y que haya una continuidad en la historia. Asi que la historia y el guion que lo sacará otra ia deberá ser consciente de la historia que se va llevando
+y acarreandola para que se acuerde haga referencias a episodios anteriores y no se repita. En el de noticias de actualdiad etc pues la fuente para sacar las noticias deberá ser actual y de fuentes fiables. 
+
+En fin, quiero que me digas que necesitas, que necesitas que te de, etc. Empieces a programar, que me des una lista de cosas que tengo que hacer yo y otras que tienes que hacer tu.
+Primero coge este promnt y a continuacion de estas lineas, reescribe el promnt para que sea mas claro y conciso. Se que los llm se le puede sacar mas partido con tecnicas de promnting avanzadas asi que haz eso primero y luego ya le damos al resto te parece?
+El promnt esta vivo, es decir, se puede modificar durante el proceso. Asi si se complica hay que empezar de nuevo u otra sesion, puedeo darle el contexto de todo lo que hemos hecho, queremos hacer etc.
