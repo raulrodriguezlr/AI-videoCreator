@@ -1,0 +1,42 @@
+{
+  "script_generation": {
+    "system_role": "Eres un narrador de cuentos infantiles experto. Creas historias educativas, emocionantes y con valores claros. Tus narrativas tienen estructura completa: introducción, desarrollo, clímax y conclusión satisfactoria.",
+    "user_template": "Escribe un guion para un video educativo dirigido a {target_audience}.\n\n## TEMA DEL EPISODIO\n{topic}\n\n## CONTEXTO DE LA SERIE\n{series_context}\n\n## EPISODIOS ANTERIORES\n{memory_context}\n\n## PERSONAJES PRINCIPALES\n{characters}\n\n## REQUISITOS TÉCNICOS\n- Duración aproximada: {duration_seconds} segundos\n- Número de escenas: entre {min_scenes} y {max_scenes}\n- Estilo artístico: {art_style}\n- Preguntas interactivas: {num_interactive_questions} (solo si interactivity_enabled es true)\n\n## ESTRUCTURA NARRATIVA OBLIGATORIA\n1. **Introducción** (15-20% del tiempo): Presenta el escenario, personajes y el problema/objetivo\n2. **Desarrollo** (40-50% del tiempo): El personaje enfrenta desafíos, aprende lecciones\n3. **Clímax** (15-20% del tiempo): Momento culminante donde se aplica lo aprendido\n4. **Conclusión** (15-20% del tiempo): Resolución, moraleja clara, refuerzo del aprendizaje\n\n## NOTAS IMPORTANTES\n- Si hay episodios anteriores, haz referencias sutiles a eventos pasados\n- Mantén coherencia con la personalidad establecida de los personajes\n- La moraleja debe ser clara pero no sermoneadora\n- Si interactivity_enabled es true, distribuye las preguntas estratégicamente\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
+    "output_format": {
+      "title": "Título atractivo del episodio",
+      "summary": "Resumen ejecutivo en 1-2 frases para la memoria del sistema",
+      "moral": "Moraleja o lección aprendida en el episodio",
+      "scenes": [
+        {
+          "scene_number": 1,
+          "narrative_phase": "introduction | development | climax | conclusion",
+          "visual_prompt": "Descripción detallada y específica de la imagen para IA generativa",
+          "audio_text": "Texto exacto que dirá el narrador o personaje (natural y conversacional)",
+          "character": "Nombre del personaje que habla",
+          "duration_est": 8,
+          "is_interactive_question": false,
+          "pause_for_answer": 0
+        }
+      ]
+    }
+  },
+  "topic_generation": {
+    "system_role": "Eres un creativo de contenido experto en crear temas educativos y entretenidos para series de video. Conoces bien qué tipo de contenido funciona para cada audiencia.",
+    "user_template": "Genera {num_topics} ideas de temas para nuevos episodios de la serie \"{series_name}\".\n\n## CONCEPTO DE LA SERIE\n{series_description}\n\n## AUDIENCIA OBJETIVO\n{target_audience}\n\n## EPISODIOS YA CREADOS\n{previous_episodes}\n\n## CRITERIOS DE GENERACIÓN\n1. Los temas deben ser **únicos** y no repetir episodios anteriores\n2. Deben ser apropiados para {target_audience}\n3. Pueden hacer referencias o continuaciones de episodios previos cuando tenga sentido\n4. Deben enseñar valores, habilidades o conocimientos importantes\n5. Deben ser lo suficientemente específicos para generar un episodio completo\n6. Variar entre temas emocionales, prácticos, científicos y sociales\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
+    "output_format": {
+      "topics": [
+        {
+          "title": "Título sugerido del episodio",
+          "description": "Descripción breve (2-3 frases) de qué tratará el episodio",
+          "educational_value": "Qué aprenderán o qué valor/habilidad desarrollarán",
+          "references_episode": "null o título de episodio anterior relacionado",
+          "target_emotion": "Emoción principal que evocará (curiosidad, empatía, valentía, etc.)"
+        }
+      ]
+    }
+  },
+  "visual_generation": {
+    "base_style": "{art_style}, vibrant colors, child-friendly aesthetic, no scary elements, high quality render, detailed textures",
+    "scene_template": "{scene_description}. Artistic style: {art_style}. Setting/Location: {setting}. Characters present: {characters_in_scene}. Mood/Atmosphere: {mood}. Lighting: warm and inviting, cinematic quality."
+  }
+}

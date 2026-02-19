@@ -1,24 +1,49 @@
 {
     "pod_name": "kids_story_pod",
     "niche": "kids_education",
-    "target_audience": "children_3_to_7",
+    "series_name": "Las Aventuras de Tico",
+    "series_description": "Tico es una ardilla curiosa que vive en el Bosque Mágico. En cada episodio aprende valiosas lecciones sobre amistad, honestidad, valentía y otros valores importantes mientras explora su mundo y ayuda a sus amigos del bosque.",
+    "target_audience": "niños de 3 a 7 años",
     "language": "es-ES",
     "narrative_style": "fable",
-    "video_duration_seconds": 60,
+    "video_settings": {
+        "duration_seconds": 180,
+        "min_scenes": 12,
+        "max_scenes": 20,
+        "interactive_questions": 2,
+        "interactivity_enabled": true
+    },
     "consistency": {
         "character_sheet_id": "sjinn_char_tico_squirrel_v1",
-        "art_style_lora": "3d_disney_pixar_style"
+        "art_style": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting, detailed character expressions"
     },
     "characters": [
         {
             "name": "Tico",
+            "role": "protagonist",
             "voice_id": "cgSgspJ2msm6clMCkdW9",
-            "visual_description": "Friendly squirrel, orange fur, big eyes, wearing a small green backpack"
+            "visual_description": "Friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass",
+            "personality": "curious, brave, sometimes impulsive but always learns from mistakes, loves helping friends"
         },
         {
             "name": "Narrator",
-            "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+            "role": "storyteller",
+            "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+            "personality": "warm, encouraging, asks questions to engage viewers, patient and supportive"
         }
     ],
-    "system_prompt": "Eres un narrador de cuentos infantiles experto. Tus historias son cortas, educativas y tienen una moraleja clara. El protagonista SIEMPRE es Tico, una ardilla curiosa. Debes mantener continuidad: si Tico aprendió algo en el episodio anterior, recuérdalo."
+    "visual_generation": {
+        "use_gemini_imagen": true,
+        "fallback_to_mock": true,
+        "image_resolution": "1024x1024",
+        "gemini_models_priority": [
+            "imagen-3.0-generate-001",
+            "imagen-2.0-generate-001"
+        ]
+    },
+    "topic_generation": {
+        "enabled": true,
+        "auto_generate_count": 5,
+        "regenerate_threshold": 2
+    }
 }

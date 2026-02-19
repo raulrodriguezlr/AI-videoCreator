@@ -11,6 +11,11 @@
         {
             "title": "Tico y la Nuez de Luz",
             "summary": "Tico encuentra una nuez brillante y, recordando sus lecciones pasadas, decide usarla para iluminar el camino de sus amigos en lugar de guardársela."
+        },
+        {
+            "title": "Tico y la Semilla Dormilona",
+            "summary": "Tico encuentra una semilla extraña y aprende que, con paciencia y cuidado, incluso las cosas más pequeñas pueden convertirse en algo maravilloso, recordando lecciones pasadas sobre ayudar a la naturaleza.",
+            "moral": "La paciencia es un superpoder que ayuda a las cosas a crecer."
         }
     ],
     "current_state": {

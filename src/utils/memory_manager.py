@@ -43,3 +43,9 @@ class MemoryManager:
             context += f"- Episodio {i+1}: {ep.get('summary', 'Sin resumen')}\n"
         
         return context
+    
+    def get_all_episodes(self) -> List[Dict[str, Any]]:
+        """Get all episodes from memory"""
+        memory = self.load_memory()
+        return memory.get("episodes", [])
+
