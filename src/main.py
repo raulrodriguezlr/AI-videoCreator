@@ -16,11 +16,11 @@ import argparse
 import json
 import httpx
 from dotenv import load_dotenv
-from google import genai
 
 from src.engines.script_engine import ScriptGenerator
 from src.engines.video_engine import VideoEngine
 from src.engines.topic_engine import TopicEngine
+from src.utils.api_key_manager import get_api_key_manager
 from src.utils.memory_manager import MemoryManager
 from src.utils.progress_manager import ProgressManager
 from src.utils.resume_handler import resume_episode
@@ -68,12 +68,9 @@ def main():
 
         if VIDEO_PROVIDER == "veo":
             try:
-                api_key = os.getenv("GOOGLE_API_KEY")
-                if not api_key:
-                    print("❌ GOOGLE_API_KEY no encontrada en .env")
-                    return
-                client = genai.Client(api_key=api_key)
-                print(f"✅ Provider 'veo' disponible y listo")
+                key_mgr = get_api_key_manager()
+                client = key_mgr.get_client()
+                print(f"✅ Provider 'veo' disponible — {key_mgr.get_key_label()}")
             except Exception as e:
                 print(f"❌ Provider 'veo' NO disponible: {e}")
         elif VIDEO_PROVIDER == "ovi":

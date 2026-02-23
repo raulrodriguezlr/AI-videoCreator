@@ -24,6 +24,8 @@ from google import genai
 from google.genai import types
 
 from src.providers.base_provider import BaseVideoProvider, VideoClip
+from src.utils.api_key_manager import get_api_key_manager
+from src.utils.progress_manager import is_rate_limit_error, is_content_error
 from src.variables import (
     VEO_MODEL,
     VEO_RESOLUTION,
@@ -33,7 +35,6 @@ from src.variables import (
     VEO_TIMEOUT,
     USE_REFERENCE_IMAGES,
 )
-from src.utils.progress_manager import is_rate_limit_error, is_content_error
 
 class VeoProvider(BaseVideoProvider):
     """Video generation using Google Veo 3.1 API."""
@@ -47,23 +48,14 @@ class VeoProvider(BaseVideoProvider):
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.assets_dir, exist_ok=True)
 
-        # Initialize Google GenAI client
-        self.client = self._init_client()
+        # Initialize client via ApiKeyManager
+        self.key_manager = get_api_key_manager()
+        self.client = self.key_manager.get_client()
 
     def _load_config(self, path: str) -> dict:
         """Load pod configuration from JSON file."""
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-
-    def _init_client(self):
-        """Initialize the Google GenAI client."""
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "GOOGLE_API_KEY no encontrada en .env. "
-                "Necesitas una API key de Google AI Studio: https://aistudio.google.com/apikey"
-            )
-        return genai.Client(api_key=api_key)
 
     def check_availability(self) -> bool:
         """Verify Veo API is accessible."""
@@ -310,6 +302,7 @@ class VeoProvider(BaseVideoProvider):
 
                 clips.append(clip)
                 print(f"[VEO] ✅ Escena {scene_num} generada: {clip.file_path}")
+                self.key_manager.record_success()
 
                 # Persist progress
                 if progress_manager:
@@ -324,11 +317,42 @@ class VeoProvider(BaseVideoProvider):
                 print(f"[VEO] ❌ Error en escena {scene_num}: {error_msg[:120]}")
 
                 if is_rate_limit_error(e):
-                    print(f"[VEO] 🛑 Rate limit alcanzado. Guardando progreso...")
+                    # Try rotating to another API key
+                    if self.key_manager.rotate_key(error_msg):
+                        self.client = self.key_manager.get_client()
+                        print(f"[VEO] 🔄 Reintentando escena {scene_num} con {self.key_manager.get_key_label()}...")
+                        try:
+                            # Retry the same scene with the new key
+                            if i == 0 or not clips:
+                                clip = self.generate_scene(
+                                    prompt=prompt, seed=scene.get("seed"),
+                                    reference_images=ref_images, negative_prompt=negative,
+                                )
+                            elif transition == "extend" and clips:
+                                clip = self.extend_scene(video_clip=clips[-1], prompt=prompt)
+                            else:
+                                clip = self.jump_to_scene(
+                                    previous_clip=clips[-1], prompt=prompt,
+                                    reference_images=ref_images,
+                                )
+                            clips.append(clip)
+                            self.key_manager.record_success()
+                            print(f"[VEO] ✅ Escena {scene_num} generada con key rotada: {clip.file_path}")
+                            if progress_manager:
+                                progress_manager.mark_scene_completed(
+                                    scene_index=i, clip_path=clip.file_path, model_used=VEO_MODEL,
+                                )
+                            continue
+                        except Exception as retry_e:
+                            error_msg = str(retry_e)
+                            print(f"[VEO] ❌ Retry también falló: {error_msg[:120]}")
+
+                    # All keys exhausted — stop
+                    print(f"[VEO] 🛑 Todas las keys agotadas. Guardando progreso...")
                     if progress_manager:
                         progress_manager.mark_scene_failed(i, error_msg, is_rate_limit=True)
                     rate_limited = True
-                    break  # Stop — no point trying more scenes
+                    break
                 elif is_content_error(e):
                     print(f"[VEO] ⚠️  Error de contenido. Saltando escena {scene_num}...")
                     if progress_manager:

@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional
 from google import genai
 from google.genai import types
 
+from src.utils.api_key_manager import get_api_key_manager
 from src.utils.memory_manager import MemoryManager
 from src.utils.prompt_manager import PromptManager
 from src.variables import GEMINI_MODEL_NAME
@@ -29,14 +30,9 @@ class TopicEngine:
         prompts_file = os.path.join(self.pod_dir, "prompts.json")
         self.prompt_manager = PromptManager(prompts_file)
 
-        # Initialize Google GenAI client (new SDK)
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "GOOGLE_API_KEY no encontrada en .env. "
-                "Obtener en: https://aistudio.google.com/apikey"
-            )
-        self.client = genai.Client(api_key=api_key)
+        # Initialize Google GenAI client via ApiKeyManager
+        self.key_manager = get_api_key_manager()
+        self.client = self.key_manager.get_client()
 
     def _load_config(self, path: str) -> Dict[str, Any]:
         with open(path, "r", encoding="utf-8") as f:
