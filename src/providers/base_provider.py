@@ -106,6 +106,7 @@ class BaseVideoProvider(ABC):
         self,
         script: Dict[str, Any],
         output_path: str,
+        episode_dir: str = None,
         resume_from: int = 0,
         progress_manager=None,
     ) -> str:
@@ -120,6 +121,7 @@ class BaseVideoProvider(ABC):
         Args:
             script: Full script dict with scenes, camera metadata, etc.
             output_path: Path where the final video will be saved.
+            episode_dir: Episode directory (clips saved to episode_dir/clips/).
             resume_from: Scene index to resume from (0 = start fresh).
             progress_manager: Optional ProgressManager for state persistence.
 

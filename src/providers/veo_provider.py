@@ -34,6 +34,9 @@ from src.variables import (
     VEO_POLLING_INTERVAL,
     VEO_TIMEOUT,
     USE_REFERENCE_IMAGES,
+    SMART_MODEL_SELECTION,
+    SCENE_TIER_MAP,
+    TIER_MODEL_MAP,
 )
 
 class VeoProvider(BaseVideoProvider):
@@ -99,6 +102,7 @@ class VeoProvider(BaseVideoProvider):
         video=None,
         reference_images: Optional[List[str]] = None,
         negative_prompt: Optional[str] = None,
+        narrative_phase: str = "",
     ) -> dict:
         """
         Build the full parameter dict for client.models.generate_videos().
@@ -106,8 +110,16 @@ class VeoProvider(BaseVideoProvider):
         """
         config = self._build_config(mode=mode)
 
+        # Smart model selection based on narrative_phase
+        model = VEO_MODEL
+        if SMART_MODEL_SELECTION and narrative_phase:
+            tier = SCENE_TIER_MAP.get(narrative_phase)
+            if tier:
+                model = TIER_MODEL_MAP.get(tier, VEO_MODEL)
+                print(f"[VEO]    🎯 Tier: {tier} ({narrative_phase}) → {model}")
+
         gen_params = {
-            "model": VEO_MODEL,
+            "model": model,
             "prompt": prompt,
             "config": config,
         }
@@ -141,6 +153,9 @@ class VeoProvider(BaseVideoProvider):
         seed: Optional[int] = None,
         reference_images: Optional[List[str]] = None,
         negative_prompt: Optional[str] = None,
+        save_dir: Optional[str] = None,
+        scene_index: Optional[int] = None,
+        narrative_phase: str = "",
     ) -> VideoClip:
         """
         Generate a single video clip using Veo 3.1 text-to-video.
@@ -154,15 +169,22 @@ class VeoProvider(BaseVideoProvider):
             mode="text",
             reference_images=reference_images,
             negative_prompt=negative_prompt,
+            narrative_phase=narrative_phase,
         )
 
         operation = self.client.models.generate_videos(**gen_params)
-        return self._poll_and_download(operation, prompt, seed)
+        return self._poll_and_download(
+            operation, prompt, seed,
+            save_dir=save_dir, scene_index=scene_index, narrative_phase=narrative_phase,
+        )
 
     def extend_scene(
         self,
         video_clip: VideoClip,
         prompt: str,
+        save_dir: Optional[str] = None,
+        scene_index: Optional[int] = None,
+        narrative_phase: str = "",
     ) -> VideoClip:
         """
         Extend an existing Veo-generated video by ~7 seconds.
@@ -180,16 +202,23 @@ class VeoProvider(BaseVideoProvider):
             prompt=prompt,
             mode="extend",
             video=video_clip.video_ref,
+            narrative_phase=narrative_phase,
         )
 
         operation = self.client.models.generate_videos(**gen_params)
-        return self._poll_and_download(operation, prompt, video_clip.seed)
+        return self._poll_and_download(
+            operation, prompt, video_clip.seed,
+            save_dir=save_dir, scene_index=scene_index, narrative_phase=narrative_phase,
+        )
 
     def jump_to_scene(
         self,
         previous_clip: VideoClip,
         prompt: str,
         reference_images: Optional[List[str]] = None,
+        save_dir: Optional[str] = None,
+        scene_index: Optional[int] = None,
+        narrative_phase: str = "",
     ) -> VideoClip:
         """
         Create a new scene using the last frame of the previous clip.
@@ -203,22 +232,30 @@ class VeoProvider(BaseVideoProvider):
 
         if last_frame is None:
             print("[VEO] ⚠️  No se pudo extraer último frame. Generando sin seed visual.")
-            return self.generate_scene(prompt, reference_images=reference_images)
+            return self.generate_scene(
+                prompt, reference_images=reference_images,
+                save_dir=save_dir, scene_index=scene_index, narrative_phase=narrative_phase,
+            )
 
         gen_params = self._build_gen_params(
             prompt=prompt,
             mode="image",  # image-to-video: NO person_generation
             image=last_frame,
             reference_images=reference_images,
+            narrative_phase=narrative_phase,
         )
 
         operation = self.client.models.generate_videos(**gen_params)
-        return self._poll_and_download(operation, prompt)
+        return self._poll_and_download(
+            operation, prompt,
+            save_dir=save_dir, scene_index=scene_index, narrative_phase=narrative_phase,
+        )
 
     def generate_full_video(
         self,
         script: Dict[str, Any],
         output_path: str,
+        episode_dir: str = None,
         resume_from: int = 0,
         progress_manager=None,
     ) -> str:
@@ -226,13 +263,14 @@ class VeoProvider(BaseVideoProvider):
         Orchestrate full video generation using Scene Builder logic.
 
         RESILIENT: each scene is wrapped in try/except. If a scene fails:
-        - Rate limit (429) → save progress, stop cleanly, can resume later
+        - Rate limit (429) → rotate key + retry, or save progress & stop
         - Content error → skip scene, continue with next
         - Other error → save progress, try next scene
 
         Args:
             script: Full script dict with scenes
             output_path: Path for final concatenated video
+            episode_dir: Episode directory (clips saved to episode_dir/clips/)
             resume_from: Scene index to resume from (0 = start fresh)
             progress_manager: Optional ProgressManager for persistence
         """
@@ -248,6 +286,12 @@ class VeoProvider(BaseVideoProvider):
             print(f"[VEO]    ▶️  Continuando desde escena {resume_from + 1}")
         print(f"{'='*60}\n")
 
+        # Determine clip save directory
+        if episode_dir:
+            clips_dir = os.path.join(episode_dir, "clips")
+            os.makedirs(clips_dir, exist_ok=True)
+        else:
+            clips_dir = self.assets_dir
         # Load character reference images from config
         ref_images = self._get_character_reference_images()
         # Collect clips — load previously generated clips if resuming
@@ -278,6 +322,9 @@ class VeoProvider(BaseVideoProvider):
             print(f"\n--- Escena {scene_num}/{len(scenes)} ---")
 
             try:
+                scene_num_str = f"{scene_num:02d}"
+                narrative_phase = scene.get("narrative_phase", "")
+
                 if i == 0 or not clips:
                     # First scene or no previous clips: pure text-to-video
                     clip = self.generate_scene(
@@ -285,12 +332,18 @@ class VeoProvider(BaseVideoProvider):
                         seed=scene.get("seed"),
                         reference_images=ref_images,
                         negative_prompt=negative,
+                        save_dir=clips_dir,
+                        scene_index=i,
+                        narrative_phase=narrative_phase,
                     )
                 elif transition == "extend" and clips:
                     # Continue same scene
                     clip = self.extend_scene(
                         video_clip=clips[-1],
                         prompt=prompt,
+                        save_dir=clips_dir,
+                        scene_index=i,
+                        narrative_phase=narrative_phase,
                     )
                 else:
                     # Jump to new scene (default)
@@ -298,6 +351,9 @@ class VeoProvider(BaseVideoProvider):
                         previous_clip=clips[-1],
                         prompt=prompt,
                         reference_images=ref_images,
+                        save_dir=clips_dir,
+                        scene_index=i,
+                        narrative_phase=narrative_phase,
                     )
 
                 clips.append(clip)
@@ -327,13 +383,18 @@ class VeoProvider(BaseVideoProvider):
                                 clip = self.generate_scene(
                                     prompt=prompt, seed=scene.get("seed"),
                                     reference_images=ref_images, negative_prompt=negative,
+                                    save_dir=clips_dir, scene_index=i, narrative_phase=narrative_phase,
                                 )
                             elif transition == "extend" and clips:
-                                clip = self.extend_scene(video_clip=clips[-1], prompt=prompt)
+                                clip = self.extend_scene(
+                                    video_clip=clips[-1], prompt=prompt,
+                                    save_dir=clips_dir, scene_index=i, narrative_phase=narrative_phase,
+                                )
                             else:
                                 clip = self.jump_to_scene(
                                     previous_clip=clips[-1], prompt=prompt,
                                     reference_images=ref_images,
+                                    save_dir=clips_dir, scene_index=i, narrative_phase=narrative_phase,
                                 )
                             clips.append(clip)
                             self.key_manager.record_success()
@@ -405,6 +466,9 @@ class VeoProvider(BaseVideoProvider):
         operation,
         prompt: str,
         seed: Optional[int] = None,
+        save_dir: Optional[str] = None,
+        scene_index: Optional[int] = None,
+        narrative_phase: str = "",
     ) -> VideoClip:
         """Poll operation status and download the generated video."""
         elapsed = 0
@@ -422,10 +486,17 @@ class VeoProvider(BaseVideoProvider):
         generated = operation.response.generated_videos[0]
         self.client.files.download(file=generated.video)
 
-        # Save to assets directory
-        safe_name = prompt[:40].replace(" ", "_").replace("'", "").replace('"', "")
-        filename = f"scene_{safe_name}_{int(time.time())}.mp4"
-        output_path = os.path.join(self.assets_dir, filename)
+        # Build filename — structured if scene info provided, else legacy
+        if scene_index is not None:
+            phase_suffix = f"_{narrative_phase}" if narrative_phase else ""
+            filename = f"clip_{scene_index + 1:02d}{phase_suffix}.mp4"
+        else:
+            safe_name = prompt[:40].replace(" ", "_").replace("'", "").replace('"', "")
+            filename = f"scene_{safe_name}_{int(time.time())}.mp4"
+
+        # Save to episode clips dir or fallback to assets
+        target_dir = save_dir if save_dir else self.assets_dir
+        output_path = os.path.join(target_dir, filename)
         generated.video.save(output_path)
 
         print(f"[VEO] 💾 Descargado: {output_path}")
@@ -508,7 +579,9 @@ class VeoProvider(BaseVideoProvider):
     def _build_cinematographic_prompt(self, scene: dict) -> str:
         """
         Build a detailed cinematographic prompt from scene metadata.
-        Combines visual_prompt with camera, mood, and lighting info.
+        Combines visual_prompt with camera, mood, lighting, and audio info.
+        Veo 3.1 generates synchronized audio — the prompt must include
+        voice direction and dialogue for proper audio generation.
         """
         parts = []
 
@@ -537,10 +610,20 @@ class VeoProvider(BaseVideoProvider):
         visual_prompt = scene.get("visual_prompt", scene.get("narration", ""))
         parts.append(visual_prompt)
 
-        # Audio/dialogue (Veo 3.1 generates audio natively)
+        # Audio/dialogue with voice direction (Veo 3.1 generates audio natively)
+        character = scene.get("character", "")
         audio_text = scene.get("audio_text", "")
+        voice_direction = scene.get("voice_direction", "")
+
         if audio_text:
-            parts.append(f'Narration: "{audio_text}"')
+            if character and character.lower() != "narrator":
+                # Character dialogue — Veo needs clear voice attribution
+                voice_desc = f" ({voice_direction})" if voice_direction else ""
+                parts.append(f'{character}{voice_desc} says: "{audio_text}"')
+            else:
+                # Narrator — warm adult voice by default
+                voice_desc = f" ({voice_direction})" if voice_direction else " (warm adult male voice)"
+                parts.append(f'Narrator{voice_desc}: "{audio_text}"')
 
         # Art style from config
         art_style = self.config.get("consistency", {}).get("art_style", "")

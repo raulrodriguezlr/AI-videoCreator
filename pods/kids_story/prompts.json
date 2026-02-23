@@ -1,7 +1,7 @@
 {
   "script_generation": {
-    "system_role": "Eres un narrador de cuentos infantiles experto. Creas historias educativas, emocionantes y con valores claros. Tus narrativas tienen estructura completa: introducción, desarrollo, clímax y conclusión satisfactoria.",
-    "user_template": "Escribe un guion para un video educativo dirigido a {target_audience}.\n\n## TEMA DEL EPISODIO\n{topic}\n\n## CONTEXTO DE LA SERIE\n{series_context}\n\n## EPISODIOS ANTERIORES\n{memory_context}\n\n## PERSONAJES PRINCIPALES\n{characters}\n\n## REQUISITOS TÉCNICOS\n- Duración aproximada: {duration_seconds} segundos\n- Número de escenas: entre {min_scenes} y {max_scenes}\n- Estilo artístico: {art_style}\n- Preguntas interactivas: {num_interactive_questions} (solo si interactivity_enabled es true)\n\n## ESTRUCTURA NARRATIVA OBLIGATORIA\n1. **Introducción** (15-20% del tiempo): Presenta el escenario, personajes y el problema/objetivo\n2. **Desarrollo** (40-50% del tiempo): El personaje enfrenta desafíos, aprende lecciones\n3. **Clímax** (15-20% del tiempo): Momento culminante donde se aplica lo aprendido\n4. **Conclusión** (15-20% del tiempo): Resolución, moraleja clara, refuerzo del aprendizaje\n\n## NOTAS IMPORTANTES\n- Si hay episodios anteriores, haz referencias sutiles a eventos pasados\n- Mantén coherencia con la personalidad establecida de los personajes\n- La moraleja debe ser clara pero no sermoneadora\n- Si interactivity_enabled es true, distribuye las preguntas estratégicamente\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
+    "system_role": "Eres un director y guionista de cuentos infantiles animados con experiencia en Pixar/Disney. Creas historias educativas con estructura cinematográfica completa. Cada escena que escribes incluye dirección de cámara, iluminación, audio y transiciones — listo para generar vídeo con IA generativa (Veo). El audio se genera nativamente desde el prompt: debes especificar VOZ, TONO y DIÁLOGOS exactos.",
+    "user_template": "Escribe un guion cinematográfico para un video educativo dirigido a {target_audience}.\n\n## TEMA DEL EPISODIO\n{topic}\n\n## CONTEXTO DE LA SERIE\n{series_context}\n\n## EPISODIOS ANTERIORES\n{memory_context}\n\n## PERSONAJES PRINCIPALES\n{characters}\n\n## REQUISITOS TÉCNICOS\n- Duración aproximada: {duration_seconds} segundos\n- Número de escenas: entre {min_scenes} y {max_scenes}\n- Estilo artístico: {art_style}\n- Preguntas interactivas: {num_interactive_questions} (solo si > 0)\n\n## ESTRUCTURA NARRATIVA OBLIGATORIA\nCada escena DEBE tener un narrative_phase de esta lista exacta:\n- \"introduction\"    → Presenta el escenario y personajes (1-2 escenas)\n- \"establishing\"    → Establece el contexto/problema (1-2 escenas)\n- \"rising_action\"   → El conflicto crece, el personaje intenta resolver (3-5 escenas)\n- \"climax\"          → Momento culminante: el personaje aplica lo aprendido (1-2 escenas)\n- \"falling_action\"  → Consecuencias del clímax (1-2 escenas)\n- \"resolution\"      → Moraleja clara, cierre satisfactorio (1-2 escenas)\n- \"transition\"      → Escenas de paso entre bloques narrativos (1-3 escenas)\n\nDistribuye las escenas cubriendo TODOS los phases. No uses phases que no estén en esta lista.\n\n## REGLAS DE VOCES Y AUDIO (MUY IMPORTANTE)\nVeo genera audio nativo desde el prompt. Cada personaje debe tener una VOZ DIFERENTE:\n\n1. **Narrador omnisciente**: voz masculina adulta, cálida y reposada. Habla EN TERCERA PERSONA. Nunca dice \"yo\". Describe la escena y guía al espectador. Ejemplo: \"Tico miró a su alrededor y sonrió.\"\n2. **Personajes (Tico, etc.)**: voces distintas del narrador. Hablan EN PRIMERA PERSONA con sus diálogos entre comillas. Ejemplo: Tico dice: \"¡Vamos a explorar!\"\n3. **NUNCA mezcles**: el narrador NO puede ser a la vez el personaje. Si en una escena habla Tico, el campo character debe ser \"Tico\" y el audio_text debe contener su diálogo. Si narra el narrador, el character debe ser \"Narrator\".\n4. **Alterna voces**: no pongas 5 escenas seguidas del narrador. Alterna entre narración y diálogos de personajes.\n5. **voice_direction**: incluye indicaciones de tono para la generación de audio (ej: \"voz suave y calmada\", \"voz enérgica y emocionada\").\n\n## REGLAS DE VISUAL_PROMPT (PARA GENERACIÓN DE VÍDEO)\n- El visual_prompt debe ser una descripción CINEMATOGRÁFICA detallada en INGLÉS\n- Debe describir EXACTAMENTE lo que se ve: personajes, acciones, fondo, expresiones\n- Incluye la apariencia física completa del personaje (no solo el nombre)\n- NO incluyas texto, UI, ni elementos abstractos\n- El audio_text va en español (es lo que se escucha)\n\n## TRANSICIONES ENTRE ESCENAS\nCada escena debe indicar cómo conectar con la siguiente:\n- \"jump\"   → Corte directo (nueva escena, distinto ángulo)\n- \"extend\" → Continuación del mismo plano (misma escena, más tiempo)\n- \"cut\"    → Corte seco a nueva localización\n\n## NOTAS ADICIONALES\n- Si hay episodios anteriores, haz referencias sutiles a eventos pasados\n- Mantén coherencia con la personalidad establecida de los personajes\n- La moraleja debe ser clara pero no sermoneadora\n- Si hay preguntas interactivas, distribúyelas estratégicamente\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
     "output_format": {
       "title": "Título atractivo del episodio",
       "summary": "Resumen ejecutivo en 1-2 frases para la memoria del sistema",
@@ -9,10 +9,19 @@
       "scenes": [
         {
           "scene_number": 1,
-          "narrative_phase": "introduction | development | climax | conclusion",
-          "visual_prompt": "Descripción detallada y específica de la imagen para IA generativa",
-          "audio_text": "Texto exacto que dirá el narrador o personaje (natural y conversacional)",
-          "character": "Nombre del personaje que habla",
+          "narrative_phase": "introduction | establishing | rising_action | climax | falling_action | resolution | transition",
+          "visual_prompt": "Detailed cinematographic description in ENGLISH: characters, actions, setting, expressions, art style",
+          "audio_text": "Texto exacto que se escuchará (español). Diálogos entre comillas si es un personaje.",
+          "character": "Narrator | Tico | (nombre del personaje que habla)",
+          "voice_direction": "Indicación de tono: voz cálida, emocionada, suspense, etc.",
+          "camera": {
+            "shot_type": "wide | medium | close-up | extreme_close_up | aerial",
+            "movement": "static | pan_left | pan_right | tracking | dolly_in | dolly_out | crane_up",
+            "angle": "eye_level | low_angle | high_angle | bird_eye | dutch_angle"
+          },
+          "mood": "warm | tense | joyful | mysterious | triumphant | calm | exciting",
+          "lighting": "golden_hour | soft_diffused | dramatic_shadows | bright_daylight | moonlit",
+          "transition_to_next": "jump | extend | cut",
           "duration_est": 8,
           "is_interactive_question": false,
           "pause_for_answer": 0
@@ -37,6 +46,6 @@
   },
   "visual_generation": {
     "base_style": "{art_style}, vibrant colors, child-friendly aesthetic, no scary elements, high quality render, detailed textures",
-    "scene_template": "{scene_description}. Artistic style: {art_style}. Setting/Location: {setting}. Characters present: {characters_in_scene}. Mood/Atmosphere: {mood}. Lighting: warm and inviting, cinematic quality."
+    "scene_template": "{scene_description}. Artistic style: {art_style}. Setting/Location: {setting}. Characters present: {characters_in_scene}. Mood/Atmosphere: {mood}. Lighting: {lighting}, cinematic quality."
   }
 }

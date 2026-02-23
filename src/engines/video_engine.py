@@ -40,6 +40,7 @@ class VideoEngine:
         self,
         script: dict,
         output_path: str = None,
+        episode_dir: str = None,
         resume_from: int = 0,
         progress_manager=None,
     ) -> str:
@@ -49,6 +50,7 @@ class VideoEngine:
         Args:
             script: Script estructurado con escenas.
             output_path: Path de salida (opcional, se genera automáticamente).
+            episode_dir: Directory for the episode (clips saved to episode_dir/clips/).
             resume_from: Índice de escena desde donde retomar (0 = desde el inicio).
             progress_manager: ProgressManager para persistencia de estado.
 
@@ -62,6 +64,7 @@ class VideoEngine:
         return self.provider.generate_full_video(
             script,
             output_path,
+            episode_dir=episode_dir,
             resume_from=resume_from,
             progress_manager=progress_manager,
         )

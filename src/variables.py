@@ -74,6 +74,40 @@ USE_REFERENCE_IMAGES = True
 SCENE_BUILDER_MAX_EXTENDS = 20
 
 # ==========================
+# SMART MODEL SELECTION — Modelo según importancia de escena
+# ==========================
+# Si True, cada escena usa un modelo diferente según narrative_phase.
+# Si False, todas usan VEO_MODEL (el de arriba).
+SMART_MODEL_SELECTION = True
+
+# narrative_phase → tier
+SCENE_TIER_MAP = {
+    # HERO → máxima calidad (escenas clave de la historia)
+    "climax": "hero",
+    "resolution": "hero",
+    "introduction": "hero",
+
+    # STANDARD → rápido pero buena calidad
+    "rising_action": "standard",
+    "falling_action": "standard",
+
+    # FILLER → modelo más económico
+    "transition": "filler",
+    "establishing": "filler",
+
+    # Backward compat (nombres legacy de prompts.json antiguos)
+    "development": "standard",
+    "conclusion": "hero",
+}
+
+# tier → modelo Veo
+TIER_MODEL_MAP = {
+    "hero": "veo-3.0-generate-001",
+    "standard": "veo-3.0-fast-generate-001",
+    "filler": "veo-2.0-generate-001",
+}
+
+# ==========================
 # LLM — Gemini (Script + Topic Generation)
 # ==========================
 GEMINI_MODEL_NAME = "gemini-3-flash-preview"

@@ -122,6 +122,7 @@ class OviProvider(BaseVideoProvider):
         self,
         script: Dict[str, Any],
         output_path: str,
+        episode_dir: str = None,
         resume_from: int = 0,
         progress_manager=None,
     ) -> str:

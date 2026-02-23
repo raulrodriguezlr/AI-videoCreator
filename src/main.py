@@ -21,6 +21,7 @@ from src.engines.script_engine import ScriptGenerator
 from src.engines.video_engine import VideoEngine
 from src.engines.topic_engine import TopicEngine
 from src.utils.api_key_manager import get_api_key_manager
+from src.utils.episode_manager import EpisodeManager
 from src.utils.memory_manager import MemoryManager
 from src.utils.progress_manager import ProgressManager
 from src.utils.resume_handler import resume_episode
@@ -170,25 +171,13 @@ def main():
     print(f"   Escenas: {len(script.get('scenes', []))}")
     print(f"   Moraleja: {script.get('moral', 'N/A')}\n")
 
-    # Create episode output directory
+    # Create episode via EpisodeManager
     pod_dir = os.path.dirname(pod_config_path)
-    output_dir = os.path.join(pod_dir, "output")
-    os.makedirs(output_dir, exist_ok=True)
+    episode_mgr = EpisodeManager(pod_dir)
+    episode = episode_mgr.create_episode(topic, script)
 
-    # Generate episode ID
-    episode_num = len([d for d in os.listdir(output_dir)
-                       if os.path.isdir(os.path.join(output_dir, d))
-                       and d.startswith("ep_")]) + 1
-    safe_title = topic[:30].replace(" ", "_").replace("'", "").replace('"', '')
-    episode_id = f"ep_{episode_num:03d}_{safe_title}"
-    episode_dir = os.path.join(output_dir, episode_id)
-    os.makedirs(episode_dir, exist_ok=True)
-
-    # Save script to episode dir
-    script_path = os.path.join(episode_dir, "script.json")
-    with open(script_path, "w", encoding="utf-8") as f:
-        json.dump(script, f, indent=2, ensure_ascii=False)
-    print(f"   📄 Script guardado en: {script_path}\n")
+    episode_id = episode["episode_id"]
+    episode_dir = episode["episode_dir"]
 
     # Also save as last_script for backwards compat
     last_script_path = os.path.join(pod_dir, "last_script.json")
@@ -212,6 +201,7 @@ def main():
         final_video_path = video_engine.generate(
             script,
             output_path=os.path.join(episode_dir, "final.mp4"),
+            episode_dir=episode_dir,
             progress_manager=progress,
         )
         print(f"✅ Vídeo generado: {final_video_path}\n")
