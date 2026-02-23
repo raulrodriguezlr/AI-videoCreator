@@ -15,7 +15,13 @@ import os
 import json
 import time
 import tempfile
+import base64
+import subprocess
+import cv2
 from typing import Optional, List, Dict, Any
+from PIL import Image as PILImage
+from google import genai
+from google.genai import types
 
 from src.providers.base_provider import BaseVideoProvider, VideoClip
 from src.variables import (
@@ -27,7 +33,7 @@ from src.variables import (
     VEO_TIMEOUT,
     USE_REFERENCE_IMAGES,
 )
-
+from src.utils.progress_manager import is_rate_limit_error, is_content_error
 
 class VeoProvider(BaseVideoProvider):
     """Video generation using Google Veo 3.1 API."""
@@ -51,8 +57,6 @@ class VeoProvider(BaseVideoProvider):
 
     def _init_client(self):
         """Initialize the Google GenAI client."""
-        from google import genai
-
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError(
@@ -83,8 +87,6 @@ class VeoProvider(BaseVideoProvider):
         Args:
             mode: 'text' (text-to-video), 'image' (image-to-video), 'extend'
         """
-        from google.genai import types
-
         config_params = {
             "aspect_ratio": VEO_ASPECT_RATIO,
             "resolution": VEO_RESOLUTION,
@@ -225,16 +227,22 @@ class VeoProvider(BaseVideoProvider):
         self,
         script: Dict[str, Any],
         output_path: str,
+        resume_from: int = 0,
+        progress_manager=None,
     ) -> str:
         """
         Orchestrate full video generation using Scene Builder logic.
 
-        For each scene in the script:
-        1. First scene: generate_scene (text-to-video)
-        2. Subsequent scenes: jump_to_scene (last frame → new scene)
-           OR extend_scene (continue same scene)
+        RESILIENT: each scene is wrapped in try/except. If a scene fails:
+        - Rate limit (429) → save progress, stop cleanly, can resume later
+        - Content error → skip scene, continue with next
+        - Other error → save progress, try next scene
 
-        The transition type is determined by each scene's 'transition_to_next' field.
+        Args:
+            script: Full script dict with scenes
+            output_path: Path for final concatenated video
+            resume_from: Scene index to resume from (0 = start fresh)
+            progress_manager: Optional ProgressManager for persistence
         """
         scenes = script.get("scenes", [])
         if not scenes:
@@ -244,54 +252,122 @@ class VeoProvider(BaseVideoProvider):
         print(f"\n{'='*60}")
         print(f"[VEO] 🎬 Scene Builder — '{title}'")
         print(f"[VEO]    {len(scenes)} escenas a generar")
+        if resume_from > 0:
+            print(f"[VEO]    ▶️  Continuando desde escena {resume_from + 1}")
         print(f"{'='*60}\n")
 
         # Load character reference images from config
         ref_images = self._get_character_reference_images()
-
+        # Collect clips — load previously generated clips if resuming
         clips: List[VideoClip] = []
+        if resume_from > 0 and progress_manager:
+            completed = progress_manager.get_completed_clips()
+            for c in completed:
+                if c.get("clip_path") and os.path.exists(c["clip_path"]):
+                    clips.append(VideoClip(
+                        file_path=c["clip_path"],
+                        duration=c.get("duration_seconds", VEO_DURATION_SECONDS),
+                    ))
+            print(f"[VEO]    📂 {len(clips)} clips previos recuperados")
+
+        rate_limited = False
 
         for i, scene in enumerate(scenes):
             scene_num = scene.get("scene_number", i + 1)
+
+            # Skip already completed scenes
+            if i < resume_from:
+                continue
+
             prompt = self._build_cinematographic_prompt(scene)
             negative = scene.get("negative_prompt")
             transition = scene.get("transition_to_next", "jump")
 
             print(f"\n--- Escena {scene_num}/{len(scenes)} ---")
 
-            if i == 0:
-                # First scene: pure text-to-video
-                clip = self.generate_scene(
-                    prompt=prompt,
-                    seed=scene.get("seed"),
-                    reference_images=ref_images,
-                    negative_prompt=negative,
-                )
-            elif transition == "extend" and clips:
-                # Continue same scene
-                clip = self.extend_scene(
-                    video_clip=clips[-1],
-                    prompt=prompt,
-                )
-            else:
-                # Jump to new scene (default)
-                clip = self.jump_to_scene(
-                    previous_clip=clips[-1],
-                    prompt=prompt,
-                    reference_images=ref_images,
-                )
+            try:
+                if i == 0 or not clips:
+                    # First scene or no previous clips: pure text-to-video
+                    clip = self.generate_scene(
+                        prompt=prompt,
+                        seed=scene.get("seed"),
+                        reference_images=ref_images,
+                        negative_prompt=negative,
+                    )
+                elif transition == "extend" and clips:
+                    # Continue same scene
+                    clip = self.extend_scene(
+                        video_clip=clips[-1],
+                        prompt=prompt,
+                    )
+                else:
+                    # Jump to new scene (default)
+                    clip = self.jump_to_scene(
+                        previous_clip=clips[-1],
+                        prompt=prompt,
+                        reference_images=ref_images,
+                    )
 
-            clips.append(clip)
-            print(f"[VEO] ✅ Escena {scene_num} generada: {clip.file_path}")
+                clips.append(clip)
+                print(f"[VEO] ✅ Escena {scene_num} generada: {clip.file_path}")
 
-        # Concatenate clips if multiple
+                # Persist progress
+                if progress_manager:
+                    progress_manager.mark_scene_completed(
+                        scene_index=i,
+                        clip_path=clip.file_path,
+                        model_used=VEO_MODEL,
+                    )
+
+            except Exception as e:
+                error_msg = str(e)
+                print(f"[VEO] ❌ Error en escena {scene_num}: {error_msg[:120]}")
+
+                if is_rate_limit_error(e):
+                    print(f"[VEO] 🛑 Rate limit alcanzado. Guardando progreso...")
+                    if progress_manager:
+                        progress_manager.mark_scene_failed(i, error_msg, is_rate_limit=True)
+                    rate_limited = True
+                    break  # Stop — no point trying more scenes
+                elif is_content_error(e):
+                    print(f"[VEO] ⚠️  Error de contenido. Saltando escena {scene_num}...")
+                    if progress_manager:
+                        progress_manager.mark_scene_skipped(i, error_msg)
+                    continue
+                else:
+                    print(f"[VEO] ⚠️  Error inesperado. Intentando siguiente escena...")
+                    if progress_manager:
+                        progress_manager.mark_scene_failed(i, error_msg)
+                    continue
+
+        # Final result
+        if not clips:
+            error_msg = "No se generó ningún clip."
+            if progress_manager:
+                progress_manager.mark_episode_failed(error_msg)
+            raise RuntimeError(error_msg)
+
+        # Concatenate clips
         if len(clips) == 1:
             final_path = clips[0].file_path
         else:
             final_path = self._concatenate_clips(clips, output_path)
 
+        # Update progress
+        if progress_manager:
+            if rate_limited:
+                print(f"\n[VEO] ⏸️  Episodio pausado por rate limit. Resume con --resume")
+                print(progress_manager.get_status_summary())
+            else:
+                progress_manager.mark_episode_completed(final_path)
+
+        completed_count = len(clips)
+        total_count = len(scenes)
+        status = "PARCIAL" if completed_count < total_count else "COMPLETO"
+
         print(f"\n{'='*60}")
-        print(f"[VEO] ✅ Vídeo final: {final_path}")
+        print(f"[VEO] {'⏸️' if rate_limited else '✅'} Vídeo {status}: {final_path}")
+        print(f"[VEO]    Clips generados: {completed_count}/{total_count}")
         print(f"{'='*60}\n")
 
         return final_path
@@ -308,7 +384,6 @@ class VeoProvider(BaseVideoProvider):
     ) -> VideoClip:
         """Poll operation status and download the generated video."""
         elapsed = 0
-
         while not operation.done:
             if elapsed >= VEO_TIMEOUT:
                 raise TimeoutError(
@@ -342,9 +417,6 @@ class VeoProvider(BaseVideoProvider):
         """Extract the last frame from a video file using OpenCV.
         Returns a google.genai types.Image with base64 encoded data."""
         try:
-            import cv2
-            import base64
-            from google.genai import types
 
             cap = cv2.VideoCapture(video_path)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -382,9 +454,6 @@ class VeoProvider(BaseVideoProvider):
 
     def _load_reference_images(self, image_paths: List[str]) -> list:
         """Load reference images for character consistency."""
-        from google.genai import types
-        from PIL import Image as PILImage
-
         ref_images = []
         for path in image_paths[:3]:  # Max 3 reference images
             if os.path.exists(path):
@@ -462,8 +531,6 @@ class VeoProvider(BaseVideoProvider):
         Uses ffmpeg via subprocess for reliability.
         """
         try:
-            import subprocess
-
             # Create concat file list for ffmpeg
             concat_list_path = os.path.join(self.assets_dir, "_concat_list.txt")
             with open(concat_list_path, "w") as f:

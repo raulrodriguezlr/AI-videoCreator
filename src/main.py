@@ -14,12 +14,17 @@ El vídeo se genera nativamente con audio sincronizado.
 import os
 import argparse
 import json
+import httpx
 from dotenv import load_dotenv
+from google import genai
 
 from src.engines.script_engine import ScriptGenerator
 from src.engines.video_engine import VideoEngine
 from src.engines.topic_engine import TopicEngine
 from src.utils.memory_manager import MemoryManager
+from src.utils.progress_manager import ProgressManager
+from src.utils.resume_handler import resume_episode
+from src.variables import VIDEO_PROVIDER, OVI_COMFYUI_URL
 
 # Load env vars
 load_dotenv()
@@ -47,16 +52,22 @@ def main():
         action="store_true",
         help="Verificar que el provider de vídeo está disponible (no requiere --pod)",
     )
+    parser.add_argument(
+        "--resume",
+        type=str,
+        nargs="?",
+        const="last",
+        metavar="EPISODE_DIR",
+        help="Continuar episodio incompleto. Usa 'last' con --pod para el más reciente, o pasa la carpeta exacta Ej: python -m src.main --pod kids_story --resume last o python -m src.main --resume pods/kids_story/output/ep_001_tico_paciencia",
+    )
     args = parser.parse_args()
 
     # --- Mode: Check provider (no requiere pod) ---
     if args.check_provider:
-        from src.variables import VIDEO_PROVIDER
         print(f"🔍 Verificando provider '{VIDEO_PROVIDER}'...")
 
         if VIDEO_PROVIDER == "veo":
             try:
-                from google import genai
                 api_key = os.getenv("GOOGLE_API_KEY")
                 if not api_key:
                     print("❌ GOOGLE_API_KEY no encontrada en .env")
@@ -67,8 +78,6 @@ def main():
                 print(f"❌ Provider 'veo' NO disponible: {e}")
         elif VIDEO_PROVIDER == "ovi":
             try:
-                import httpx
-                from src.variables import OVI_COMFYUI_URL
                 response = httpx.get(f"{OVI_COMFYUI_URL}/system_stats", timeout=5)
                 if response.status_code == 200:
                     print(f"✅ Provider 'ovi' disponible en {OVI_COMFYUI_URL}")
@@ -78,6 +87,11 @@ def main():
                 print(f"❌ Provider 'ovi' NO disponible: {e}")
         else:
             print(f"❌ Provider '{VIDEO_PROVIDER}' no reconocido")
+        return
+
+    # --- Mode: Resume incomplete episode ---
+    if args.resume is not None:
+        resume_episode(resume_value=args.resume, pod_name=args.pod)
         return
 
     # Para todo lo demás, --pod es obligatorio
@@ -119,7 +133,7 @@ def main():
         return
 
     # --- Mode: Full video creation ---
-    from src.variables import VIDEO_PROVIDER
+
     print(f"\n{'='*60}")
     print(f"🚀 AI-videoCreator v2.0 — Pod: {args.pod}")
     print(f"   Provider: {VIDEO_PROVIDER}")
@@ -159,17 +173,57 @@ def main():
     print(f"   Escenas: {len(script.get('scenes', []))}")
     print(f"   Moraleja: {script.get('moral', 'N/A')}\n")
 
-    # Save script to file for reference
-    script_path = os.path.join(os.path.dirname(pod_config_path), "last_script.json")
+    # Create episode output directory
+    pod_dir = os.path.dirname(pod_config_path)
+    output_dir = os.path.join(pod_dir, "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Generate episode ID
+    episode_num = len([d for d in os.listdir(output_dir)
+                       if os.path.isdir(os.path.join(output_dir, d))
+                       and d.startswith("ep_")]) + 1
+    safe_title = topic[:30].replace(" ", "_").replace("'", "").replace('"', '')
+    episode_id = f"ep_{episode_num:03d}_{safe_title}"
+    episode_dir = os.path.join(output_dir, episode_id)
+    os.makedirs(episode_dir, exist_ok=True)
+
+    # Save script to episode dir
+    script_path = os.path.join(episode_dir, "script.json")
     with open(script_path, "w", encoding="utf-8") as f:
         json.dump(script, f, indent=2, ensure_ascii=False)
     print(f"   📄 Script guardado en: {script_path}\n")
 
-    # Step 3: Video Generation (native, with audio)
+    # Also save as last_script for backwards compat
+    last_script_path = os.path.join(pod_dir, "last_script.json")
+    with open(last_script_path, "w", encoding="utf-8") as f:
+        json.dump(script, f, indent=2, ensure_ascii=False)
+
+    # Step 3: Video Generation (native, with audio) — WITH PROGRESS TRACKING
     print("--- PASO 2/3: GENERACIÓN DE VÍDEO ---")
+
+    progress = ProgressManager(episode_dir)
+    progress.create_progress(
+        episode_id=episode_id,
+        topic=topic,
+        script=script,
+        total_scenes=len(script.get("scenes", [])),
+    )
+
     video_engine = VideoEngine(pod_config_path)
-    final_video_path = video_engine.generate(script)
-    print(f"✅ Vídeo generado: {final_video_path}\n")
+
+    try:
+        final_video_path = video_engine.generate(
+            script,
+            output_path=os.path.join(episode_dir, "final.mp4"),
+            progress_manager=progress,
+        )
+        print(f"✅ Vídeo generado: {final_video_path}\n")
+    except Exception as e:
+        print(f"❌ Error en generación de vídeo: {e}")
+        print(f"📊 Estado guardado en: {episode_dir}/progress.json")
+        print(f"   Usa --resume {episode_dir} para continuar")
+        print(f"\n{progress.get_status_summary()}")
+        return
 
     # Step 4: Save to Memory
     print("--- PASO 3/3: GUARDANDO EN MEMORIA ---")
@@ -180,6 +234,7 @@ def main():
     print(f"✅ PROCESO COMPLETADO")
     print(f"{'='*60}")
     print(f"📺 Video: {final_video_path}")
+    print(f"📁 Episodio: {episode_dir}")
     print(f"📝 Título: {script.get('title')}")
     print(f"🎬 Escenas: {len(script.get('scenes', []))}")
     print()

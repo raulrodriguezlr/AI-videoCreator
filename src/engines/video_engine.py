@@ -14,6 +14,7 @@ Usage:
 import os
 import json
 from src.providers import get_provider
+from src.variables import VIDEO_PROVIDER
 
 
 class VideoEngine:
@@ -33,17 +34,23 @@ class VideoEngine:
 
         # Factory: obtener el provider según variables.py
         self.provider = get_provider(pod_config_path)
-
-        from src.variables import VIDEO_PROVIDER
         print(f"[VideoEngine] Provider activo: {VIDEO_PROVIDER}")
 
-    def generate(self, script: dict, output_path: str = None) -> str:
+    def generate(
+        self,
+        script: dict,
+        output_path: str = None,
+        resume_from: int = 0,
+        progress_manager=None,
+    ) -> str:
         """
         Genera el vídeo completo delegando al provider.
 
         Args:
             script: Script estructurado con escenas.
             output_path: Path de salida (opcional, se genera automáticamente).
+            resume_from: Índice de escena desde donde retomar (0 = desde el inicio).
+            progress_manager: ProgressManager para persistencia de estado.
 
         Returns:
             Path al vídeo final generado.
@@ -52,7 +59,12 @@ class VideoEngine:
             title = script.get("title", "video").replace(" ", "_")
             output_path = os.path.join(self.output_dir, f"{title}.mp4")
 
-        return self.provider.generate_full_video(script, output_path)
+        return self.provider.generate_full_video(
+            script,
+            output_path,
+            resume_from=resume_from,
+            progress_manager=progress_manager,
+        )
 
     def check_provider(self) -> bool:
         """Verifica que el provider está disponible."""

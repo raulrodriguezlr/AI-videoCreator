@@ -16,6 +16,7 @@ Setup guide: See README.md section "Configuración de Ovi (Local)"
 import os
 import json
 import time
+import subprocess
 import httpx
 from typing import Optional, List, Dict, Any
 
@@ -121,6 +122,8 @@ class OviProvider(BaseVideoProvider):
         self,
         script: Dict[str, Any],
         output_path: str,
+        resume_from: int = 0,
+        progress_manager=None,
     ) -> str:
         """Generate full video by creating each scene individually."""
         scenes = script.get("scenes", [])
@@ -303,7 +306,6 @@ class OviProvider(BaseVideoProvider):
     def _concatenate_clips(self, clips: List[VideoClip], output_path: str) -> str:
         """Concatenate clips using ffmpeg."""
         try:
-            import subprocess
 
             concat_list = os.path.join(self.assets_dir, "_concat_list.txt")
             with open(concat_list, "w") as f:

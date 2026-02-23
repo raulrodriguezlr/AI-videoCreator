@@ -106,15 +106,22 @@ class BaseVideoProvider(ABC):
         self,
         script: Dict[str, Any],
         output_path: str,
+        resume_from: int = 0,
+        progress_manager=None,
     ) -> str:
         """
         Orchestrate full video generation from a structured script.
         Uses Scene Builder logic: generate first scene, then chain
         extend/jump_to for subsequent scenes.
 
+        Supports resuming from a specific scene index if generation
+        was previously interrupted (e.g., rate limit).
+
         Args:
             script: Full script dict with scenes, camera metadata, etc.
             output_path: Path where the final video will be saved.
+            resume_from: Scene index to resume from (0 = start fresh).
+            progress_manager: Optional ProgressManager for state persistence.
 
         Returns:
             Path to the final assembled video file.
