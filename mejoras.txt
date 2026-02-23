@@ -1,0 +1,6 @@
+Convertirlo en micro servicios con docker y docker compose
+Quiero hacer una api rest con fastapi y que se pueda ejecutar con docker y docker compose el nucleo de la aplicacion.
+Quiero hacer unas tools para aprovechar los clips y los topicos para cuando se queda pillado. Algo para unir clips, reutilizar clips, topicos, generar o borrar topicos.
+Las salidas de los videos enumerados en carpetas de episodio 1 y dentro de eso los subclips con sus indices nominales y numerales. 
+Crear interfaz web interactiva para poder ver los clis, topicos, juntarlos, editar topicos, generar o borrar topicos. Crear topicos nuevos, generando plantillas json y subiendolas.
+Hacer que aparte de interactiva, que pueda todo por parametros para automatizar por workflow por input output.

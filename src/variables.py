@@ -1,59 +1,91 @@
+"""
+variables.py — Configuración centralizada del proyecto AI-videoCreator v2.0
+
+TODAS las configuraciones van aquí. No hay configuración hardcoded en ningún otro archivo.
+Edita este archivo para cambiar el comportamiento del pipeline.
+
+Requiere: .env con GOOGLE_API_KEY
+"""
+
 import os
+from dotenv import load_dotenv
 
-# --- LLM / SCRIPTING ---
-# Model to use for script generation. 
-# Options: 'gemini-1.5-pro', 'gemini-3-pro-preview', 'gemini-pro'
-GEMINI_MODEL_NAME = "gemini-3-pro-preview"
+load_dotenv()
 
-# --- AUDIO / TTS ---
-# Default Voice ID (Adam) if none is specified in character config
-ELEVENLABS_DEFAULT_VOICE_ID = "nPczCjzI2devNBz1zQrb" 
+# ==========================
+# PIPELINE — Selección de provider
+# ==========================
+# 'veo' = Google Veo 3.1 API (producción, cloud, genera audio nativo)
+# 'ovi' = ComfyUI local (testing, dev, no gasta tokens)
+VIDEO_PROVIDER = "veo"
 
-# Specific Voices
-VOICE_ID_GEORGE = "JBFqnCBsd6RMkjVDRZzb" # Warm, Storyteller
-VOICE_ID_JESSICA = "cgSgspJ2msm6clMCkdW9" # Playful, Bright is nice for Tico 
-# Model for TTS generation
-ELEVENLABS_MODEL_ID = "eleven_multilingual_v2"
-# Voice settings
-ELEVENLABS_STABILITY = 0.5
-ELEVENLABS_SIMILARITY_BOOST = 0.75
+# ==========================
+# VEO — Google Veo 3.1 (Cloud)
+# ==========================
+# Modelos disponibles:
+#   "veo-3.1-generate-preview"        → Máxima calidad, más lento
+#   "veo-3.1-fast-generate-preview"   → Rápido, buena calidad
+#   "veo-2"                           → Anterior, sin audio nativo
+VEO_MODEL = "veo-3.1-generate-preview"
 
-# --- VISUALS / IMAGE GENERATION ---
-# Fallback mock mode if API Key is missing or for testing
-MOCK_VISUALS_ENABLED = False  # Set to False to use real image generation
-# Set to True to attempt using Gemini for mock images (if available)
-GEMINI_MOCK_IMAGES = True 
+# Resolución: "720p", "1080p", "4k"
+VEO_RESOLUTION = "720p"
 
-# Image Generation Provider: 'huggingface' (FREE), 'gemini', or 'sjinn'
-IMAGE_GENERATION_PROVIDER = "huggingface"  # Hugging Face Stable Diffusion - 100% FREE!
+# Aspect ratio: "16:9" (landscape) | "9:16" (portrait/shorts)
+VEO_ASPECT_RATIO = "16:9"
 
-# Hugging Face Configuration (FREE API - https://huggingface.co/settings/tokens)
-# Model options: 
-# - stabilityai/stable-diffusion-xl-base-1.0 (Best quality, slower)
-# - runwayml/stable-diffusion-v1-5 (Faster, good quality)
-# - CompVis/stable-diffusion-v1-4 (Fast, decent quality)
-HUGGINGFACE_IMAGE_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
-HUGGINGFACE_IMAGE_SIZE = (1024, 1024)  # Width x Height
-HUGGINGFACE_NUM_INFERENCE_STEPS = 30  # Higher = better quality but slower (20-50)
-HUGGINGFACE_GUIDANCE_SCALE = 7.5  # How closely to follow prompt (7-15)
+# Duración por clip: 4, 6 u 8 segundos
+VEO_DURATION_SECONDS = 8
 
-# Gemini Image Generation Models (for prompt enhancement only)
-GEMINI_IMAGE_MODELS = [
-    "gemini-2.5-flash-image",
-    "gemini-3-pro-image-preview",
-]
-GEMINI_IMAGE_MODEL = GEMINI_IMAGE_MODELS[0]
+# Generación de personas: "allow_all" | "allow_adult" | "dont_allow" puede que sea en minusculas
+VEO_PERSON_GENERATION = "allow_adult"
 
-# Image generation parameters
-IMAGE_GENERATION_TIMEOUT = 60  # seconds (Stable Diffusion can take 30-60s)
-IMAGE_ASPECT_RATIO = "16:9"
-IMAGE_SAMPLE_COUNT = 1
+# Polling: cada cuántos segundos comprobar si el vídeo está listo
+VEO_POLLING_INTERVAL = 10
 
-# Legacy SJinn API (currently not implemented)
-SJINN_MODEL_QUALITY = "quality"
+# Timeout máximo de espera en segundos (6 min = 360s)
+VEO_TIMEOUT = 360
 
-# --- VIDEO ---
+# ==========================
+# OVI — Local Testing (ComfyUI)
+# ==========================
+# URL del servidor ComfyUI local
+OVI_COMFYUI_URL = "http://127.0.0.1:8188"
+
+# Cuantización del modelo: "fp4" | "fp8" | "fp16"
+# fp4 → ~10-12GB VRAM (RTX 4070 Ti)
+# fp8 → ~20-24GB VRAM
+# fp16 → ~32GB+ VRAM
+OVI_QUANTIZATION = "fp4"
+
+# Resolución para generación local (menor = menos VRAM)
+OVI_RESOLUTION = "512x512"
+
+# Timeout de espera para ComfyUI (segundos)
+OVI_TIMEOUT = 300
+
+# ==========================
+# SCENE BUILDER — Lógica de construcción de vídeo
+# ==========================
+# Usar reference images para mantener consistencia de personaje
+USE_REFERENCE_IMAGES = True
+
+# Máximo de extensiones por clip (Veo soporta hasta 20)
+SCENE_BUILDER_MAX_EXTENDS = 20
+
+# ==========================
+# LLM — Gemini (Script + Topic Generation)
+# ==========================
+GEMINI_MODEL_NAME = "gemini-3-flash-preview"
+
+# ==========================
+# OUTPUT
+# ==========================
 VIDEO_FPS = 24
-VIDEO_CODEC = "libx264"
-AUDIO_CODEC = "aac"
 
+# ==========================
+# AUTOMATION (futuro)
+# ==========================
+# 'none' | 'n8n_local' | 'opal'
+AUTOMATION_MODE = "none"
+N8N_URL = "http://localhost:5678"

@@ -1,0 +1,147 @@
+{
+  "title": "Tico y el Eco de la Cueva",
+  "summary": "Tico descubre una cueva misteriosa donde sus palabras rebotan, enseñándole que la amabilidad que entregamos al mundo es la que recibimos de vuelta.",
+  "moral": "Nuestras palabras y acciones son como un eco: si damos bondad y alegría, eso es lo que el mundo nos devolverá.",
+  "scenes": [
+    {
+      "scene_number": 1,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney style, bright morning in the Magic Forest. Tico the squirrel with his green backpack is jumping over colorful mushrooms and mossy logs. Sunbeams filter through the leaves.",
+      "audio_text": "¡Hola, amiguitos! Qué alegría verlos. Hoy Tico está explorando una parte del bosque que nunca antes había visitado.",
+      "character": "Narrador",
+      "duration_est": 12,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 2,
+      "narrative_phase": "introduction",
+      "visual_prompt": "Tico stops in front of a large, ancient stone entrance covered in sparkling blue moss. It's the entrance to a mysterious cave. Tico looks curious but cautious.",
+      "audio_text": "¡Miren! Una cueva. Tico recuerda que con paciencia y cuidado, como cuando plantó su semilla, se descubren grandes cosas. ¿Entramos?",
+      "character": "Narrador",
+      "duration_est": 10,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 3,
+      "narrative_phase": "development",
+      "visual_prompt": "Inside the cave. Magical crystals on the walls glow faintly. Tico steps on a pebble that makes a loud 'clack'. He looks around with big expressive eyes.",
+      "audio_text": "Tico se siente un poco nervioso. Todo está muy silencioso. Para darse valor, decide gritar algo.",
+      "character": "Narrador",
+      "duration_est": 10,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 4,
+      "narrative_phase": "development",
+      "visual_prompt": "Tico puts his hands around his mouth and shouts. He looks grumpy because he is tired of walking.",
+      "audio_text": "¡No me gusta este lugar! —grita Tico con voz un poco enfadada.",
+      "character": "Tico",
+      "duration_est": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 5,
+      "narrative_phase": "development",
+      "visual_prompt": "Close up of Tico's surprised face as a voice from the depths of the cave repeats '¡No me gusta este lugar!' with the same grumpy tone.",
+      "audio_text": "¡Oh, no! La cueva le respondió a Tico de forma muy pesada. ¿Por qué creen que la cueva suena tan enojada?",
+      "character": "Narrador",
+      "duration_est": 12,
+      "is_interactive_question": true,
+      "pause_for_answer": 5
+    },
+    {
+      "scene_number": 6,
+      "narrative_phase": "development",
+      "visual_prompt": "Tico hides behind his big bushy tail, looking scared. The glowing crystals flicker as if reacting to his mood.",
+      "audio_text": "Tico piensa que hay alguien más ahí dentro. Pero el Narrador sabe un secreto: ¡es un eco!",
+      "character": "Narrador",
+      "duration_est": 10,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 7,
+      "narrative_phase": "development",
+      "visual_prompt": "Tico looks at his backpack, remembering the shiny nut he shared to light the way for others. He begins to understand.",
+      "audio_text": "Tico recuerda: si compartes luz, recibes luz. Si gritas cosas feas, escuchas cosas feas. ¿Qué pasaría si Tico dijera algo bonito?",
+      "character": "Narrador",
+      "duration_est": 12,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 8,
+      "narrative_phase": "development",
+      "visual_prompt": "Tico takes a deep breath, stands tall, and smiles broadly. The cave seems to brighten as his mood improves.",
+      "audio_text": "¡Eres una cueva muy hermosa! —dice Tico con su voz más dulce.",
+      "character": "Tico",
+      "duration_est": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 9,
+      "narrative_phase": "climax",
+      "visual_prompt": "The cave walls vibrate gently and a melodic echo returns: '...muy hermosa... hermosa...'. Tico jumps with joy as the sound feels like a warm hug.",
+      "audio_text": "¡Qué maravilla! La cueva le devolvió sus palabras amables. ¡El eco es como un espejo de nuestro corazón!",
+      "character": "Narrador",
+      "duration_est": 12,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 10,
+      "narrative_phase": "climax",
+      "visual_prompt": "Suddenly, Tico hears a tiny '¡Ayuda!' from a side tunnel. It's his friend, a little ladybug stuck in a spider web. Tico uses the echo to reassure her.",
+      "audio_text": "¡No tengas miedo, ya voy a ayudarte! —grita Tico. El eco repite '...ayudarte... ayudarte...', llenando el lugar de esperanza.",
+      "character": "Tico",
+      "duration_est": 15,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 11,
+      "narrative_phase": "climax",
+      "visual_prompt": "Tico carefully frees the ladybug using a small twig. Both are smiling. The cave crystals are now glowing with a warm golden light.",
+      "audio_text": "Gracias a sus palabras valientes y dulces, Tico rescató a su amiga. ¿Verdad que las palabras bonitas nos hacen sentir mejor a todos?",
+      "character": "Narrador",
+      "duration_est": 12,
+      "is_interactive_question": true,
+      "pause_for_answer": 5
+    },
+    {
+      "scene_number": 12,
+      "narrative_phase": "conclusion",
+      "visual_prompt": "Tico and the ladybug walking out of the cave back into the sunny forest. The cave entrance looks friendly now.",
+      "audio_text": "Tico aprendió que el mundo es como ese eco. Si tratamos a los demás con cariño, recibiremos cariño de vuelta.",
+      "character": "Narrador",
+      "duration_est": 12,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 13,
+      "narrative_phase": "conclusion",
+      "visual_prompt": "Tico waving at the camera, surrounded by his friends from previous episodes (the bird, the rabbit). The sun is setting with beautiful colors.",
+      "audio_text": "Hoy hemos aprendido una gran lección. ¡Intenten decir algo amable hoy y vean qué sucede! ¡Hasta la próxima, amiguitos!",
+      "character": "Narrador",
+      "duration_est": 12,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 14,
+      "narrative_phase": "conclusion",
+      "visual_prompt": "Close up of Tico winking and giving a 'thumbs up' with his paw. He has a glowing nut in his backpack as a reminder of his journey.",
+      "audio_text": "¡Adiós! ¡No olviden ser siempre amables!",
+      "character": "Tico",
+      "duration_est": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    }
+  ]
+}

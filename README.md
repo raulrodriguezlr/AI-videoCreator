@@ -1,344 +1,203 @@
-# AI-videoCreator 🎬
+# AI-videoCreator v2.0 🎬
 
-Sistema automatizado de generación de videos para YouTube usando IA. Arquitectura modular basada en "Pods" para soportar múltiples canales y nichos.
+Generador automático de vídeos usando IA. Crea vídeos con guión, narración y audio sincronizado de forma nativa.
 
----
+## ¿Qué hace?
 
-## ✨ Características Principales
+Le das un tema → genera un guión → genera un vídeo con audio sincronizado. Todo automático.
 
-- ✅ **Prompts Configurables** - Templates JSON con variables, sin hardcoding
-- 🤖 **Auto-generación de Topics** - LLM sugiere temas coherentes con la serie
-- 🎭 **Videos Interactivos** - Preguntas al espectador (configurable por nicho)
-- 📝 **Guiones de 180s** - Estructura narrativa completa (Intro/Desarrollo/Clímax/Conclusión)
-- 🧠 **Memoria Persistente** - Continuidad entre episodios
-- ☁️ **Cloud-Ready** - Configuración externalizada, fácil deploy
+```
+python -m src.main --pod kids_story --topic "Tico aprende sobre la paciencia"
+```
 
----
+## Arquitectura
 
-## 🛠️ Configuración Inicial
+```
+main.py (orquestador)
+  │
+  ├── TopicEngine → Gemini genera temas
+  ├── ScriptEngine → Gemini genera guion cinematográfico
+  └── VideoEngine (router)
+        │
+        ├── VeoProvider → Google Veo 3.1 API (producción)
+        │     └── Scene Builder: generate → extend → jump_to
+        │
+        └── OviProvider → ComfyUI local (testing)
+              └── GPU local, no gasta tokens
+```
 
-### 0. Crear entorno Virtual
+## Requisitos
+
+- **Python 3.10+**
+- **Google AI Pro plan** (para Veo 3.1 API)
+- **API Key de Google AI Studio**: [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+
+### Requisitos opcionales (testing local)
+
+- **ComfyUI** corriendo en `http://127.0.0.1:8188` (para OviProvider)
+- **NVIDIA GPU 12GB+** (RTX 4070 Ti o similar)
+- **ffmpeg** instalado (para concatenar clips)
+
+## Instalación
+
 ```bash
+# 1. Clonar el repo
+git clone https://github.com/raulrodriguezlr/AI-videoCreator.git
+cd AI-videoCreator
+
+# 2. Crear entorno virtual
 python -m venv .venv
-```
 
-### 1. Activar Entorno Virtual
-
-**Linux/Mac**:
-```bash
+# 3. Activar entorno
+# Windows (PowerShell):
+# Si da error de ExecutionPolicy, primero: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.venv\Scripts\Activate
+# macOS/Linux:
 source .venv/bin/activate
-```
 
-**Windows**:
-```bash
-.venv\Scripts\activate
-```
-
-### 2. Instalar Dependencias
-```bash
+# 4. Instalar dependencias
 pip install -r requirements.txt
+
+# 5. Configurar API key
+# Edita .env y pon tu GOOGLE_API_KEY
 ```
 
-### 3. Configurar Variables de Entorno
+## Configuración
 
-Crear archivo `.env` en la raíz:
+### `.env` — Secretos
+
 ```env
-GOOGLE_API_KEY=tu_clave_gemini
-ELEVENLABS_API_KEY=tu_clave_elevenlabs
-SJINN_API_KEY=tu_clave_sjinn
+GOOGLE_API_KEY=tu_api_key_de_google_ai_studio
 ```
 
----
+### `src/variables.py` — Todo lo demás
 
-## 🚀 Comandos Disponibles
+| Variable | Default | Descripción |
+|---|---|---|
+| `VIDEO_PROVIDER` | `"veo"` | Provider de vídeo: `"veo"` (cloud) o `"ovi"` (local) |
+| `VEO_MODEL` | `"veo-3.1-generate-preview"` | Modelo de Veo a usar |
+| `VEO_RESOLUTION` | `"720p"` | Resolución: `"720p"`, `"1080p"`, `"4k"` |
+| `VEO_ASPECT_RATIO` | `"16:9"` | Ratio: `"16:9"` o `"9:16"` |
+| `VEO_DURATION_SECONDS` | `8` | Segundos por clip: 4, 6 u 8 |
+| `GEMINI_MODEL_NAME` | `"gemini-2.5-flash-preview-05-20"` | Modelo Gemini para scripts |
+| `OVI_COMFYUI_URL` | `"http://127.0.0.1:8188"` | URL de ComfyUI local |
+| `OVI_QUANTIZATION` | `"fp4"` | Cuantización: `"fp4"`, `"fp8"`, `"fp16"` |
 
-### 📹 Generación de Videos
+## Uso
 
-#### 1. Modo Manual (Topic específico)
+### Crear un vídeo con tema manual
+
 ```bash
-python -m src.main --topic "Tico aprende sobre la honestidad" --pod kids_story
+python -m src.main --pod kids_story --topic "Tico aprende sobre la paciencia"
 ```
-**Qué hace**: Crea un video completo basándose en el topic que TÚ especificas.
-- Genera guion con el tema proporcionado
-- Crea visuales (imágenes)
-- Genera audio (narración)
-- Ensambla el video final
-- Guarda el episodio en memoria
 
----
+### Crear un vídeo con tema automático
 
-#### 2. Modo Auto-Topic (100% Automatizado) ⭐
 ```bash
-python -m src.main --auto-topic --pod kids_story
+python -m src.main --pod kids_story --auto-topic
 ```
-**Qué hace**: Sistema **COMPLETAMENTE AUTOMÁTICO**
-- 🧠 Analiza episodios anteriores en la memoria
-- 🎯 Genera automáticamente un topic único y coherente con la serie
-- 📝 Crea el guion basándose en ese topic
-- 🎬 Produce el video completo
-- 💾 Guarda todo en memoria
 
-**Ideal para**: Producción batch, automatización con n8n, generar contenido sin intervención manual.
+### Generar ideas de temas (sin crear vídeo)
 
----
-
-#### 3. Generar Ideas de Temas (Sin crear video)
 ```bash
-python -m src.main --generate-topics 5 --pod kids_story
-```
-**Qué hace**: Genera **solo ideas** de temas, NO crea videos
-- 💡 Genera 5 topics únicos (puedes cambiar el número)
-- 📋 Muestra: título, descripción, valor educativo, emoción objetivo
-- 🔗 Indica si referencia episodios anteriores
-- ⚡ Útil para planificar contenido futuro
-
-**Salida ejemplo**:
-```
-TEMA 1: Tico y la Importancia de Escuchar
-Descripción: Tico debe aprender a escuchar...
-Valor educativo: Habilidades de escucha activa
-Emoción: Empatía
+python -m src.main --pod kids_story --generate-topics 5
 ```
 
----
+### Verificar que el provider funciona
 
-### 🧪 Comandos de Testing
-
-#### Listar Modelos Gemini Disponibles
 ```bash
-python -m src.testing.list_models
-```
-**Qué hace**: Muestra todos los modelos Gemini disponibles con tu API key que soportan generación de contenido.
-
----
-
-#### Listar Voces ElevenLabs
-```bash
-python -m src.testing.list_voices
-```
-**Qué hace**: Lista todas las voces disponibles en tu cuenta de ElevenLabs con:
-- Nombre de la voz
-- ID (para usar en config.json)
-- Categoría
-
----
-
-#### Verificar Generación de Imágenes
-```bash
-python -m src.testing.check_image_gen
-```
-**Qué hace**: Verifica qué modelos de generación de imágenes tienes disponibles (Imagen 2.0, 3.0, etc.)
-
----
-
-#### Probar Visual Gemini
-```bash
-python -m src.testing.test_visual_gemini
-```
-**Qué hace**: Intenta generar una imagen de prueba con Gemini Imagen API para verificar que funciona.
-
----
-
-#### Probar Topic Engine
-```bash
-python -m src.engines.topic_engine 3
-```
-**Qué hace**: Genera 3 topics de prueba usando el TopicEngine (útil para debugging).
-
----
-
-#### Probar Script Engine
-```bash
-python -m src.engines.script_engine
-```
-**Qué hace**: Genera un guion de prueba con el ScriptEngine (sin crear video completo).
-
----
-
-## ⚙️ Configuración de Pods
-
-Cada pod en `pods/{nombre}/` contiene:
-
-- **`config.json`** - Configuración del canal (personajes, voces, duración, etc.)
-- **`prompts.json`** - Templates de prompts configurables
-- **`universe_memory.json`** - Memoria de episodios anteriores
-
-### Ejemplo: Configurar Interactividad
-
-**Para contenido infantil** (`interactivity_enabled: true`):
-```json
-{
-  "video_settings": {
-    "duration_seconds": 180,
-    "interactive_questions": 2,
-    "interactivity_enabled": true
-  }
-}
+python -m src.main --check-provider
 ```
 
-**Para finanzas/noticias** (`interactivity_enabled: false`):
-```json
-{
-  "video_settings": {
-    "duration_seconds": 180,
-    "interactivity_enabled": false
-  }
-}
+### Cambiar a testing local (Ovi)
+
+En `src/variables.py`:
+```python
+VIDEO_PROVIDER = "ovi"  # Cambia de "veo" a "ovi"
 ```
 
----
+Asegúrate de que ComfyUI está corriendo en `http://127.0.0.1:8188`.
 
-## 📁 Estructura del Proyecto
+## Estructura del proyecto
 
 ```
 AI-videoCreator/
-├── pods/               # Configuración por canal/nicho
-│   └── kids_story/
-│       ├── config.json      # ⚙️ Configuración del pod
-│       ├── prompts.json     # 📝 Templates de prompts
-│       ├── universe_memory.json  # 🧠 Memoria
-│       └── output/          # 📺 Videos generados
+├── .env                          # API keys (secretos)
+├── requirements.txt              # Dependencias Python
 ├── src/
-│   ├── engines/        # 🎬 Motores de generación
-│   │   ├── script_engine.py
-│   │   ├── topic_engine.py
-│   │   ├── visual_engine.py
-│   │   ├── audio_engine.py
-│   │   └── video_engine.py
-│   ├── utils/          # 🛠️ Utilidades
-│   │   ├── prompt_manager.py
-│   │   └── memory_manager.py
-│   ├── testing/        # 🧪 Scripts de prueba
-│   └── main.py         # 🚀 Orquestador principal
-├── .env                # 🔑 Variables de entorno
-└── requirements.txt
+│   ├── main.py                   # Orquestador principal
+│   ├── variables.py              # TODA la configuración
+│   ├── engines/
+│   │   ├── script_engine.py      # Gemini → Guión cinematográfico
+│   │   ├── topic_engine.py       # Gemini → Ideas de temas
+│   │   └── video_engine.py       # Router → delega al provider
+│   ├── providers/
+│   │   ├── __init__.py           # Factory (get_provider)
+│   │   ├── base_provider.py      # Clase abstracta
+│   │   ├── veo_provider.py       # Google Veo 3.1 (producción)
+│   │   └── ovi_provider.py       # ComfyUI local (testing)
+│   └── utils/
+│       ├── memory_manager.py     # Memoria episódica
+│       └── prompt_manager.py     # Templates de prompts
+├── pods/
+│   └── kids_story/
+│       ├── config.json           # Configuración del pod
+│       ├── prompts.json          # Templates de prompts
+│       ├── universe_memory.json  # Memoria de episodios
+│       ├── assets/               # Archivos generados (clips, frames)
+│       └── output/               # Vídeos finales
+└── README.md
 ```
 
----
+## Cómo funciona el Scene Builder
 
-## 🎯 Workflows Típicos
+El `VeoProvider` replica la lógica de Google Flow Scene Builder:
 
-### Workflow 1: Producción Manual
+1. **Escena 1**: Genera vídeo de cero con `generate_scene()` (texto → vídeo)
+2. **Escenas 2..N**: Para cada escena siguiente:
+   - **Extend** (misma escena, más larga): `extend_scene()` — añade +7s al clip anterior
+   - **Jump To** (corte a nueva escena): `jump_to_scene()` — extrae último frame del clip anterior → lo usa como seed visual para el siguiente clip
+3. **Character Consistency**: Usa `referenceImages` (hasta 3 imágenes de referencia por personaje)
+4. **Audio**: Veo 3.1 genera audio sincronizado nativamente (narración, diálogos, efectos)
+
+## Cómo crear un pod nuevo
+
+1. Crea una carpeta en `pods/`:
+```
+pods/mi_nuevo_pod/
+├── config.json
+├── prompts.json
+├── universe_memory.json  # {} vacío
+├── assets/
+└── output/
+```
+
+2. Copia y adapta `config.json` de `kids_story`
+3. Ejecuta:
 ```bash
-# 1. Generar ideas
-python -m src.main --generate-topics 10 --pod kids_story
-
-# 2. Elegir un topic manualmente
-python -m src.main --topic "Tico aprende a ser paciente" --pod kids_story
+python -m src.main --pod mi_nuevo_pod --auto-topic
 ```
 
----
+## Troubleshooting
 
-### Workflow 2: Producción Automatizada
-```bash
-# Generar video automáticamente (ideal para cron jobs)
-python -m src.main --auto-topic --pod kids_story
-```
+### "GOOGLE_API_KEY no encontrada"
+Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
 
----
+### "Provider 'veo' timeout"
+- Veo puede tardar hasta 6 minutos en horas punta
+- Aumenta `VEO_TIMEOUT` en `variables.py`
 
-### Workflow 3: Testing y Debugging
-```bash
-# 1. Verificar APIs
-python -m src.testing.list_models
-python -m src.testing.list_voices
+### "ComfyUI no disponible" (Ovi)
+- Verifica que ComfyUI está corriendo: `http://127.0.0.1:8188`
+- Instala el modelo Ovi/LTX-2 en ComfyUI
 
-# 2. Probar componentes individuales
-python -m src.engines.topic_engine 3
-python -m src.engines.script_engine
+### "ffmpeg no encontrado"
+- Instala ffmpeg: `choco install ffmpeg` (Windows) o `brew install ffmpeg` (macOS)
 
-# 3. Generar video completo
-python -m src.main --topic "Test" --pod kids_story
-```
+## Roadmap
 
----
-
-## 🎨 Personalización de Prompts
-
-Edita `pods/{tu_pod}/prompts.json` para cambiar:
-- Tono del narrador
-- Estructura de guiones  
-- Criterios de generación de topics
-- Estilo visual
-
-**Ejemplo**: Cambiar a tono dramático
-```json
-{
-  "script_generation": {
-    "system_role": "Eres un narrador DRAMÁTICO y TEATRAL..."
-  }
-}
-```
-
-**Sin necesidad de tocar código Python** ✨
-
----
-
-## 🐛 Troubleshooting
-
-### Error: "ModuleNotFoundError: google"
-```bash
-# Activar entorno virtual
-.venv\Scripts\activate  # Windows
-source .venv/bin/activate  # Linux/Mac
-
-# Reinstalar dependencias
-pip install -r requirements.txt
-```
-
-### Videos muy cortos
-- Ajustar `duration_seconds` en `pods/{pod}/config.json`
-
-### Prompts no se aplican
-- Verificar sintaxis JSON en `prompts.json`
-- Revisar que todas las variables `{placeholder}` estén presentes
-
-### TopicEngine no genera ideas coherentes
-- Revisar `universe_memory.json` para ver episodios guardados
-- Ajustar prompts en `prompts.json` sección `topic_generation`
-
----
-
-## 📚 Documentación Adicional
-
-Ver carpeta `brain/` para:
-- `walkthrough.md` - Guía completa de cambios
-- `implementation_plan.md` - Plan técnico detallado
-- `refactoring_comparison.md` - Antes vs Después visual
-- `task.md` - Checklist de progreso
-
----
-
-## 🔄 Integración con n8n (Futuro)
-
-```javascript
-// Webhook trigger en n8n
-{
-  "command": "python -m src.main --auto-topic --pod kids_story",
-  "schedule": "0 9 * * *"  // Diario a las 9am
-}
-```
-
----
-
-## 🤝 Contribuir
-
-1. Fork el proyecto
-2. Crea una rama para tu feature
-3. Commit tus cambios
-4. Push y crea un Pull Request
-
----
-
-## 📄 Licencia
-
-Ver archivo `LICENSE`
-
----
-
-## 🆘 Soporte
-
-Para problemas o preguntas:
-1. Revisar troubleshooting arriba
-2. Consultar `walkthrough.md` para detalles técnicos
-3. Abrir un issue en GitHub
+- [ ] Automatización con n8n (local/cloud)
+- [ ] Google Opal integration
+- [ ] Modelos de vídeo adicionales (providers)
+- [ ] LoRA para character consistency local
+- [ ] Publicación automática a YouTube

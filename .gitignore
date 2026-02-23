@@ -1,25 +1,55 @@
-.venv
+# =======================
+# AI-videoCreator .gitignore
+# =======================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# --- Virtual Environment ---
+.venv/
+venv/
+env/
+
+# --- Environment & Secrets ---
 .env
+.env.local
+.env.production
 
-*.png
-*.mp3
+# --- Generated Assets (regenerable) ---
+pods/*/assets/*.png
+pods/*/assets/*.mp3
+pods/*/assets/*.mp4
+pods/*/output/
+
+# --- Media files (generated, not source) ---
 *.mp4
-*.pyc
-# GSD State Files
-.gsd/ARCHITECTURE.md
-.gsd/DECISIONS.md
-.gsd/JOURNAL.md
-.gsd/ROADMAP.md
-.gsd/SPEC.md
-.gsd/STACK.md
-.gsd/STATE.md
-.gsd/TODO.md
+*.mp3
+*.wav
 
-#docs
-#GSD-STYLE.md
-#.agent
-#.gemini
-#model_capabilities.yaml
-# OS generated
-Thumbs.db
+# --- PDFs (generated docs) ---
+*.pdf
+
+# --- OS generated ---
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- GSD State Files ---
+.gsd/
+
+# --- Agent/AI tool configs ---
+# .agent
+# .gemini
+# model_capabilities.yaml
