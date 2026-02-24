@@ -110,16 +110,9 @@ class VeoProvider(BaseVideoProvider):
         """
         config = self._build_config(mode=mode)
 
-        # Smart model selection based on narrative_phase
-        model = VEO_MODEL
-        if SMART_MODEL_SELECTION and narrative_phase:
-            tier = SCENE_TIER_MAP.get(narrative_phase)
-            if tier:
-                model = TIER_MODEL_MAP.get(tier, VEO_MODEL)
-                print(f"[VEO]    🎯 Tier: {tier} ({narrative_phase}) → {model}")
-
+        # Base parameters
         gen_params = {
-            "model": model,
+            "model": VEO_MODEL,
             "prompt": prompt,
             "config": config,
         }
@@ -162,15 +155,29 @@ class VeoProvider(BaseVideoProvider):
         Uses referenceImages for character consistency if provided.
         """
         print(f"[VEO] 🎬 Generando escena: '{prompt[:80]}...'")
-        print(f"[VEO]    Modelo: {VEO_MODEL} | Duración: {duration}s | Resolución: {VEO_RESOLUTION}")
+
+        # Smart model selection
+        model = VEO_MODEL
+        if SMART_MODEL_SELECTION and narrative_phase:
+            tier = SCENE_TIER_MAP.get(narrative_phase)
+            if tier:
+                model = TIER_MODEL_MAP.get(tier, VEO_MODEL)
+                print(f"[VEO]    🎯 Tier: {tier} ({narrative_phase}) → {model}")
+
+        print(f"[VEO]    Modelo: {model} | Duración: {duration}s | Resolución: {VEO_RESOLUTION}")
 
         gen_params = self._build_gen_params(
             prompt=prompt,
             mode="text",
             reference_images=reference_images,
             negative_prompt=negative_prompt,
-            narrative_phase=narrative_phase,
         )
+        # Override model for smart selection
+        if SMART_MODEL_SELECTION and narrative_phase:
+            tier = SCENE_TIER_MAP.get(narrative_phase)
+            if tier:
+                selected = TIER_MODEL_MAP.get(tier, VEO_MODEL)
+                gen_params["model"] = selected
 
         operation = self.client.models.generate_videos(**gen_params)
         return self._poll_and_download(
@@ -187,8 +194,7 @@ class VeoProvider(BaseVideoProvider):
         narrative_phase: str = "",
     ) -> VideoClip:
         """
-        Extend an existing Veo-generated video by ~7 seconds.
-        Can be called up to 20 times for max ~148s total.
+        Extend an existing Veo-generated video.
         """
         print(f"[VEO] 🔄 Extendiendo escena: '{prompt[:60]}...'")
 
@@ -202,7 +208,6 @@ class VeoProvider(BaseVideoProvider):
             prompt=prompt,
             mode="extend",
             video=video_clip.video_ref,
-            narrative_phase=narrative_phase,
         )
 
         operation = self.client.models.generate_videos(**gen_params)
@@ -222,8 +227,8 @@ class VeoProvider(BaseVideoProvider):
     ) -> VideoClip:
         """
         Create a new scene using the last frame of the previous clip.
-        Extracts the last frame → passes as image input to Veo.
-        This replicates Google Flow's "Jump To" feature.
+        Extracts the last frame -> passes as image input to Veo.
+        This replicates Google Flow's Jump To feature.
         """
         print(f"[VEO] ⏭️  Jump To nueva escena: '{prompt[:60]}...'")
 
@@ -239,10 +244,9 @@ class VeoProvider(BaseVideoProvider):
 
         gen_params = self._build_gen_params(
             prompt=prompt,
-            mode="image",  # image-to-video: NO person_generation
+            mode="image",
             image=last_frame,
             reference_images=reference_images,
-            narrative_phase=narrative_phase,
         )
 
         operation = self.client.models.generate_videos(**gen_params)
@@ -315,7 +319,8 @@ class VeoProvider(BaseVideoProvider):
             if i < resume_from:
                 continue
 
-            prompt = self._build_cinematographic_prompt(scene)
+            narrative_phase = scene.get("narrative_phase", "")
+            prompt = self._build_cinematographic_prompt(scene, narrative_phase)
             negative = scene.get("negative_prompt")
             transition = scene.get("transition_to_next", "jump")
 
@@ -323,7 +328,6 @@ class VeoProvider(BaseVideoProvider):
 
             try:
                 scene_num_str = f"{scene_num:02d}"
-                narrative_phase = scene.get("narrative_phase", "")
 
                 if i == 0 or not clips:
                     # First scene or no previous clips: pure text-to-video
@@ -373,7 +377,6 @@ class VeoProvider(BaseVideoProvider):
                 print(f"[VEO] ❌ Error en escena {scene_num}: {error_msg[:120]}")
 
                 if is_rate_limit_error(e):
-                    # Try rotating to another API key
                     if self.key_manager.rotate_key(error_msg):
                         self.client = self.key_manager.get_client()
                         print(f"[VEO] 🔄 Reintentando escena {scene_num} con {self.key_manager.get_key_label()}...")
@@ -480,9 +483,19 @@ class VeoProvider(BaseVideoProvider):
             print(f"[VEO] ⏳ Esperando... ({elapsed}s)")
             time.sleep(VEO_POLLING_INTERVAL)
             elapsed += VEO_POLLING_INTERVAL
-            operation = self.client.operations.get(operation)
+            operation = self.client.operations.get(operation=operation)
+
+        # Check for backend errors
+        if hasattr(operation, "error") and operation.error:
+            raise RuntimeError(f"Backend API Error: {operation.error}")
+
+        if not hasattr(operation, "response") or not operation.response:
+            raise RuntimeError("Backend returned an empty response with no errors.")
 
         # Download the generated video
+        if not hasattr(operation.response, "generated_videos") or not operation.response.generated_videos:
+            raise RuntimeError("Backend response did not contain 'generated_videos'.")
+
         generated = operation.response.generated_videos[0]
         self.client.files.download(file=generated.video)
 
@@ -553,10 +566,18 @@ class VeoProvider(BaseVideoProvider):
         for path in image_paths[:3]:  # Max 3 reference images
             if os.path.exists(path):
                 try:
-                    img = PILImage.open(path)
+                    with open(path, "rb") as f:
+                        image_bytes = f.read()
+                        
+                    ext = os.path.splitext(path)[1].lower()
+                    mime_type = "image/png" if ext == ".png" else "image/jpeg"
+                    
                     ref_images.append(
                         types.VideoGenerationReferenceImage(
-                            image=img,
+                            image=types.Image(
+                                image_bytes=image_bytes,
+                                mime_type=mime_type,
+                            ),
                             reference_type="asset",
                         )
                     )
@@ -576,14 +597,23 @@ class VeoProvider(BaseVideoProvider):
                     ref_images.append(full_path)
         return ref_images
 
-    def _build_cinematographic_prompt(self, scene: dict) -> str:
+    def _build_cinematographic_prompt(self, scene: dict, narrative_phase: str = "") -> str:
         """
         Build a detailed cinematographic prompt from scene metadata.
         Combines visual_prompt with camera, mood, lighting, and audio info.
-        Veo 3.1 generates synchronized audio — the prompt must include
-        voice direction and dialogue for proper audio generation.
+        If the assigned model does not support audio (e.g., Veo 2), audio text is stripped
+        so it doesn't get incorrectly rendered as onscreen text.
         """
         parts = []
+
+        # Determine target model to check audio support
+        model = VEO_MODEL
+        if SMART_MODEL_SELECTION and narrative_phase:
+            tier = SCENE_TIER_MAP.get(narrative_phase)
+            if tier:
+                model = TIER_MODEL_MAP.get(tier, VEO_MODEL)
+                
+        is_audio_supported = "veo-3" in model
 
         # Camera metadata
         camera = scene.get("camera", {})
@@ -610,20 +640,20 @@ class VeoProvider(BaseVideoProvider):
         visual_prompt = scene.get("visual_prompt", scene.get("narration", ""))
         parts.append(visual_prompt)
 
-        # Audio/dialogue with voice direction (Veo 3.1 generates audio natively)
+        # Audio/dialogue with voice direction
         character = scene.get("character", "")
         audio_text = scene.get("audio_text", "")
         voice_direction = scene.get("voice_direction", "")
 
-        if audio_text:
+        if audio_text and is_audio_supported:
             if character and character.lower() != "narrator":
-                # Character dialogue — Veo needs clear voice attribution
+                # Character dialogue
                 voice_desc = f" ({voice_direction})" if voice_direction else ""
                 parts.append(f'{character}{voice_desc} says: "{audio_text}"')
             else:
-                # Narrator — warm adult voice by default
+                # Narrator (Off-screen voiceover prevents character lip-sync)
                 voice_desc = f" ({voice_direction})" if voice_direction else " (warm adult male voice)"
-                parts.append(f'Narrator{voice_desc}: "{audio_text}"')
+                parts.append(f'Off-screen voiceover narration{voice_desc}: "{audio_text}"')
 
         # Art style from config
         art_style = self.config.get("consistency", {}).get("art_style", "")

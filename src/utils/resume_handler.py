@@ -19,7 +19,8 @@ def resume_episode(resume_value: str, pod_name: str = None):
         resume_value: "last" for auto-detect, or explicit path to episode dir.
         pod_name: Pod name (required when resume_value is "last").
     """
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # File is in src/utils/resume_handler.py, so root is 3 levels up
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
     # --- Smart mode: "last" → find latest incomplete ---
     if resume_value == "last":
@@ -83,6 +84,7 @@ def resume_episode(resume_value: str, pod_name: str = None):
         final_video_path = video_engine.generate(
             script,
             output_path=os.path.join(episode_dir, "final.mp4"),
+            episode_dir=episode_dir,
             resume_from=resume_from,
             progress_manager=progress,
         )

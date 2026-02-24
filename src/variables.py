@@ -102,15 +102,21 @@ SCENE_TIER_MAP = {
 
 # tier → modelo Veo
 TIER_MODEL_MAP = {
-    "hero": "veo-3.0-generate-001",
-    "standard": "veo-3.0-fast-generate-001",
-    "filler": "veo-2.0-generate-001",
+    "hero": "veo-3.1-generate-preview",
+    "standard": "veo-3.1-generate-preview",
+    "filler": "veo-3.1-generate-preview",
 }
+
+# ==========================
+# AUDIO MODEL — Lyria / Gemini Audio
+# ==========================
+LYRIA_MODEL = "gemini-2.0-flash-exp"
 
 # ==========================
 # LLM — Gemini (Script + Topic Generation)
 # ==========================
-GEMINI_MODEL_NAME = "gemini-3-flash-preview"
+GEMINI_MODEL_NAME = "gemini-3.1-pro-preview"
+#"gemini-3-pro-preview"
 
 # ==========================
 # OUTPUT

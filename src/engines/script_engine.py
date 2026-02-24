@@ -105,6 +105,10 @@ class ScriptGenerator:
 
             script_data = json.loads(response.text)
 
+            # Gemini sometimes wraps the response in a list
+            if isinstance(script_data, list) and len(script_data) > 0:
+                script_data = script_data[0]
+
             # Post-process: ensure interactive questions have pause
             if interactivity_enabled and "scenes" in script_data:
                 for scene in script_data["scenes"]:

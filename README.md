@@ -108,6 +108,11 @@ python -m src.main --pod kids_story --generate-topics 5
 ```bash
 python -m src.main --check-provider
 ```
+### Lanzar el modo interactivo
+
+```bash
+python -m src.main --pod kids_story --interactive
+```
 
 ### Cambiar a testing local (Ovi)
 

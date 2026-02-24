@@ -6,14 +6,15 @@
       "title": "Título atractivo del episodio",
       "summary": "Resumen ejecutivo en 1-2 frases para la memoria del sistema",
       "moral": "Moraleja o lección aprendida en el episodio",
+      "ambient_audio_prompt": "Prompt en INGLÉS para generar música o FX de fondo (ej: 'Cheerful acoustic guitar'). Déjalo VACÍO ('') si no requiere audio extra.",
       "scenes": [
         {
           "scene_number": 1,
           "narrative_phase": "introduction | establishing | rising_action | climax | falling_action | resolution | transition",
-          "visual_prompt": "Detailed cinematographic description in ENGLISH: characters, actions, setting, expressions, art style",
-          "audio_text": "Texto exacto que se escuchará (español). Diálogos entre comillas si es un personaje.",
-          "character": "Narrator | Tico | (nombre del personaje que habla)",
-          "voice_direction": "Indicación de tono: voz cálida, emocionada, suspense, etc.",
+          "visual_prompt": "Detailed cinematographic description in ENGLISH: characters, actions, setting, expressions, art style. NO TEXT, NO SUBTITLES, NO WATERMARKS.",
+          "audio_text": "Texto a escuchar (español). Diálogos entre comillas si es un personaje. Narración sin comillas.",
+          "character": "Narrator | Tico | (nombre)",
+          "voice_direction": "Indicación de tono (ej: calmada, alegre) o VACÍO",
           "camera": {
             "shot_type": "wide | medium | close-up | extreme_close_up | aerial",
             "movement": "static | pan_left | pan_right | tracking | dolly_in | dolly_out | crane_up",
@@ -45,7 +46,7 @@
     }
   },
   "visual_generation": {
-    "base_style": "{art_style}, vibrant colors, child-friendly aesthetic, no scary elements, high quality render, detailed textures",
+    "base_style": "{art_style}, vibrant colors, child-friendly aesthetic, no scary elements, high quality render, detailed textures, absolutely NO text, NO watermarks, NO subtitles, NO letters",
     "scene_template": "{scene_description}. Artistic style: {art_style}. Setting/Location: {setting}. Characters present: {characters_in_scene}. Mood/Atmosphere: {mood}. Lighting: {lighting}, cinematic quality."
   }
 }

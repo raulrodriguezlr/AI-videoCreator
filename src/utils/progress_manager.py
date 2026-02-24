@@ -146,7 +146,7 @@ class ProgressManager:
                 "timestamp": datetime.now().isoformat(),
             })
 
-            progress["resume_from_scene"] = scene_index
+            progress["resume_from_scene"] = self._next_pending_scene(progress)
 
             # If rate limit, mark all remaining as pending and stop
             if is_rate_limit:

@@ -15,6 +15,8 @@ import os
 import json
 from src.providers import get_provider
 from src.variables import VIDEO_PROVIDER
+from src.providers.lyria_provider import LyriaProvider
+from src.utils.audio_mixer import AudioMixer
 
 
 class VideoEngine:
@@ -61,13 +63,45 @@ class VideoEngine:
             title = script.get("title", "video").replace(" ", "_")
             output_path = os.path.join(self.output_dir, f"{title}.mp4")
 
-        return self.provider.generate_full_video(
+        # 1. Generate full video sequence using Provider (Veo or Ovi)
+        final_video_path = self.provider.generate_full_video(
             script,
             output_path,
             episode_dir=episode_dir,
             resume_from=resume_from,
             progress_manager=progress_manager,
         )
+
+        # 2. Generate ambient background music using Lyria
+        audio_prompt = script.get("ambient_audio_prompt", "").strip()
+        
+        if audio_prompt and os.path.exists(final_video_path):
+            audio_dir = os.path.join(episode_dir, "audio") if episode_dir else self.output_dir
+            lyria = LyriaProvider(output_dir=audio_dir)
+            
+            audio_file = f"bg_{os.path.basename(output_path).replace('.mp4', '.wav')}"
+            
+            generated_audio_path = lyria.generate_ambient_audio(audio_prompt, audio_file)
+            
+            # 3. Mix audio and video together
+            if generated_audio_path:
+                mixed_output = final_video_path.replace(".mp4", "_mixed.mp4")
+                mixed_video_path = AudioMixer.mix_audio_to_video(
+                    video_path=final_video_path,
+                    audio_path=generated_audio_path,
+                    output_path=mixed_output,
+                    audio_volume=0.3  # Background volume level
+                )
+                
+                # Replace the original video output with the mixed one
+                if os.path.exists(mixed_video_path) and mixed_video_path != final_video_path:
+                    try:
+                        os.replace(mixed_video_path, final_video_path)
+                        print(f"[VideoEngine] 🎵 Audio añadido al vídeo final exitosamente.")
+                    except OSError as e:
+                        print(f"[VideoEngine] ⚠️  No se pudo renombrar vídeo mezclado: {e}")
+
+        return final_video_path
 
     def check_provider(self) -> bool:
         """Verifica que el provider está disponible."""

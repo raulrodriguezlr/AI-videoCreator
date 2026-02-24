@@ -22,6 +22,7 @@ from src.engines.video_engine import VideoEngine
 from src.engines.topic_engine import TopicEngine
 from src.utils.api_key_manager import get_api_key_manager
 from src.utils.episode_manager import EpisodeManager
+from src.utils.topic_manager import TopicManager
 from src.utils.memory_manager import MemoryManager
 from src.utils.progress_manager import ProgressManager
 from src.utils.resume_handler import resume_episode
@@ -29,6 +30,130 @@ from src.variables import VIDEO_PROVIDER, OVI_COMFYUI_URL
 
 # Load env vars
 load_dotenv()
+
+
+def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
+    """
+    Menú interactivo completo (Fase 6).
+    """
+    while True:
+        print(f"\n{'='*60}")
+        print(f"🎬 AI-videoCreator — Pod: {pod_name}")
+        print(f"{'='*60}")
+        print("\n¿Qué quieres hacer?")
+        print("1. 📝 Ver temas disponibles")
+        print("2. 🆕 Generar nuevos temas con IA")
+        print("3. ▶️  Crear vídeo completo (Auto Topic)")
+        print("4. 🔄 Continuar episodio incompleto")
+        print("5. 📋 Ver episodios generados")
+        print("6. ❌ Borrar un tema")
+        print("0. Salir")
+        
+        choice = input("\n> ").strip()
+
+        if choice == "0":
+            break
+        elif choice == "1":
+            topic_mgr.print_topics_table()
+        elif choice == "2":
+            count_str = input("¿Cuántos temas quieres generar? [3]: ").strip()
+            count = int(count_str) if count_str.isdigit() else 3
+            print(f"🧠 Generando {count} temas...")
+            engine = TopicEngine(pod_config_path)
+            topics = engine.generate_topics(count)
+            if topics:
+                added = topic_mgr.add_topics(topics)
+                print(f"✅ Guardados {added} temas nuevos.")
+                topic_mgr.print_topics_table()
+        elif choice == "3":
+            # Delegate to standard flow but with auto_topic
+            topic_data = topic_mgr.pick_next()
+            if not topic_data:
+                print("⚠️ No hay temas pendientes. Generando uno automáticamente...")
+                engine = TopicEngine(pod_config_path)
+                topics = engine.generate_topics(3)
+                if topics:
+                    topic_mgr.add_topics(topics)
+                    topic_data = topic_mgr.pick_next()
+                
+            if not topic_data:
+                print("❌ Error: No se pudo generar un tema automáticamente.")
+            else:
+                print(f"✅ Usando tema: {topic_data['title']}")
+                prompt_full_video(pod_name, pod_config_path, topic_data['title'], topic_mgr, episode_mgr, topic_id=topic_data['id'])
+        elif choice == "4":
+            episode_mgr.print_episodes_table()
+            ep = input("ID de episodio a continuar (ej: ep_001_...): ").strip()
+            if ep:
+                resume_episode(os.path.join("pods", pod_name, "output", ep), pod_name)
+        elif choice == "5":
+            episode_mgr.print_episodes_table()
+        elif choice == "6":
+            topic_mgr.print_topics_table()
+            tid = input("ID del tema a borrar (ej: topic_001): ").strip()
+            if tid and topic_mgr.delete_topic(tid):
+                print("✅ Borrado correctamente.")
+            elif tid:
+                print("❌ No encontrado.")
+        else:
+            print("❌ Opción no válida.")
+
+def prompt_full_video(pod_name, pod_config_path, topic, topic_mgr, episode_mgr, topic_id=None):
+    """Ejecuta el pipeline completo de vídeo (extraído de main para reutilización)."""
+    print(f"\n📝 Tema del episodio: {topic}\n")
+    print("--- PASO 1/3: GENERACIÓN DE GUIÓN ---")
+    script_engine = ScriptGenerator(pod_config_path)
+
+    script = script_engine.generate_script(topic)
+    if not script:
+        print("❌ Error generando guion. Abortando pipeline.")
+        return
+
+    print(f"✅ Guion generado: '{script.get('title')}'")
+    print(f"   Escenas: {len(script.get('scenes', []))}\n")
+
+    episode = episode_mgr.create_episode(topic, script)
+    episode_id = episode["episode_id"]
+    episode_dir = episode["episode_dir"]
+
+    if topic_id:
+        topic_mgr.mark_in_progress(topic_id, episode_id)
+
+    # También guarda un last_script por compat
+    with open(os.path.join(os.path.dirname(pod_config_path), "last_script.json"), "w", encoding="utf-8") as f:
+        json.dump(script, f, indent=2, ensure_ascii=False)
+
+    print("--- PASO 2/3: GENERACIÓN DE VÍDEO ---")
+    progress = ProgressManager(episode_dir)
+    progress.create_progress(
+        episode_id=episode_id,
+        topic=topic,
+        script=script,
+        total_scenes=len(script.get("scenes", [])),
+    )
+
+    video_engine = VideoEngine(pod_config_path)
+    try:
+        final_video_path = video_engine.generate(
+            script,
+            output_path=os.path.join(episode_dir, "final.mp4"),
+            episode_dir=episode_dir,
+            progress_manager=progress,
+        )
+        print(f"✅ Vídeo generado: {final_video_path}\n")
+        
+        if topic_id:
+            topic_mgr.mark_completed(topic_id, episode_id)
+            
+    except Exception as e:
+        print(f"❌ Error en generación de vídeo: {e}")
+        print(f"📊 Estado guardado en: {episode_dir}/progress.json")
+        print(f"   Puedes continuar usando la Opción 4 del menú interactivo o flag --resume")
+        return
+
+    print("--- PASO 3/3: GUARDANDO EN MEMORIA ---")
+    script_engine.save_episode_to_memory(script)
+    print(f"✅ Episodio guardado en memoria.\n")
 
 
 def main():
@@ -60,6 +185,20 @@ def main():
         const="last",
         metavar="EPISODE_DIR",
         help="Continuar episodio incompleto. Usa 'last' con --pod para el más reciente, o pasa la carpeta exacta Ej: python -m src.main --pod kids_story --resume last o python -m src.main --resume pods/kids_story/output/ep_001_tico_paciencia",
+    )
+    
+    # --- Nuevos comandos (Fase 6) ---
+    parser.add_argument(
+        "--list-topics", action="store_true", help="Mostrar tabla de temas generados"
+    )
+    parser.add_argument(
+        "--list-episodes", action="store_true", help="Mostrar tabla de episodios"
+    )
+    parser.add_argument(
+        "--delete-topic", type=str, metavar="TOPIC_ID", help="Eliminar un tema por ID"
+    )
+    parser.add_argument(
+        "--interactive", action="store_true", help="Iniciar menú interactivo"
     )
     args = parser.parse_args()
 
@@ -102,10 +241,36 @@ def main():
     # Paths
     base_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(base_dir)
-    pod_config_path = os.path.join(project_root, "pods", args.pod, "config.json")
+    pod_dir = os.path.join(project_root, "pods", args.pod)
+    pod_config_path = os.path.join(pod_dir, "config.json")
 
     if not os.path.exists(pod_config_path):
         print(f"❌ Error: No se encontró configuración para pod '{args.pod}' en {pod_config_path}")
+        return
+
+    topic_mgr = TopicManager(pod_dir)
+    episode_mgr = EpisodeManager(pod_dir)
+
+    # --- Mode: Direct CLI commands ---
+    if args.list_topics:
+        print(f"📋 Temas para pod '{args.pod}':")
+        topic_mgr.print_topics_table()
+        return
+
+    if args.list_episodes:
+        print(f"🎬 Episodios para pod '{args.pod}':")
+        episode_mgr.print_episodes_table()
+        return
+
+    if args.delete_topic:
+        if topic_mgr.delete_topic(args.delete_topic):
+            print(f"✅ Tema eliminado: {args.delete_topic}")
+        else:
+            print(f"❌ No se encontró el tema: {args.delete_topic}")
+        return
+
+    if args.interactive:
+        run_interactive_menu(args.pod, pod_config_path, topic_mgr, episode_mgr)
         return
 
     # --- Mode: Generate topics only ---
@@ -115,17 +280,9 @@ def main():
         topics = topic_engine.generate_topics(count=args.generate_topics)
 
         if topics:
-            print(f"\n✅ {len(topics)} temas generados:\n")
-            for idx, topic in enumerate(topics, 1):
-                print(f"{'='*60}")
-                print(f"TEMA {idx}: {topic.get('title')}")
-                print(f"{'='*60}")
-                print(f"Descripción: {topic.get('description')}")
-                print(f"Valor educativo: {topic.get('educational_value')}")
-                print(f"Emoción: {topic.get('target_emotion')}")
-                if topic.get("references_episode"):
-                    print(f"Referencia: {topic['references_episode']}")
-                print()
+            added = topic_mgr.add_topics(topics)
+            print(f"\n✅ {len(topics)} temas generados ({added} nuevos guardados):\n")
+            topic_mgr.print_topics_table()
         else:
             print("❌ No se pudieron generar temas")
         return
@@ -138,17 +295,26 @@ def main():
     print(f"{'='*60}\n")
 
     # Step 1: Determine topic
+    topic_id = None
     if args.auto_topic:
-        print("🧠 Generando tema automáticamente...")
-        topic_engine = TopicEngine(pod_config_path)
-        topic_data = topic_engine.get_next_topic()
+        print("🧠 Obteniendo siguiente tema...")
+        topic_data = topic_mgr.pick_next()
+
+        if not topic_data:
+            print("⚠️ No hay temas pendientes. Generando de forma automática...")
+            topic_engine = TopicEngine(pod_config_path)
+            topics = topic_engine.generate_topics(count=3)
+            if topics:
+                topic_mgr.add_topics(topics)
+                topic_data = topic_mgr.pick_next()
 
         if not topic_data:
             print("❌ Error: No se pudo generar un topic automáticamente")
             return
 
         topic = topic_data.get("title")
-        print(f"✅ Topic: {topic}")
+        topic_id = topic_data.get("id")
+        print(f"✅ Topic seleccionado: {topic}")
         print(f"   Descripción: {topic_data.get('description')}\n")
     elif args.topic:
         topic = args.topic
@@ -156,75 +322,7 @@ def main():
         print("⚠️  No se especificó --topic ni --auto-topic, usando tema por defecto...")
         topic = "Tico aprende sobre la perseverancia"
 
-    print(f"📝 Tema del episodio: {topic}\n")
-
-    # Step 2: Script Generation
-    print("--- PASO 1/3: GENERACIÓN DE GUIÓN ---")
-    script_engine = ScriptGenerator(pod_config_path)
-
-    script = script_engine.generate_script(topic)
-    if not script:
-        print("❌ Error generando guion. Abortando pipeline.")
-        return
-
-    print(f"✅ Guion generado: '{script.get('title')}'")
-    print(f"   Escenas: {len(script.get('scenes', []))}")
-    print(f"   Moraleja: {script.get('moral', 'N/A')}\n")
-
-    # Create episode via EpisodeManager
-    pod_dir = os.path.dirname(pod_config_path)
-    episode_mgr = EpisodeManager(pod_dir)
-    episode = episode_mgr.create_episode(topic, script)
-
-    episode_id = episode["episode_id"]
-    episode_dir = episode["episode_dir"]
-
-    # Also save as last_script for backwards compat
-    last_script_path = os.path.join(pod_dir, "last_script.json")
-    with open(last_script_path, "w", encoding="utf-8") as f:
-        json.dump(script, f, indent=2, ensure_ascii=False)
-
-    # Step 3: Video Generation (native, with audio) — WITH PROGRESS TRACKING
-    print("--- PASO 2/3: GENERACIÓN DE VÍDEO ---")
-
-    progress = ProgressManager(episode_dir)
-    progress.create_progress(
-        episode_id=episode_id,
-        topic=topic,
-        script=script,
-        total_scenes=len(script.get("scenes", [])),
-    )
-
-    video_engine = VideoEngine(pod_config_path)
-
-    try:
-        final_video_path = video_engine.generate(
-            script,
-            output_path=os.path.join(episode_dir, "final.mp4"),
-            episode_dir=episode_dir,
-            progress_manager=progress,
-        )
-        print(f"✅ Vídeo generado: {final_video_path}\n")
-    except Exception as e:
-        print(f"❌ Error en generación de vídeo: {e}")
-        print(f"📊 Estado guardado en: {episode_dir}/progress.json")
-        print(f"   Usa --resume {episode_dir} para continuar")
-        print(f"\n{progress.get_status_summary()}")
-        return
-
-    # Step 4: Save to Memory
-    print("--- PASO 3/3: GUARDANDO EN MEMORIA ---")
-    script_engine.save_episode_to_memory(script)
-    print(f"✅ Episodio guardado en memoria del universo\n")
-
-    print(f"{'='*60}")
-    print(f"✅ PROCESO COMPLETADO")
-    print(f"{'='*60}")
-    print(f"📺 Video: {final_video_path}")
-    print(f"📁 Episodio: {episode_dir}")
-    print(f"📝 Título: {script.get('title')}")
-    print(f"🎬 Escenas: {len(script.get('scenes', []))}")
-    print()
+    prompt_full_video(args.pod, pod_config_path, topic, topic_mgr, episode_mgr, topic_id=topic_id)
 
 
 if __name__ == "__main__":

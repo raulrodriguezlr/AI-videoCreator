@@ -1,0 +1,112 @@
+{
+  "topics": [
+    {
+      "id": "topic_001",
+      "title": "Tico y el Gran Desorden de Bellotas",
+      "description": "Tico intenta organizar sus provisiones para el invierno pero se siente abrumado por la cantidad de bellotas. Con ayuda de la Liebre Saltarina, aprende a clasificar los objetos por tamaño y color, descubriendo que el orden facilita la vida de todos.",
+      "educational_value": "Pensamiento lógico-matemático (clasificación y seriación) y la importancia del orden.",
+      "references_episode": null,
+      "target_emotion": "Curiosidad",
+      "status": "completed",
+      "episode_id": "ep_001_tico_y_el_gran_desorden_de_bel",
+      "created_at": "2026-02-23T17:59:05.696067",
+      "completed_at": "2026-02-23T18:06:03.209299"
+    },
+    {
+      "id": "topic_002",
+      "title": "Tico y el Puente de la Amistad",
+      "description": "Un pequeño arroyo impide que Tico visite a su amigo el Mapache. Tico debe superar su miedo al agua y trabajar en equipo con otros animales para construir un puente seguro utilizando troncos y piedras del bosque.",
+      "educational_value": "Trabajo en equipo, resolución de problemas y superación de miedos personales.",
+      "references_episode": "Tico y el Pajarito Perdido",
+      "target_emotion": "Valentía",
+      "status": "in_progress",
+      "episode_id": "ep_002_tico_y_el_puente_de_la_amistad",
+      "created_at": "2026-02-23T17:59:05.696067",
+      "completed_at": null
+    },
+    {
+      "id": "topic_003",
+      "title": "Tico y la Promesa del Jardín",
+      "description": "Tico se compromete a cuidar el jardín de flores que creció de su semilla especial, pero se distrae jugando y olvida regarlas. Al ver las flores marchitas, aprende que sus acciones tienen consecuencias y que cumplir una promesa es fundamental para ser un buen amigo.",
+      "educational_value": "Responsabilidad, honestidad y cuidado del medio ambiente.",
+      "references_episode": "Tico y la Semilla Dormilona",
+      "target_emotion": "Empatía",
+      "status": "in_progress",
+      "episode_id": "ep_003_tico_y_la_promesa_del_jardín",
+      "created_at": "2026-02-23T17:59:05.696067",
+      "completed_at": null
+    },
+    {
+      "id": "topic_004",
+      "title": "Tico y el Canto de la Tormenta",
+      "description": "Una fuerte tormenta llega al Bosque Mágico y asusta a Tico por los relámpagos y ruidos fuertes. Al refugiarse, descubre que la lluvia es vital para que su amiga la Semilla Dormilona siga creciendo y aprende a ver la tormenta como una necesaria y hermosa sinfonía de la naturaleza.",
+      "educational_value": "Manejo del miedo a las tormentas, valentía y comprensión científica básica sobre la importancia de la lluvia para las plantas.",
+      "references_episode": "Tico y la Semilla Dormilona",
+      "target_emotion": "Valentía",
+      "status": "in_progress",
+      "episode_id": "ep_004_tico_y_el_canto_de_la_tormenta",
+      "created_at": "2026-02-23T23:48:51.799550",
+      "completed_at": null
+    },
+    {
+      "id": "topic_005",
+      "title": "Tico y el Hongo Tambor Roto",
+      "description": "Mientras jugaba sin cuidado, Tico rompe accidentalmente el hongo favorito del pajarito al que ayudó en el pasado. Al principio intenta ocultar lo que hizo por miedo a que se enojen, pero pronto comprende que decir la verdad es la única forma de arreglar las cosas.",
+      "educational_value": "La importancia de la honestidad, asumir la responsabilidad de los propios errores y el valor de pedir disculpas.",
+      "references_episode": "Tico y el Pajarito Perdido",
+      "target_emotion": "Empatía",
+      "status": "in_progress",
+      "episode_id": null,
+      "created_at": "2026-02-23T23:48:51.799550",
+      "completed_at": null
+    },
+    {
+      "id": "topic_006",
+      "title": "Tico y la Amiga con Caparazón",
+      "description": "Tico quiere jugar a las carreras y conoce a una tortuga nueva en el bosque, pero se frustra rápidamente porque ella es muy lenta. Sin embargo, cuando los amigos necesitan recuperar un juguete que cayó en un arbusto espinoso, la tortuga demuestra que su resistente caparazón es el superpoder perfecto para salvar el día.",
+      "educational_value": "Inclusión social, tolerancia, respeto por las diferencias y comprender que cada persona tiene habilidades únicas y valiosas.",
+      "references_episode": "null",
+      "target_emotion": "Curiosidad",
+      "status": "in_progress",
+      "episode_id": "ep_004_tico_y_la_amiga_con_caparazón",
+      "created_at": "2026-02-23T23:48:51.799550",
+      "completed_at": null
+    },
+    {
+      "id": "topic_007",
+      "title": "Tico y el Misterio de la Sombra Gigante",
+      "description": "Tico se asusta al ver una sombra enorme moverse cerca del arroyo por la noche. Usando su Nuez de Luz para investigar con cuidado, descubre que el 'monstruo' es solo una pequeña y amigable rana proyectada por la luz de la luna.",
+      "educational_value": "Desarrollo de la valentía para enfrentar lo desconocido y aprendizaje científico básico sobre cómo la luz y la distancia crean las sombras.",
+      "references_episode": "Tico y la Nuez de Luz",
+      "target_emotion": "Valentía",
+      "status": "in_progress",
+      "episode_id": "ep_005_tico_y_el_misterio_de_la_sombr",
+      "created_at": "2026-02-24T00:32:56.633883",
+      "completed_at": null
+    },
+    {
+      "id": "topic_008",
+      "title": "Tico y la Carrera del Bosque Mágico",
+      "description": "Durante un día de juegos, Tico se impacienta porque su nueva amiga, una tortuga llamada Tina, hace todo muy despacio. Sin embargo, cuando pierden un juguete en el bosque, es la capacidad de observación y la calma de Tina lo que les ayuda a encontrarlo.",
+      "educational_value": "Fomento de la empatía, el respeto por las diferencias individuales y la comprensión de que cada persona tiene su propio ritmo y talentos únicos.",
+      "references_episode": null,
+      "target_emotion": "Empatía",
+      "status": "completed",
+      "episode_id": "ep_006_tico_y_la_carrera_del_bosque_m",
+      "created_at": "2026-02-24T00:32:56.633883",
+      "completed_at": "2026-02-24T00:39:03.685152"
+    },
+    {
+      "id": "topic_009",
+      "title": "Tico y el Árbol que Perdió su Abrigo",
+      "description": "Llega el otoño al Bosque Mágico y las hojas de los árboles comienzan a caerse. Tico, muy preocupado, intenta usar savia para volver a pegar las hojas en las ramas, hasta que aprende que los árboles necesitan descansar para florecer de nuevo.",
+      "educational_value": "Aceptación de los cambios (adaptabilidad) y conocimiento científico sobre el ciclo de las estaciones del año y el cuidado de la naturaleza.",
+      "references_episode": "Tico y la Semilla Dormilona",
+      "target_emotion": "Asombro",
+      "status": "pending",
+      "episode_id": null,
+      "created_at": "2026-02-24T00:32:56.634806",
+      "completed_at": null
+    }
+  ]
+}
