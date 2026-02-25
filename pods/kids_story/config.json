@@ -7,9 +7,7 @@
     "language": "es-ES",
     "narrative_style": "fable",
     "video_settings": {
-        "duration_seconds": 180,
-        "min_scenes": 12,
-        "max_scenes": 20,
+        "duration_seconds": 120,
         "interactive_questions": 2,
         "interactivity_enabled": true
     },
@@ -32,7 +30,7 @@
     ],
     "topic_generation": {
         "enabled": true,
-        "auto_generate_count": 5,
-        "regenerate_threshold": 2
+        "auto_generate_count": 1,
+        "regenerate_threshold": 1
     }
 }

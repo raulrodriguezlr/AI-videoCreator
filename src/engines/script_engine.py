@@ -16,7 +16,7 @@ from google.genai import types
 from src.utils.api_key_manager import get_api_key_manager
 from src.utils.memory_manager import MemoryManager
 from src.utils.prompt_manager import PromptManager
-from src.variables import GEMINI_MODEL_NAME
+from src.variables import GEMINI_MODEL_NAME, VEO_DURATION_SECONDS
 
 
 class ScriptGenerator:
@@ -51,9 +51,7 @@ class ScriptGenerator:
 
         # Extract config values
         video_settings = self.config.get("video_settings", {})
-        duration_seconds = video_settings.get("duration_seconds", 180)
-        min_scenes = video_settings.get("min_scenes", 12)
-        max_scenes = video_settings.get("max_scenes", 20)
+        duration_seconds = video_settings.get("duration_seconds", 120)
         interactive_questions = video_settings.get("interactive_questions", 2)
         interactivity_enabled = video_settings.get("interactivity_enabled", False)
 
@@ -82,8 +80,7 @@ class ScriptGenerator:
             else "Este es el primer episodio de la serie.",
             characters=characters_text,
             duration_seconds=duration_seconds,
-            min_scenes=min_scenes,
-            max_scenes=max_scenes,
+            max_clip_seconds=VEO_DURATION_SECONDS,
             art_style=art_style,
             num_interactive_questions=interactive_questions
             if interactivity_enabled

@@ -235,6 +235,14 @@ class VeoProvider(BaseVideoProvider):
         # Extract last frame from previous video
         last_frame = self._extract_last_frame(previous_clip.file_path)
 
+        # Fallback: try saved PNG frame if video extraction failed
+        if last_frame is None and save_dir and scene_index is not None and scene_index > 0:
+            saved_frame_path = os.path.join(save_dir, f"last_frame_{scene_index:02d}.png")
+            if os.path.exists(saved_frame_path):
+                print(f"[VEO]    📷 Usando frame guardado: {os.path.basename(saved_frame_path)}")
+                image_bytes = open(saved_frame_path, "rb").read()
+                last_frame = types.Image(image_bytes=image_bytes, mime_type="image/png")
+
         if last_frame is None:
             print("[VEO] ⚠️  No se pudo extraer último frame. Generando sin seed visual.")
             return self.generate_scene(
@@ -246,7 +254,9 @@ class VeoProvider(BaseVideoProvider):
             prompt=prompt,
             mode="image",
             image=last_frame,
-            reference_images=reference_images,
+            # NOTE: Do NOT pass reference_images here.
+            # Veo 3.1 rejects image + reference_images simultaneously.
+            # The last frame already provides visual continuity.
         )
 
         operation = self.client.models.generate_videos(**gen_params)
@@ -323,8 +333,11 @@ class VeoProvider(BaseVideoProvider):
             prompt = self._build_cinematographic_prompt(scene, narrative_phase)
             negative = scene.get("negative_prompt")
             transition = scene.get("transition_to_next", "jump")
+            scene_duration = scene.get("duration_seconds", VEO_DURATION_SECONDS)
+            # Clamp to valid range (4-8)
+            scene_duration = max(4, min(scene_duration, VEO_DURATION_SECONDS))
 
-            print(f"\n--- Escena {scene_num}/{len(scenes)} ---")
+            print(f"\n--- Escena {scene_num}/{len(scenes)} ({scene_duration}s) ---")
 
             try:
                 scene_num_str = f"{scene_num:02d}"
@@ -333,6 +346,7 @@ class VeoProvider(BaseVideoProvider):
                     # First scene or no previous clips: pure text-to-video
                     clip = self.generate_scene(
                         prompt=prompt,
+                        duration=scene_duration,
                         seed=scene.get("seed"),
                         reference_images=ref_images,
                         negative_prompt=negative,
@@ -340,17 +354,9 @@ class VeoProvider(BaseVideoProvider):
                         scene_index=i,
                         narrative_phase=narrative_phase,
                     )
-                elif transition == "extend" and clips:
-                    # Continue same scene
-                    clip = self.extend_scene(
-                        video_clip=clips[-1],
-                        prompt=prompt,
-                        save_dir=clips_dir,
-                        scene_index=i,
-                        narrative_phase=narrative_phase,
-                    )
                 else:
-                    # Jump to new scene (default)
+                    # All subsequent scenes use jump_to for clean cuts
+                    # (extend is disabled — it duplicates content)
                     clip = self.jump_to_scene(
                         previous_clip=clips[-1],
                         prompt=prompt,
@@ -363,6 +369,9 @@ class VeoProvider(BaseVideoProvider):
                 clips.append(clip)
                 print(f"[VEO] ✅ Escena {scene_num} generada: {clip.file_path}")
                 self.key_manager.record_success()
+
+                # Save last frame for resume safety
+                self._save_last_frame(clip.file_path, clips_dir, i)
 
                 # Persist progress
                 if progress_manager:
@@ -379,18 +388,13 @@ class VeoProvider(BaseVideoProvider):
                 if is_rate_limit_error(e):
                     if self.key_manager.rotate_key(error_msg):
                         self.client = self.key_manager.get_client()
-                        print(f"[VEO] 🔄 Reintentando escena {scene_num} con {self.key_manager.get_key_label()}...")
+                        print(f"[VEO] 🔄 Reintentando escena {scene_num} con {self.key_manager.get_key_label()} ({self.key_manager.get_active_key()})...")
                         try:
                             # Retry the same scene with the new key
                             if i == 0 or not clips:
                                 clip = self.generate_scene(
-                                    prompt=prompt, seed=scene.get("seed"),
+                                    prompt=prompt, duration=scene_duration, seed=scene.get("seed"),
                                     reference_images=ref_images, negative_prompt=negative,
-                                    save_dir=clips_dir, scene_index=i, narrative_phase=narrative_phase,
-                                )
-                            elif transition == "extend" and clips:
-                                clip = self.extend_scene(
-                                    video_clip=clips[-1], prompt=prompt,
                                     save_dir=clips_dir, scene_index=i, narrative_phase=narrative_phase,
                                 )
                             else:
@@ -417,16 +421,12 @@ class VeoProvider(BaseVideoProvider):
                         progress_manager.mark_scene_failed(i, error_msg, is_rate_limit=True)
                     rate_limited = True
                     break
-                elif is_content_error(e):
-                    print(f"[VEO] ⚠️  Error de contenido. Saltando escena {scene_num}...")
-                    if progress_manager:
-                        progress_manager.mark_scene_skipped(i, error_msg)
-                    continue
                 else:
-                    print(f"[VEO] ⚠️  Error inesperado. Intentando siguiente escena...")
+                    # Any other error — stop immediately and save progress
+                    print(f"[VEO] 🛑 Error en escena {scene_num}. Guardando progreso y parando.")
                     if progress_manager:
                         progress_manager.mark_scene_failed(i, error_msg)
-                    continue
+                    break
 
         # Final result
         if not clips:
@@ -446,8 +446,13 @@ class VeoProvider(BaseVideoProvider):
             if rate_limited:
                 print(f"\n[VEO] ⏸️  Episodio pausado por rate limit. Resume con --resume")
                 print(progress_manager.get_status_summary())
-            else:
+            elif len(clips) >= len(scenes):
+                # ALL scenes completed successfully
                 progress_manager.mark_episode_completed(final_path)
+            else:
+                # Partial generation (stopped by error) — don't mark as completed
+                print(f"\n[VEO] ⏸️  Episodio parcial ({len(clips)}/{len(scenes)} clips). Resume con opción 4.")
+                print(progress_manager.get_status_summary())
 
         completed_count = len(clips)
         total_count = len(scenes)
@@ -501,8 +506,7 @@ class VeoProvider(BaseVideoProvider):
 
         # Build filename — structured if scene info provided, else legacy
         if scene_index is not None:
-            phase_suffix = f"_{narrative_phase}" if narrative_phase else ""
-            filename = f"clip_{scene_index + 1:02d}{phase_suffix}.mp4"
+            filename = f"clip_{scene_index + 1:02d}.mp4"
         else:
             safe_name = prompt[:40].replace(" ", "_").replace("'", "").replace('"', "")
             filename = f"scene_{safe_name}_{int(time.time())}.mp4"
@@ -559,6 +563,24 @@ class VeoProvider(BaseVideoProvider):
         except Exception as e:
             print(f"[VEO] ⚠️  Error extrayendo frame: {e}")
             return None
+
+    def _save_last_frame(self, video_path: str, clips_dir: str, scene_index: int):
+        """Save the last frame of a clip as PNG for resume safety."""
+        try:
+            cap = cv2.VideoCapture(video_path)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if total_frames <= 0:
+                cap.release()
+                return
+            cap.set(cv2.CAP_PROP_POS_FRAMES, total_frames - 1)
+            ret, frame = cap.read()
+            cap.release()
+            if ret:
+                frame_path = os.path.join(clips_dir, f"last_frame_{scene_index + 1:02d}.png")
+                cv2.imwrite(frame_path, frame)
+                print(f"[VEO]    📷 Último frame guardado: {os.path.basename(frame_path)}")
+        except Exception as e:
+            print(f"[VEO] ⚠️  No se pudo guardar último frame: {e}")
 
     def _load_reference_images(self, image_paths: List[str]) -> list:
         """Load reference images for character consistency."""
@@ -646,14 +668,9 @@ class VeoProvider(BaseVideoProvider):
         voice_direction = scene.get("voice_direction", "")
 
         if audio_text and is_audio_supported:
-            if character and character.lower() != "narrator":
-                # Character dialogue
-                voice_desc = f" ({voice_direction})" if voice_direction else ""
-                parts.append(f'{character}{voice_desc} says: "{audio_text}"')
-            else:
-                # Narrator (Off-screen voiceover prevents character lip-sync)
-                voice_desc = f" ({voice_direction})" if voice_direction else " (warm adult male voice)"
-                parts.append(f'Off-screen voiceover narration{voice_desc}: "{audio_text}"')
+            # All dialogue is Tico narrating in first person — consistent voice
+            voice_desc = f" ({voice_direction})" if voice_direction else " (young cheerful male voice, European Spanish)"
+            parts.append(f'Tico{voice_desc} says: "{audio_text}"')
 
         # Art style from config
         art_style = self.config.get("consistency", {}).get("art_style", "")

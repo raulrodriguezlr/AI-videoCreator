@@ -110,7 +110,7 @@ TIER_MODEL_MAP = {
 # ==========================
 # AUDIO MODEL — Lyria / Gemini Audio
 # ==========================
-LYRIA_MODEL = "gemini-2.0-flash-exp"
+LYRIA_MODEL = "gemini-2.5-flash-preview-tts"
 
 # ==========================
 # LLM — Gemini (Script + Topic Generation)

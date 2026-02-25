@@ -47,6 +47,7 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
         print("4. 🔄 Continuar episodio incompleto")
         print("5. 📋 Ver episodios generados")
         print("6. ❌ Borrar un tema")
+        print("7. 🎯 Crear vídeo de un tema específico")
         print("0. Salir")
         
         choice = input("\n> ").strip()
@@ -82,10 +83,44 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
                 print(f"✅ Usando tema: {topic_data['title']}")
                 prompt_full_video(pod_name, pod_config_path, topic_data['title'], topic_mgr, episode_mgr, topic_id=topic_data['id'])
         elif choice == "4":
-            episode_mgr.print_episodes_table()
-            ep = input("ID de episodio a continuar (ej: ep_001_...): ").strip()
-            if ep:
-                resume_episode(os.path.join("pods", pod_name, "output", ep), pod_name)
+            # Find all incomplete episodes
+            pod_output_dir = os.path.join("pods", pod_name, "output")
+            incomplete_episodes = []
+            if os.path.exists(pod_output_dir):
+                for name in sorted(os.listdir(pod_output_dir)):
+                    ep_dir = os.path.join(pod_output_dir, name)
+                    if not os.path.isdir(ep_dir) or not name.startswith("ep_"):
+                        continue
+                    progress_file = os.path.join(ep_dir, "progress.json")
+                    if os.path.exists(progress_file):
+                        try:
+                            with open(progress_file, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                            if data.get("status") != "completed":
+                                completed = sum(1 for s in data.get('scenes', []) if s.get('status') == 'completed')
+                                total = data.get('total_scenes', '?')
+                                incomplete_episodes.append({
+                                    "dir": ep_dir,
+                                    "name": name,
+                                    "title": data.get("title", name),
+                                    "clips": f"{completed}/{total}",
+                                })
+                        except (json.JSONDecodeError, IOError):
+                            continue
+
+            if not incomplete_episodes:
+                print("✅ No hay episodios incompletos.")
+            else:
+                print("\n🔄 Episodios incompletos:\n")
+                for idx, ep in enumerate(incomplete_episodes, 1):
+                    print(f"  {idx}. {ep['title']} ({ep['clips']} clips)")
+                pick = input(f"\nElige episodio (1-{len(incomplete_episodes)}): ").strip()
+                if pick.isdigit() and 1 <= int(pick) <= len(incomplete_episodes):
+                    chosen = incomplete_episodes[int(pick) - 1]
+                    print(f"🔄 Continuando: {chosen['title']}")
+                    resume_episode(chosen['dir'], pod_name)
+                else:
+                    print("❌ Selección no válida.")
         elif choice == "5":
             episode_mgr.print_episodes_table()
         elif choice == "6":
@@ -95,6 +130,21 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
                 print("✅ Borrado correctamente.")
             elif tid:
                 print("❌ No encontrado.")
+        elif choice == "7":
+            pending = topic_mgr.get_pending()
+            if not pending:
+                print("⚠️ No hay temas pendientes. Usa la opción 2 para generar nuevos.")
+            else:
+                print("\n🎯 Temas pendientes:")
+                for idx, t in enumerate(pending, 1):
+                    print(f"  {idx}. {t['title']}")
+                pick = input(f"\nElige tema (1-{len(pending)}): ").strip()
+                if pick.isdigit() and 1 <= int(pick) <= len(pending):
+                    chosen = pending[int(pick) - 1]
+                    print(f"✅ Seleccionado: {chosen['title']}")
+                    prompt_full_video(pod_name, pod_config_path, chosen['title'], topic_mgr, episode_mgr, topic_id=chosen['id'])
+                else:
+                    print("❌ Selección no válida.")
         else:
             print("❌ Opción no válida.")
 

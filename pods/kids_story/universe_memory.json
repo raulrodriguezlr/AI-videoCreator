@@ -1,31 +1,9 @@
 {
     "episodes": [
         {
-            "title": "Tico y la Nuez Brillante",
-            "summary": "Tico encuentra una nuez mágica y aprende que la verdadera felicidad está en compartir con los demás."
-        },
-        {
-            "title": "Tico y el Pajarito Perdido",
-            "summary": "Tico utiliza su lección sobre compartir para ganar la confianza de un pajarito perdido y ayudarlo a regresar a su nido."
-        },
-        {
-            "title": "Tico y la Nuez de Luz",
-            "summary": "Tico encuentra una nuez brillante y, recordando sus lecciones pasadas, decide usarla para iluminar el camino de sus amigos en lugar de guardársela."
-        },
-        {
-            "title": "Tico y la Semilla Dormilona",
-            "summary": "Tico encuentra una semilla extraña y aprende que, con paciencia y cuidado, incluso las cosas más pequeñas pueden convertirse en algo maravilloso, recordando lecciones pasadas sobre ayudar a la naturaleza.",
-            "moral": "La paciencia es un superpoder que ayuda a las cosas a crecer."
-        },
-        {
-            "title": "Tico y el Gran Desorden de Bellotas",
-            "summary": "Tico intenta recolectar todas las bellotas del bosque solo y crea un caos, pero aprende que con organización y la ayuda de sus amigos, todo es más sencillo.",
-            "moral": "La organización y el trabajo en equipo nos ayudan a resolver grandes problemas de forma alegre."
-        },
-        {
-            "title": "Tico y la Carrera del Bosque Mágico",
-            "summary": "Tico participa en la Gran Carrera del Bosque y aprende que ayudar a un amigo en apuros es mucho más valioso e importante que ganar el primer lugar.",
-            "moral": "La verdadera victoria no siempre es llegar primero, sino ayudar a los demás y compartir el camino con amigos."
+            "title": "El Gran Tesoro de Bellotas",
+            "summary": "Tico la ardilla encuentra un mapa hacia un gran tesoro. En su camino ayuda a un amigo y al encontrar la enorme bellota, descubre que necesita la ayuda de los demás para abrirla, aprendiendo que el verdadero tesoro es compartir.",
+            "moral": "El verdadero valor de un tesoro se encuentra cuando lo compartes con tus amigos."
         }
     ],
     "current_state": {
