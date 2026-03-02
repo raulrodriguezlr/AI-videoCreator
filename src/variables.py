@@ -108,9 +108,10 @@ TIER_MODEL_MAP = {
 }
 
 # ==========================
-# AUDIO MODEL — Lyria / Gemini Audio
+# AUDIO — ElevenLabs Sound Generation
 # ==========================
-LYRIA_MODEL = "gemini-2.5-flash-preview-tts"
+# Used for ambient background music generation (replaces Gemini TTS which only does speech)
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 
 # ==========================
 # LLM — Gemini (Script + Topic Generation)
