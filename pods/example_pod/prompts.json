@@ -1,0 +1,46 @@
+{
+    "script_generation": {
+        "system_role": "Eres un director y guionista de documentales. Creas escenas cinematográficas detalladas para IA generativa. Tus guiones son educativos y atrapantes.",
+        "user_template": "Escribe un guion para un vídeo corto sobre {target_audience}.\n\n## TEMA\n{topic}\n\n## CONTEXTO\n{series_context}\n\n## EPISODIOS ANTERIORES\n{memory_context}\n\n## REQUISITOS TÉCNICOS\n- Duración mínima: {duration_seconds} segundos.\n- Estilo: {art_style}\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
+        "output_format": {
+            "title": "Título del episodio",
+            "summary": "Resumen ejecutivo",
+            "moral": "Moraleja o conclusión principal",
+            "ambient_audio_prompt": "Prompt EN INGLÉS para ElevenLabs: ej. 'Dark synthwave ambient music, sci-fi mystery'",
+            "scenes": [
+                {
+                    "scene_number": 1,
+                    "narrative_phase": "introduction",
+                    "visual_prompt": "Detailed description in ENGLISH of the visuals. NO TEXT.",
+                    "audio_text": "Texto que dirá el narrador (en español).",
+                    "character": "Narrador",
+                    "voice_direction": "Tono de voz (ej: misterioso, urgente)",
+                    "camera": {
+                        "shot_type": "wide",
+                        "movement": "pan_right",
+                        "angle": "eye_level"
+                    },
+                    "mood": "mysterious",
+                    "lighting": "neon lighting",
+                    "transition_to_next": "cut",
+                    "duration_seconds": 6
+                }
+            ]
+        }
+    },
+    "topic_generation": {
+        "system_role": "Eres un experto creador de contenido.",
+        "user_template": "Genera {num_topics} temas sobre {series_description}. Formato JSON: {output_format}",
+        "output_format": {
+            "topics": [
+                {
+                    "title": "Título sugerido",
+                    "description": "Descripción del tema",
+                    "educational_value": "Valor educativo",
+                    "references_episode": null,
+                    "target_emotion": "Curiosidad"
+                }
+            ]
+        }
+    }
+}

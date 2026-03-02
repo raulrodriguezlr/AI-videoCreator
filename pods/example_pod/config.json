@@ -1,0 +1,18 @@
+{
+    "name": "example_pod",
+    "description": "Plantilla de ejemplo para crear un nuevo universo narrativo o canal de YouTube.",
+    "language": "es",
+    "target_audience": "Adolescentes y adultos jóvenes",
+    "series_context": "Una serie de cortos documentales sobre misterios del espacio o ciencia ficción ligera.",
+    "characters": "Narrador: Una voz IA profesional y misteriosa.",
+    "consistency": {
+        "art_style": "Cinematic sci-fi, realistic 3D render, dark and mysterious, neon lighting, volumetric fog",
+        "use_reference_images": false,
+        "characters": {}
+    },
+    "generation": {
+        "num_interactive_questions": 0,
+        "duration_seconds_target": 60,
+        "scenes_count_target": 10
+    }
+}

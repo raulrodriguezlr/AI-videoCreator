@@ -1,4 +1,4 @@
-# AI-videoCreator v2.0 🎬
+# AI-videoCreator v1.0 🎬
 
 Generador automático de vídeos usando IA. Crea vídeos con guión, narración y audio sincronizado de forma nativa.
 
@@ -31,6 +31,7 @@ main.py (orquestador)
 - **Python 3.10+**
 - **Google AI Pro plan** (para Veo 3.1 API)
 - **API Key de Google AI Studio**: [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- **API Key de ElevenLabs**: Para la generación de la música ambiental (Sound Generation API).
 
 ### Requisitos opcionales (testing local)
 
@@ -38,36 +39,74 @@ main.py (orquestador)
 - **NVIDIA GPU 12GB+** (RTX 4070 Ti o similar)
 - **ffmpeg** instalado (para concatenar clips)
 
-## Instalación
+## Instalación paso a paso 
 
+Sigue estos pasos usando la terminal (Símbolo del sistema o PowerShell en Windows, o la Terminal en Mac/Linux).
+
+### Paso 1: Descargar el código
+Abre tu terminal y escribe:
 ```bash
-# 1. Clonar el repo
 git clone https://github.com/raulrodriguezlr/AI-videoCreator.git
 cd AI-videoCreator
-
-# 2. Crear entorno virtual
-python -m venv .venv
-
-# 3. Activar entorno
-# Windows (PowerShell):
-# Si da error de ExecutionPolicy, primero: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.venv\Scripts\Activate
-# macOS/Linux:
-source .venv/bin/activate
-
-# 4. Instalar dependencias
-pip install -r requirements.txt
-
-# 5. Configurar API key
-# Edita .env y pon tu GOOGLE_API_KEY
 ```
+
+### Paso 2: Crear el Entorno Virtual (`.venv`)
+Un entorno virtual es como una "caja aislada" para que las librerías de este proyecto no se mezclen con el resto de tu ordenador.
+- Asegúrate de tener Python instalado (escribe `python --version` o `python3 --version` para comprobarlo).
+- Escribe el comando para crear el entorno:
+
+**En Windows, Mac o Linux:**
+```bash
+python -m venv .venv
+```
+*(Si en Mac/Linux dice "command not found", prueba con `python3 -m venv .venv`)*
+
+### Paso 3: Activar el Entorno Virtual
+Este paso es crucial y **debes hacerlo cada vez que vayas a usar el programa**. Dependiendo de tu sistema operativo y terminal, el comando cambia ligeramente:
+
+**🖥️ En Windows (PowerShell) - RECOMENDADO:**
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+*(💡 NOTA para Windows: Si te sale un error rojo sobre "ExecutionPolicy" o permisos de scripts, ejecuta primero este comando: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`, dile que Sí (S o Y), y vuelve a intentar activar).*
+
+**🖥️ En Windows (Símbolo del sistema / CMD):**
+```cmd
+.venv\Scripts\activate.bat
+```
+
+**🍎 En Mac o Linux (Terminal / Bash / Zsh):**
+```bash
+source .venv/bin/activate
+```
+*(Sabrás que funcionó porque tu terminal ahora empezará con `(.venv)` a la izquierda de la línea de comandos).*
+
+### Paso 4: Instalar las dependencias
+Con el `(.venv)` activado, vamos a instalar todo lo que el programa necesita:
+```bash
+pip install -r requirements.txt
+```
+
+### Paso 5: Configurar tus API Keys
+El programa necesita conectarse a Google y ElevenLabs para funcionar.
+1. Busca un archivo llamado `env_example` o simplemente crea un archivo de texto nuevo y llámalo **exactamente** `.env` (con el punto delante).
+2. Ábrelo con el Bloc de notas o cualquier editor y pega tus claves así:
+```env
+GOOGLE_API_KEY=tu_clave_de_google_ai_studio_aqui
+ELEVENLABS_API_KEY=tu_clave_de_elevenlabs_aqui
+```
+*(Si no tienes clave, consigue una gratis en [Google AI Studio](https://aistudio.google.com/apikey) y [ElevenLabs](https://elevenlabs.io)).*
 
 ## Configuración
 
-### `.env` — Secretos
+### `.env` — Secretos (crear si no existe)
 
 ```env
 GOOGLE_API_KEY=tu_api_key_de_google_ai_studio
+ELEVENLABS_API_KEY=tu_api_key_de_elevenlabs
+# Opcional (para rotación de keys y no agotar la cuota tan rápido):
+# GOOGLE_API_KEY_1=...
+# GOOGLE_API_KEY_2=...
 ```
 
 ### `src/variables.py` — Todo lo demás
@@ -108,10 +147,20 @@ python -m src.main --pod kids_story --generate-topics 5
 ```bash
 python -m src.main --check-provider
 ```
-### Lanzar el modo interactivo
+### Lanzar el modo interactivo (Recomendado)
+
+El modo interactivo es un menú que te guía paso a paso para crear vídeos, generar temas, o retomar episodios pausados.
 
 ```bash
 python -m src.main --pod kids_story --interactive
+```
+
+### Retomar un episodio fallido o rate-limited
+
+Si se agotan tus tokens de Veo 3.1 o quieres parar, el proceso guarda cada clip generado. Puedes continuarlo sin perder dinero ni tiempo usando el modo `--interactive` (opción 4) o directamente:
+
+```bash
+python -m src.main --pod kids_story --resume last
 ```
 
 ### Cambiar a testing local (Ovi)
@@ -165,22 +214,32 @@ El `VeoProvider` replica la lógica de Google Flow Scene Builder:
 3. **Character Consistency**: Usa `referenceImages` (hasta 3 imágenes de referencia por personaje)
 4. **Audio**: Veo 3.1 genera audio sincronizado nativamente (narración, diálogos, efectos)
 
-## Cómo crear un pod nuevo
+## Cómo crear un pod nuevo (Onboarding)
 
-1. Crea una carpeta en `pods/`:
-```
-pods/mi_nuevo_pod/
-├── config.json
-├── prompts.json
-├── universe_memory.json  # {} vacío
-├── assets/
-└── output/
+El proyecto incluye la plantilla `pods/example_pod/` pensada para que te sea facilísimo arrancar tu propia serie de vídeos o canal de historia, documentales, etc.
+
+1. **Copia la plantilla `example_pod`:**
+Copia o renombra la carpeta `pods/example_pod` al nombre que quieras (por ejemplo `ods/mi_documental/`).
+
+```text
+pods/mi_documental/
+├── config.json           # Aquí cambias el estilo visual (ej: "Cinematic sci-fi"), la audiencia y las secuencias.
+├── prompts.json          # Aquí modificas tu Prompt Maestro: cómo hablará el narrador, estructura y reglas de generación.
+├── topics.json           # Inicialmente vacío { "topics": [] }
+├── universe_memory.json  # Inicialmente vacío
 ```
 
-2. Copia y adapta `config.json` de `kids_story`
-3. Ejecuta:
+2. **Ajusta `config.json`:**
+Abre el archivo y modifica parámetros como `target_audience`, `series_context` (de qué va tu canal), y `art_style`. 
+
+3. **Ajusta `prompts.json` (El corazón de tu serie):**
+   - Modifica `script_generation.system_role` para definir la personalidad del director del guión.
+   - En `scenes`, define exactamente quién narra (`character`), qué variables le pides al LLM y qué tipo de transiciones usarás (por defecto usamos `jump` y `cut`, **no uses `extend`**).
+
+4. **¡Arranca el motor!**
+Una vez modificado, usa el modo interactivo para que Gemini proponga ideas basadas en tu configuración:
 ```bash
-python -m src.main --pod mi_nuevo_pod --auto-topic
+python -m src.main --pod mi_documental --interactive
 ```
 
 ## Troubleshooting
@@ -206,3 +265,7 @@ Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
 - [ ] Modelos de vídeo adicionales (providers)
 - [ ] LoRA para character consistency local
 - [ ] Publicación automática a YouTube
+## Futuras mejoras
+
+Ahora las escenas se extienden cogiendo el ultimo frame y partiendo de ahi genera el siguiente clip, esto hace que vaya todo de seguido pero 
+no mantiene ni las voces(las imagenes si son iguales pero no las voces). Al hacer esto, no hay cortes entre escenas, no puede haber un corte de escena a otra escena diferente. Supongo que se puede cambiar con promting y no necesariarmente con codigo.
