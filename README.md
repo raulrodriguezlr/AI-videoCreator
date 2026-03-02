@@ -19,11 +19,11 @@ main.py (orquestador)
   ├── ScriptEngine → Gemini genera guion cinematográfico
   └── VideoEngine (router)
         │
-        ├── VeoProvider → Google Veo 3.1 API (producción)
-        │     └── Scene Builder: generate → extend → jump_to
+        ├── VeoProvider → Google Veo 3.1 API (producción, cloud)
+        │     └── Scene Builder: generate → jump_to
         │
-        └── OviProvider → ComfyUI local (testing)
-              └── GPU local, no gasta tokens
+        └── LtxProvider → LTX-2 via ComfyUI (local, GPU)
+              └── Genera con audio nativo (Gemma 3)
 ```
 
 ## Requisitos
@@ -35,7 +35,7 @@ main.py (orquestador)
 
 ### Requisitos opcionales (testing local)
 
-- **ComfyUI** corriendo en `http://127.0.0.1:8188` (para OviProvider)
+- **ComfyUI** corriendo en `http://127.0.0.1:8188` (para LtxProvider)
 - **NVIDIA GPU 12GB+** (RTX 4070 Ti o similar)
 - **ffmpeg** instalado (para concatenar clips)
 

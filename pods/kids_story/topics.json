@@ -19,8 +19,8 @@
       "educational_value": "Desarrollar la valentía frente al miedo a la oscuridad o a lo desconocido, y aprender un concepto científico básico sobre el sonido.",
       "references_episode": null,
       "target_emotion": "Valentía",
-      "status": "pending",
-      "episode_id": null,
+      "status": "in_progress",
+      "episode_id": "ep_002_el_misterio_del_eco_en_la_cuev",
       "created_at": "2026-02-24T23:54:48.302316",
       "completed_at": null
     },
@@ -31,9 +31,45 @@
       "educational_value": "Comprender el ciclo básico de la naturaleza (cómo crecen las plantas) y practicar la paciencia frente a la frustración.",
       "references_episode": null,
       "target_emotion": "Curiosidad",
+      "status": "in_progress",
+      "episode_id": "ep_003_la_semillita_impaciente",
+      "created_at": "2026-02-24T23:54:48.302316",
+      "completed_at": null
+    },
+    {
+      "id": "topic_004",
+      "title": "El Misterio de la Semilla Perezosa",
+      "description": "Tico encuentra una semilla brillante y la planta esperando que crezca un árbol mágico al instante. Al no ver cambios inmediatos, se frustra, pero con la ayuda del Señor Búho aprende a regarla, cuidarla y esperar pacientemente su crecimiento.",
+      "educational_value": "La paciencia y el conocimiento científico básico sobre el ciclo de vida y cuidado de las plantas.",
+      "references_episode": null,
+      "target_emotion": "Curiosidad",
+      "status": "in_progress",
+      "episode_id": "ep_004_el_misterio_de_la_semilla_pere",
+      "created_at": "2026-03-03T00:24:10.662362",
+      "completed_at": null
+    },
+    {
+      "id": "topic_005",
+      "title": "El Juguete Roto de Lilo",
+      "description": "Jugando en el bosque, Tico rompe sin querer el juguete favorito de su amigo Lilo, a quien había ayudado anteriormente con el mapa. Por miedo a que se enoje, esconde las piezas, pero pronto descubre que ocultar la verdad pesa más que una bellota gigante.",
+      "educational_value": "La honestidad, asumir la responsabilidad de los propios errores y la importancia de pedir perdón.",
+      "references_episode": "El Gran Tesoro de Bellotas",
+      "target_emotion": "Empatía",
       "status": "pending",
       "episode_id": null,
-      "created_at": "2026-02-24T23:54:48.302316",
+      "created_at": "2026-03-03T00:24:10.662362",
+      "completed_at": null
+    },
+    {
+      "id": "topic_006",
+      "title": "La Fiesta de las Luciérnagas",
+      "description": "El Bosque Mágico se prepara para un hermoso festival nocturno, pero Tico decide no ir porque le tiene miedo a la oscuridad. Sus amigos lo acompañan paso a paso, mostrándole que la noche está llena de luces maravillosas y ruidos amigables.",
+      "educational_value": "La valentía y cómo superar el miedo a lo desconocido (la oscuridad) apoyándose en la amistad.",
+      "references_episode": null,
+      "target_emotion": "Valentía",
+      "status": "pending",
+      "episode_id": null,
+      "created_at": "2026-03-03T00:24:10.662362",
       "completed_at": null
     }
   ]

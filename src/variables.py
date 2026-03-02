@@ -16,8 +16,8 @@ load_dotenv()
 # PIPELINE — Selección de provider
 # ==========================
 # 'veo' = Google Veo 3.1 API (producción, cloud, genera audio nativo)
-# 'ovi' = ComfyUI local (testing, dev, no gasta tokens)
-VIDEO_PROVIDER = "veo"
+# 'ltx' = LTX-2 via ComfyUI local (GPU local, no gasta tokens, genera audio)
+VIDEO_PROVIDER = "ltx"
 
 # ==========================
 # VEO — Google Veo 3.1 (Cloud)
@@ -47,22 +47,35 @@ VEO_POLLING_INTERVAL = 10
 VEO_TIMEOUT = 360
 
 # ==========================
-# OVI — Local Testing (ComfyUI)
+# LTX — LTX-2 via ComfyUI (Local GPU)
 # ==========================
-# URL del servidor ComfyUI local
-OVI_COMFYUI_URL = "http://127.0.0.1:8188"
+# ComfyUI API endpoint
+LTX_COMFYUI_URL = "http://127.0.0.1:8188"
 
-# Cuantización del modelo: "fp4" | "fp8" | "fp16"
-# fp4 → ~10-12GB VRAM (RTX 4070 Ti)
-# fp8 → ~20-24GB VRAM
-# fp16 → ~32GB+ VRAM
-OVI_QUANTIZATION = "fp4"
+# Model checkpoint (in ComfyUI/models/checkpoints/)
+LTX_CHECKPOINT = "ltx-2-19b-dev-fp4.safetensors"
 
-# Resolución para generación local (menor = menos VRAM)
-OVI_RESOLUTION = "512x512"
+# Distilled LoRA (in ComfyUI/models/loras/)
+LTX_LORA = "ltx-2-19b-distilled-lora-384.safetensors"
+LTX_LORA_STRENGTH = 0.6
+
+# Gemma 3 text encoder (in ComfyUI/models/text_encoders/)
+LTX_TEXT_ENCODER = "gemma-3-12b-it-qat-q4_0-unquantized/model-00001-of-00005.safetensors"
+
+# Resolution (must be divisible by 64 — 12GB VRAM safe)
+LTX_WIDTH = 768
+LTX_HEIGHT = 512
+
+# Video params
+LTX_FPS = 24
+
+# Sampling params
+LTX_STEPS = 25
+LTX_CFG = 7.0
+LTX_DENOISE = 1.0
 
 # Timeout de espera para ComfyUI (segundos)
-OVI_TIMEOUT = 300
+LTX_TIMEOUT = 600
 
 # ==========================
 # SCENE BUILDER — Lógica de construcción de vídeo

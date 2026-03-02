@@ -4,7 +4,7 @@ main.py — Orquestador principal del pipeline AI-videoCreator v2.0
 Pipeline simplificado:
 1. Determinar tema (manual, auto-topic, o generar ideas)
 2. Generar guión cinematográfico (ScriptEngine → Gemini)
-3. Generar vídeo nativo (VideoEngine → VeoProvider o OviProvider)
+3. Generar vídeo nativo (VideoEngine → VeoProvider o LtxProvider)
 4. Guardar en memoria episódica (MemoryManager)
 
 No más: VisualEngine, AudioEngine, MoviePy, Pillow mocks.
@@ -26,7 +26,7 @@ from src.utils.topic_manager import TopicManager
 from src.utils.memory_manager import MemoryManager
 from src.utils.progress_manager import ProgressManager
 from src.utils.resume_handler import resume_episode
-from src.variables import VIDEO_PROVIDER, OVI_COMFYUI_URL
+from src.variables import VIDEO_PROVIDER, LTX_COMFYUI_URL
 
 # Load env vars
 load_dotenv()
@@ -263,15 +263,15 @@ def main():
                 print(f"✅ Provider 'veo' disponible — {key_mgr.get_key_label()}")
             except Exception as e:
                 print(f"❌ Provider 'veo' NO disponible: {e}")
-        elif VIDEO_PROVIDER == "ovi":
+        elif VIDEO_PROVIDER in ("ltx", "ovi"):
             try:
-                response = httpx.get(f"{OVI_COMFYUI_URL}/system_stats", timeout=5)
+                response = httpx.get(f"{LTX_COMFYUI_URL}/system_stats", timeout=5)
                 if response.status_code == 200:
-                    print(f"✅ Provider 'ovi' disponible en {OVI_COMFYUI_URL}")
+                    print(f"✅ Provider 'ltx' disponible en {LTX_COMFYUI_URL}")
                 else:
-                    print(f"❌ Provider 'ovi' respondió con status {response.status_code}")
+                    print(f"❌ Provider 'ltx' respondió con status {response.status_code}")
             except Exception as e:
-                print(f"❌ Provider 'ovi' NO disponible: {e}")
+                print(f"❌ Provider 'ltx' NO disponible: {e}")
         else:
             print(f"❌ Provider '{VIDEO_PROVIDER}' no reconocido")
         return
