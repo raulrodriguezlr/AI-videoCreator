@@ -59,8 +59,9 @@ LTX_CHECKPOINT = "ltx-2-19b-dev-fp4.safetensors"
 LTX_LORA = "ltx-2-19b-distilled-lora-384.safetensors"
 LTX_LORA_STRENGTH = 0.6
 
-# Gemma 3 text encoder (in ComfyUI/models/text_encoders/)
-LTX_TEXT_ENCODER = "gemma-3-12b-it-qat-q4_0-unquantized/model-00001-of-00005.safetensors"
+# Gemma 3 text encoder folder (in ComfyUI/models/text_encoders/)
+# The exact path is resolved at runtime from ComfyUI (OS-agnostic)
+LTX_TEXT_ENCODER = "gemma-3-12b-it-qat-q4_0-unquantized"
 
 # Resolution (must be divisible by 64 — 12GB VRAM safe)
 LTX_WIDTH = 768
@@ -85,13 +86,6 @@ USE_REFERENCE_IMAGES = True
 
 # Máximo de extensiones por clip (Veo soporta hasta 20)
 SCENE_BUILDER_MAX_EXTENDS = 20
-
-# ==========================
-# SMART MODEL SELECTION — Modelo según importancia de escena
-# ==========================
-# Si True, cada escena usa un modelo diferente según narrative_phase.
-# Si False, todas usan VEO_MODEL (el de arriba).
-SMART_MODEL_SELECTION = True
 
 # narrative_phase → tier
 SCENE_TIER_MAP = {

@@ -52,10 +52,44 @@ class LtxProvider(BaseVideoProvider):
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.assets_dir, exist_ok=True)
         self.comfyui_url = LTX_COMFYUI_URL
+        # Resolve actual text encoder path from ComfyUI (OS-agnostic)
+        self._resolved_text_encoder = self._resolve_text_encoder_path()
 
     def _load_config(self, path: str) -> dict:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
+
+    def _resolve_text_encoder_path(self) -> str:
+        """Query ComfyUI to get the correct text encoder path (OS-agnostic).
+
+        ComfyUI returns paths with the native OS separator (backslash on Windows,
+        forward slash on Linux/Docker). We match by folder name to find the right one.
+        """
+        try:
+            r = httpx.get(
+                f"{self.comfyui_url}/object_info/LTXVGemmaCLIPModelLoader",
+                timeout=5,
+            )
+            if r.status_code == 200:
+                info = r.json()
+                node = info.get("LTXVGemmaCLIPModelLoader", {})
+                options = (
+                    node.get("input", {})
+                    .get("required", {})
+                    .get("gemma_path", [[]])[0]
+                )
+                # Match by folder name from LTX_TEXT_ENCODER
+                folder = LTX_TEXT_ENCODER.replace("\\", "/").split("/")[0]
+                for opt in options:
+                    if folder in opt:
+                        print(f"[LTX] 📂 Text encoder resuelto: {opt}")
+                        return opt
+        except Exception:
+            pass
+
+        # Fallback to configured value
+        print(f"[LTX] ⚠️  Usando text encoder de variables.py: {LTX_TEXT_ENCODER}")
+        return LTX_TEXT_ENCODER
 
     def check_availability(self) -> bool:
         """Check if ComfyUI is running and accessible."""
@@ -334,23 +368,28 @@ class LtxProvider(BaseVideoProvider):
         frames: int,
         seed: int,
     ) -> dict:
-        """Build ComfyUI API-format workflow for LTX-2 text-to-video."""
+        """Build ComfyUI API-format workflow for LTX-2 text-to-video.
+
+        Uses LowVRAM loaders for 12GB GPU compatibility.
+        FP4 checkpoint does NOT embed Gemma, so we load it separately.
+        """
         return {
-            # 1. Load checkpoint
+            # 1. Load checkpoint MODEL + VAE
+            # ComfyUI handles VRAM offloading to CPU automatically
             "1": {
                 "class_type": "CheckpointLoaderSimple",
                 "inputs": {"ckpt_name": LTX_CHECKPOINT},
             },
-            # 2. Load Gemma text encoder
+            # 2. Load Gemma text encoder separately (CLIP)
             "2": {
                 "class_type": "LTXVGemmaCLIPModelLoader",
                 "inputs": {
-                    "clip_name": LTX_TEXT_ENCODER,
-                    "ckpt_name": LTX_CHECKPOINT,
-                    "max_seq_len": 1024,
+                    "gemma_path": self._resolved_text_encoder,
+                    "ltxv_path": LTX_CHECKPOINT,
+                    "max_length": 1024,
                 },
             },
-            # 3. Load distilled LoRA
+            # 3. Load distilled LoRA (on MODEL from node 1)
             "3": {
                 "class_type": "LoraLoaderModelOnly",
                 "inputs": {
@@ -359,7 +398,7 @@ class LtxProvider(BaseVideoProvider):
                     "strength_model": LTX_LORA_STRENGTH,
                 },
             },
-            # 4. Positive prompt encoding
+            # 4. Positive prompt encoding (CLIP from Gemma, node 2)
             "4": {
                 "class_type": "CLIPTextEncode",
                 "inputs": {
@@ -394,7 +433,7 @@ class LtxProvider(BaseVideoProvider):
                     "batch_size": 1,
                 },
             },
-            # 8. KSampler
+            # 8. KSampler (MODEL from LoRA node 3)
             "8": {
                 "class_type": "KSampler",
                 "inputs": {
@@ -410,7 +449,7 @@ class LtxProvider(BaseVideoProvider):
                     "latent_image": ["7", 0],
                 },
             },
-            # 9. VAE Decode
+            # 9. VAE Decode (VAE from checkpoint node 1, output 2)
             "9": {
                 "class_type": "VAEDecode",
                 "inputs": {
@@ -418,14 +457,14 @@ class LtxProvider(BaseVideoProvider):
                     "vae": ["1", 2],
                 },
             },
-            # 10. Audio VAE loader (loads the audio decoder weights)
+            # 10. Audio VAE loader
             "10": {
                 "class_type": "LTXVAudioVAELoader",
                 "inputs": {
                     "ckpt_name": LTX_CHECKPOINT,
                 },
             },
-            # 11. Decode audio from sampled latents using audio VAE
+            # 11. Decode audio from sampled latents
             "11": {
                 "class_type": "LTXVAudioVAEDecode",
                 "inputs": {
@@ -480,14 +519,14 @@ class LtxProvider(BaseVideoProvider):
             },
         }
 
-        # Update KSampler to use encoded image as latent
+        # Update KSampler to use encoded image as latent (node 8 = KSampler)
         workflow["8"]["inputs"]["latent_image"] = ["21", 0]
         # Lower denoise for I2V (preserve more of the input image structure)
         workflow["8"]["inputs"]["denoise"] = 0.85
 
         # Update filename prefix (node 13 = SaveVideo)
         workflow["13"]["inputs"]["filename_prefix"] = f"ltx_i2v_{seed}"
-        # Remove empty latent node (not needed for I2V)
+        # Remove empty latent node (not needed for I2V, node 7 = EmptyLTXVLatentVideo)
         del workflow["7"]
 
         return workflow
@@ -514,7 +553,8 @@ class LtxProvider(BaseVideoProvider):
             )
 
             if response.status_code != 200:
-                raise Exception(f"ComfyUI error: {response.status_code} - {response.text}")
+                error_detail = response.text[:500]
+                raise Exception(f"ComfyUI error: {response.status_code} - {error_detail}")
 
             prompt_id = response.json().get("prompt_id")
             print(f"[LTX] ⏳ Prompt enviado: {prompt_id[:12]}...")
@@ -532,26 +572,58 @@ class LtxProvider(BaseVideoProvider):
                     timeout=10,
                 ).json()
 
-                if prompt_id in history:
-                    outputs = history[prompt_id].get("outputs", {})
-                    # Find the output node with videos/gifs
-                    for node_id, output in outputs.items():
-                        items = output.get("videos", output.get("gifs", output.get("images", [])))
-                        if items:
-                            filename = items[0]["filename"]
-                            subfolder = items[0].get("subfolder", "")
-                            file_type = items[0].get("type", "output")
-                            return self._download_output(
-                                filename, subfolder, file_type,
-                                save_dir, scene_index, prompt,
-                            )
+                if prompt_id not in history:
+                    continue  # Not in history yet, keep waiting
 
-                    # Check for errors
-                    status = history[prompt_id].get("status", {})
-                    if status.get("status_str") == "error":
-                        msgs = status.get("messages", [])
-                        raise RuntimeError(f"ComfyUI error: {msgs}")
-                    break
+                entry = history[prompt_id]
+                status = entry.get("status", {})
+                status_str = status.get("status_str", "")
+
+                # Still running — keep polling
+                if status_str not in ("success", "error"):
+                    continue
+
+                # Execution error — extract full details
+                if status_str == "error":
+                    msgs = status.get("messages", [])
+                    error_detail = "Ejecución fallida en ComfyUI"
+                    for msg in msgs:
+                        if isinstance(msg, list) and len(msg) >= 2:
+                            msg_type = msg[0]
+                            msg_data = msg[1] if isinstance(msg[1], dict) else {}
+                            if msg_type == "execution_error":
+                                node_type = msg_data.get("node_type", "?")
+                                node_id = msg_data.get("node_id", "?")
+                                exception_msg = msg_data.get("exception_message", "")
+                                traceback_lines = msg_data.get("traceback", [])
+                                error_detail = (
+                                    f"Nodo '{node_type}' (ID {node_id}): {exception_msg}"
+                                )
+                                if traceback_lines:
+                                    tb = "\n".join(traceback_lines[-3:])
+                                    print(f"[LTX] 📋 Traceback ComfyUI:\n{tb}")
+                    raise RuntimeError(f"[LTX] {error_detail}")
+
+                # Success — find the output video
+                outputs = entry.get("outputs", {})
+                for node_id, output in outputs.items():
+                    items = (
+                        output.get("videos", [])
+                        or output.get("gifs", [])
+                        or output.get("images", [])
+                    )
+                    if items:
+                        filename = items[0]["filename"]
+                        subfolder = items[0].get("subfolder", "")
+                        file_type = items[0].get("type", "output")
+                        return self._download_output(
+                            filename, subfolder, file_type,
+                            save_dir, scene_index, prompt,
+                        )
+
+                raise RuntimeError(
+                    "[LTX] ComfyUI terminó pero no generó ningún archivo de salida."
+                )
 
             raise TimeoutError(f"[LTX] Timeout ({LTX_TIMEOUT}s) esperando generación.")
 
