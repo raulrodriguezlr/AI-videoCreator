@@ -47,36 +47,25 @@ VEO_POLLING_INTERVAL = 10
 VEO_TIMEOUT = 360
 
 # ==========================
-# LTX — LTX-2 via ComfyUI (Local GPU)
+# LTX-Video — Local Generation
 # ==========================
-# ComfyUI API endpoint
-LTX_COMFYUI_URL = "http://127.0.0.1:8188"
+# ==========================
+# LTX-2 — Local Generation
+# ==========================
+# Configuración para usar la librería oficial ltx-pipelines con LTX-2 19B (Gemma3 + Audio)
+LTX_MODELS_DIR = r"C:\Users\raulr\Documents\ComfyUI\models"
+LTX_CHECKPOINT = "checkpoints/ltx-2-19b-dev-fp4.safetensors"
+LTX_TEXT_ENCODER = "text_encoders/gemma-3-12b-it-qat-q4_0-unquantized"
+LTX_DISTILLED_LORA = "loras/ltx-2-19b-distilled-lora-384.safetensors"
+LTX_QUANTIZATION = "fp8-cast"     # Para 12GB VRAM
 
-# Model checkpoint (in ComfyUI/models/checkpoints/)
-LTX_CHECKPOINT = "ltx-2-19b-dev-fp4.safetensors"
-
-# Distilled LoRA (in ComfyUI/models/loras/)
-LTX_LORA = "ltx-2-19b-distilled-lora-384.safetensors"
-LTX_LORA_STRENGTH = 0.6
-
-# Gemma 3 text encoder folder (in ComfyUI/models/text_encoders/)
-# The exact path is resolved at runtime from ComfyUI (OS-agnostic)
-LTX_TEXT_ENCODER = "gemma-3-12b-it-qat-q4_0-unquantized"
-
-# Resolution (must be divisible by 64 — 12GB VRAM safe)
 LTX_WIDTH = 768
 LTX_HEIGHT = 512
-
-# Video params
-LTX_FPS = 24
-
-# Sampling params
-LTX_STEPS = 25
-LTX_CFG = 7.0
-LTX_DENOISE = 1.0
-
-# Timeout de espera para ComfyUI (segundos)
-LTX_TIMEOUT = 600
+LTX_NUM_FRAMES = 97               # Recommended for LTX-2 distilled: 97 frames (~4s)
+LTX_FRAME_RATE = 24
+LTX_INFERENCE_STEPS = 30
+LTX_DURATION_SECONDS = 4
+LTX_NEGATIVE_PROMPT = "worst quality, inconsistent motion, blurry, jittery, distorted"
 
 # ==========================
 # SCENE BUILDER — Lógica de construcción de vídeo

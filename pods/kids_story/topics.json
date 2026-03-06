@@ -55,8 +55,8 @@
       "educational_value": "La honestidad, asumir la responsabilidad de los propios errores y la importancia de pedir perdón.",
       "references_episode": "El Gran Tesoro de Bellotas",
       "target_emotion": "Empatía",
-      "status": "pending",
-      "episode_id": null,
+      "status": "in_progress",
+      "episode_id": "ep_006_el_juguete_roto_de_lilo",
       "created_at": "2026-03-03T00:24:10.662362",
       "completed_at": null
     },
@@ -67,8 +67,8 @@
       "educational_value": "La valentía y cómo superar el miedo a lo desconocido (la oscuridad) apoyándose en la amistad.",
       "references_episode": null,
       "target_emotion": "Valentía",
-      "status": "pending",
-      "episode_id": null,
+      "status": "in_progress",
+      "episode_id": "ep_007_la_fiesta_de_las_luciérnagas",
       "created_at": "2026-03-03T00:24:10.662362",
       "completed_at": null
     }

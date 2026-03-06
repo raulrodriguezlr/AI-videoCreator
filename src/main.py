@@ -12,10 +12,15 @@ El vídeo se genera nativamente con audio sincronizado.
 """
 
 import os
+import sys
 import argparse
 import json
 import httpx
 from dotenv import load_dotenv
+
+# Reconfigure stdout to utf-8 to handle emojis in Windows cmd/powershell
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 from src.engines.script_engine import ScriptGenerator
 from src.engines.video_engine import VideoEngine
@@ -26,7 +31,7 @@ from src.utils.topic_manager import TopicManager
 from src.utils.memory_manager import MemoryManager
 from src.utils.progress_manager import ProgressManager
 from src.utils.resume_handler import resume_episode
-from src.variables import VIDEO_PROVIDER, LTX_COMFYUI_URL
+from src.variables import VIDEO_PROVIDER
 
 # Load env vars
 load_dotenv()
