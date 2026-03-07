@@ -31,8 +31,8 @@
       "educational_value": "La importancia de la honestidad, el valor de pedir perdón y cómo responsabilizarse para reparar los errores.",
       "references_episode": "El Gran Tesoro de Bellotas",
       "target_emotion": "Empatía y Alivio",
-      "status": "pending",
-      "episode_id": null,
+      "status": "in_progress",
+      "episode_id": "ep_003_el_accidente_con_el_nido",
       "created_at": "2026-03-07T13:49:38.846933",
       "completed_at": null
     },
@@ -43,9 +43,45 @@
       "educational_value": "Desarrollar la paciencia, la perseverancia y comprender el ciclo básico de cuidado que necesita la naturaleza para crecer.",
       "references_episode": null,
       "target_emotion": "Paciencia y Asombro",
+      "status": "in_progress",
+      "episode_id": "ep_004_la_semilla_mágica_impaciente",
+      "created_at": "2026-03-07T13:49:38.846958",
+      "completed_at": null
+    },
+    {
+      "id": "topic_005",
+      "title": "La Semillita Dormilona",
+      "description": "Tico decide plantar una semilla que guardó de la enorme bellota que encontró con sus amigos. Al ver que no crece al instante, intenta despertarla gritando y saltando, hasta que el Búho Sabio le enseña que la naturaleza necesita tiempo.",
+      "educational_value": "La importancia de la paciencia y conocimientos básicos de ciencias naturales sobre cómo crecen las plantas con agua, sol y tiempo.",
+      "references_episode": "El Gran Tesoro de Bellotas",
+      "target_emotion": "Curiosidad",
+      "status": "in_progress",
+      "episode_id": "ep_005_la_semillita_dormilona",
+      "created_at": "2026-03-07T14:24:25.340362",
+      "completed_at": null
+    },
+    {
+      "id": "topic_006",
+      "title": "El Baile de las Luciérnagas",
+      "description": "Hay un festival nocturno en el Bosque Mágico, pero Tico tiene miedo de salir porque las sombras de los árboles le parecen monstruos. Junto a sus amigos, aprende a hacer figuras divertidas con sus propias sombras y descubre que no hay nada que temer.",
+      "educational_value": "El valor de la valentía frente al miedo a la oscuridad y la comprensión práctica de que las sombras solo son objetos que tapan la luz.",
+      "references_episode": null,
+      "target_emotion": "Valentía",
       "status": "pending",
       "episode_id": null,
-      "created_at": "2026-03-07T13:49:38.846958",
+      "created_at": "2026-03-07T14:24:25.340383",
+      "completed_at": null
+    },
+    {
+      "id": "topic_007",
+      "title": "El Misterio de las Moras Desaparecidas",
+      "description": "Mientras todos preparan una fiesta sorpresa para un amigo del bosque, Tico no resiste la tentación y se come las moras del pastel. Al principio inventa una historia sobre un pájaro ladrón, pero sentirse culpable no lo deja disfrutar de la fiesta.",
+      "educational_value": "El valor ético y social de la honestidad, aprender a hacerse responsable de los propios errores y entender la importancia de pedir perdón.",
+      "references_episode": null,
+      "target_emotion": "Empatía",
+      "status": "pending",
+      "episode_id": null,
+      "created_at": "2026-03-07T14:24:25.340393",
       "completed_at": null
     }
   ]

@@ -248,6 +248,38 @@ class VeoProvider(BaseVideoProvider):
             save_dir=save_dir, scene_index=scene_index, narrative_phase=narrative_phase,
         )
 
+    def _apply_dubbing(self, clip: VideoClip, scene: dict, clips_dir: str, scene_num_str: str) -> None:
+        """
+        Genera el TTS con ElevenLabs y lo mezcla al clip (Plan B Doblaje).
+        """
+        audio_text = scene.get("audio_text", "")
+        character_name = scene.get("character", "")
+        if not audio_text or not character_name:
+            return
+
+        from src.providers.elevenlabs_provider import ElevenLabsProvider
+        from src.utils.audio_mixer import AudioMixer
+
+        config_path = os.path.join(self.pod_dir, "config.json")
+        eleven_prov = ElevenLabsProvider(config_path)
+        
+        audio_filename = f"dialogue_{scene_num_str}.wav"
+        audio_path = os.path.join(clips_dir, audio_filename)
+
+        generated_audio = eleven_prov.generate_dialogue(audio_text, character_name, audio_path)
+        if generated_audio:
+            mixed_path = clip.file_path.replace(".mp4", "_dubbed.mp4")
+            final_clip_path = AudioMixer.mix_audio_to_video(
+                video_path=clip.file_path,
+                audio_path=generated_audio,
+                output_path=mixed_path,
+                audio_volume=1.0  # Dialogue should be at 100% volume
+            )
+            if final_clip_path and final_clip_path != clip.file_path:
+                os.replace(final_clip_path, clip.file_path)
+                print(f"[DUBBING] 🎙️ Audio de {character_name} inyectado exitosamente al clip {scene_num_str}")
+
+
     def generate_full_video(
         self,
         script: Dict[str, Any],
@@ -349,6 +381,8 @@ class VeoProvider(BaseVideoProvider):
                         narrative_phase=narrative_phase,
                     )
 
+                self._apply_dubbing(clip, scene, clips_dir, scene_num_str)
+
                 clips.append(clip)
                 print(f"[VEO] ✅ Escena {scene_num} generada: {clip.file_path}")
                 self.key_manager.record_success()
@@ -386,6 +420,9 @@ class VeoProvider(BaseVideoProvider):
                                     reference_images=ref_images,
                                     save_dir=clips_dir, scene_index=i, narrative_phase=narrative_phase,
                                 )
+                            
+                            self._apply_dubbing(clip, scene, clips_dir, scene_num_str)
+                            
                             clips.append(clip)
                             self.key_manager.record_success()
                             print(f"[VEO] ✅ Escena {scene_num} generada con key rotada: {clip.file_path}")
@@ -465,9 +502,7 @@ class VeoProvider(BaseVideoProvider):
         elapsed = 0
         while not operation.done:
             if elapsed >= VEO_TIMEOUT:
-                raise TimeoutError(
-                    f"[VEO] Timeout ({VEO_TIMEOUT}s) esperando generación de vídeo."
-                )
+                raise TimeoutError(f"Operación excedió timeout de {VEO_TIMEOUT}s")
             print(f"[VEO] ⏳ Esperando... ({elapsed}s)")
             time.sleep(VEO_POLLING_INTERVAL)
             elapsed += VEO_POLLING_INTERVAL
@@ -500,6 +535,13 @@ class VeoProvider(BaseVideoProvider):
         generated.video.save(output_path)
 
         print(f"[VEO] 💾 Descargado: {output_path}")
+
+        # --- DUBBING PLAN B: Strip native audio ---
+        from src.utils.audio_mixer import AudioMixer
+        silent_path = output_path.replace(".mp4", "_silent.mp4")
+        if AudioMixer.strip_audio(output_path, silent_path) == silent_path:
+            os.replace(silent_path, output_path)
+            print(f"[VEO] 🔇 Audio original silenciado (Plan B Doblaje)")
 
         return VideoClip(
             file_path=output_path,

@@ -16,6 +16,37 @@ class AudioMixer:
             return False
 
     @staticmethod
+    def strip_audio(video_path: str, output_path: str) -> str:
+        """
+        Elimina la pista de audio de un vídeo.
+        Útil para preparar los clips de Veo para doblaje (Plan B).
+        """
+        if not AudioMixer.is_ffmpeg_installed():
+            print("[MIXER] ❌ FFmpeg no está instalado. No se puede silenciar.")
+            return video_path
+            
+        print(f"[MIXER] 🔇 Silenciando vídeo {os.path.basename(video_path)}...")
+        
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-c:v", "copy",
+            "-an",  # Disable audio
+            output_path
+        ]
+        try:
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode == 0 and os.path.exists(output_path):
+                print(f"[MIXER] ✅ Vídeo silenciado: {os.path.basename(output_path)}")
+                return output_path
+            else:
+                print(f"[MIXER] ⚠️  Fallo al silenciar. Fallback original. Log:\n{result.stderr}")
+                return video_path
+        except Exception as e:
+            print(f"[MIXER] ❌ Error ejecutando FFmpeg (strip_audio): {e}")
+            return video_path
+
+    @staticmethod
     def mix_audio_to_video(video_path: str, audio_path: str, output_path: str, audio_volume: float = 1.0) -> str:
         """
         Mixes an audio file into a video file.
