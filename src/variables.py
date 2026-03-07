@@ -17,7 +17,7 @@ load_dotenv()
 # ==========================
 # 'veo' = Google Veo 3.1 API (producción, cloud, genera audio nativo)
 # 'ltx' = LTX-2 via ComfyUI local (GPU local, no gasta tokens, genera audio)
-VIDEO_PROVIDER = "ltx"
+VIDEO_PROVIDER = "veo"
 
 # ==========================
 # VEO — Google Veo 3.1 (Cloud)
@@ -25,7 +25,6 @@ VIDEO_PROVIDER = "ltx"
 # Modelos disponibles:
 #   "veo-3.1-generate-preview"        → Máxima calidad, más lento
 #   "veo-3.1-fast-generate-preview"   → Rápido, buena calidad
-#   "veo-2"                           → Anterior, sin audio nativo
 VEO_MODEL = "veo-3.1-generate-preview"
 
 # Resolución: "720p", "1080p", "4k"

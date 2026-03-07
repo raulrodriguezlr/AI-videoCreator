@@ -34,9 +34,6 @@ from src.variables import (
     VEO_POLLING_INTERVAL,
     VEO_TIMEOUT,
     USE_REFERENCE_IMAGES,
-    SMART_MODEL_SELECTION,
-    SCENE_TIER_MAP,
-    TIER_MODEL_MAP,
 )
 
 class VeoProvider(BaseVideoProvider):
@@ -156,14 +153,7 @@ class VeoProvider(BaseVideoProvider):
         """
         print(f"[VEO] 🎬 Generando escena: '{prompt[:80]}...'")
 
-        # Smart model selection
         model = VEO_MODEL
-        if SMART_MODEL_SELECTION and narrative_phase:
-            tier = SCENE_TIER_MAP.get(narrative_phase)
-            if tier:
-                model = TIER_MODEL_MAP.get(tier, VEO_MODEL)
-                print(f"[VEO]    🎯 Tier: {tier} ({narrative_phase}) → {model}")
-
         print(f"[VEO]    Modelo: {model} | Duración: {duration}s | Resolución: {VEO_RESOLUTION}")
 
         gen_params = self._build_gen_params(
@@ -172,13 +162,6 @@ class VeoProvider(BaseVideoProvider):
             reference_images=reference_images,
             negative_prompt=negative_prompt,
         )
-        # Override model for smart selection
-        if SMART_MODEL_SELECTION and narrative_phase:
-            tier = SCENE_TIER_MAP.get(narrative_phase)
-            if tier:
-                selected = TIER_MODEL_MAP.get(tier, VEO_MODEL)
-                gen_params["model"] = selected
-
         operation = self.client.models.generate_videos(**gen_params)
         return self._poll_and_download(
             operation, prompt, seed,
@@ -342,8 +325,9 @@ class VeoProvider(BaseVideoProvider):
             try:
                 scene_num_str = f"{scene_num:02d}"
 
-                if i == 0 or not clips:
-                    # First scene or no previous clips: pure text-to-video
+                if i == 0 or not clips or transition == "cut":
+                    # First scene, no previous clips, or explicit "cut" transition
+                    # We start a fresh text-to-video generation
                     clip = self.generate_scene(
                         prompt=prompt,
                         duration=scene_duration,
@@ -355,8 +339,7 @@ class VeoProvider(BaseVideoProvider):
                         narrative_phase=narrative_phase,
                     )
                 else:
-                    # All subsequent scenes use jump_to for clean cuts
-                    # (extend is disabled — it duplicates content)
+                    # All subsequent scenes with "jump" transition use jump_to for clean sequence cuts
                     clip = self.jump_to_scene(
                         previous_clip=clips[-1],
                         prompt=prompt,
@@ -391,7 +374,7 @@ class VeoProvider(BaseVideoProvider):
                         print(f"[VEO] 🔄 Reintentando escena {scene_num} con {self.key_manager.get_key_label()} ({self.key_manager.get_active_key()})...")
                         try:
                             # Retry the same scene with the new key
-                            if i == 0 or not clips:
+                            if i == 0 or not clips or transition == "cut":
                                 clip = self.generate_scene(
                                     prompt=prompt, duration=scene_duration, seed=scene.get("seed"),
                                     reference_images=ref_images, negative_prompt=negative,
@@ -623,19 +606,8 @@ class VeoProvider(BaseVideoProvider):
         """
         Build a detailed cinematographic prompt from scene metadata.
         Combines visual_prompt with camera, mood, lighting, and audio info.
-        If the assigned model does not support audio (e.g., Veo 2), audio text is stripped
-        so it doesn't get incorrectly rendered as onscreen text.
         """
         parts = []
-
-        # Determine target model to check audio support
-        model = VEO_MODEL
-        if SMART_MODEL_SELECTION and narrative_phase:
-            tier = SCENE_TIER_MAP.get(narrative_phase)
-            if tier:
-                model = TIER_MODEL_MAP.get(tier, VEO_MODEL)
-                
-        is_audio_supported = "veo-3" in model
 
         # Camera metadata
         camera = scene.get("camera", {})
@@ -659,18 +631,32 @@ class VeoProvider(BaseVideoProvider):
             parts.append(f"{lighting} lighting")
 
         # Main visual prompt
-        visual_prompt = scene.get("visual_prompt", scene.get("narration", ""))
+        visual_prompt = scene.get("visual_prompt", "")
         parts.append(visual_prompt)
 
         # Audio/dialogue with voice direction
-        character = scene.get("character", "")
+        character_name = scene.get("character", "")
         audio_text = scene.get("audio_text", "")
         voice_direction = scene.get("voice_direction", "")
 
-        if audio_text and is_audio_supported:
-            # All dialogue is Tico narrating in first person — consistent voice
-            voice_desc = f" ({voice_direction})" if voice_direction else " (young cheerful male voice, European Spanish)"
-            parts.append(f'Tico{voice_desc} says: "{audio_text}"')
+        if audio_text:
+            # Default fallback if character not found or not mapped
+            voice_desc = "young cheerful male voice, European Spanish"
+            display_name = "Narrador"
+
+            if character_name:
+                display_name = character_name
+                # Find character in config to extract detailed voice profile
+                for char_config in self.config.get("characters", []):
+                    if char_config.get("name", "").lower() == character_name.lower():
+                        if "voice_description" in char_config:
+                            voice_desc = char_config["voice_description"]
+                        break
+            
+            # Combine config voice description with scene-specific direction if present
+            final_voice_modifier = f"{voice_desc}, {voice_direction}" if voice_direction else voice_desc
+
+            parts.append(f'{display_name} ({final_voice_modifier}) says: "{audio_text}"')
 
         # Art style from config
         art_style = self.config.get("consistency", {}).get("art_style", "")

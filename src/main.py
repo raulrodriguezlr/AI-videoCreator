@@ -23,7 +23,6 @@ from src.engines.topic_engine import TopicEngine
 from src.utils.api_key_manager import get_api_key_manager
 from src.utils.episode_manager import EpisodeManager
 from src.utils.topic_manager import TopicManager
-from src.utils.memory_manager import MemoryManager
 from src.utils.progress_manager import ProgressManager
 from src.utils.resume_handler import resume_episode
 from src.variables import VIDEO_PROVIDER, LTX_COMFYUI_URL

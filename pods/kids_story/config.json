@@ -20,7 +20,8 @@
             "role": "protagonist",
             "visual_description": "Friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass",
             "personality": "curious, brave, sometimes impulsive but always learns from mistakes, loves helping friends",
-            "reference_image": "assets/ref_tico.png"
+            "reference_image": "assets/ref_tico.png",
+            "voice_description": "young 8-year-old boy, slightly raspy and breathy timbre, high-pitched energetic tone, speaks quickly, European Spanish accent"
         },
         {
             "name": "Narrator",
