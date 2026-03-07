@@ -21,12 +21,14 @@
             "visual_description": "Friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass",
             "personality": "curious, brave, sometimes impulsive but always learns from mistakes, loves helping friends",
             "reference_image": "assets/ref_tico.png",
-            "voice_description": "young 8-year-old boy, slightly raspy and breathy timbre, high-pitched energetic tone, speaks quickly, European Spanish accent"
+            "voice_description": "young 8-year-old boy, slightly raspy and breathy timbre, high-pitched energetic tone, speaks quickly, European Spanish accent",
+            "elevenlabs_voice_id": "jBpfuIE2acCO8z3wKNLl"
         },
         {
             "name": "Narrator",
             "role": "storyteller",
-            "personality": "warm, encouraging, asks questions to engage viewers, patient and supportive"
+            "personality": "warm, encouraging, asks questions to engage viewers, patient and supportive",
+            "elevenlabs_voice_id": "ErXwobaYiN019PkySvjV"
         }
     ],
     "topic_generation": {

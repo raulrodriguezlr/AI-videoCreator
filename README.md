@@ -31,7 +31,8 @@ main.py (orquestador)
 - **Python 3.10+**
 - **Google AI Pro plan** (para Veo 3.1 API)
 - **API Key de Google AI Studio**: [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- **API Key de ElevenLabs**: Para la generación de la música ambiental (Sound Generation API).
+- **API Key de ElevenLabs**: Para la generación de voces de personajes y música ambiental.
+- **FFmpeg**: Sistema de procesamiento de audio/vídeo (necesario para el doblaje automático).
 
 ### Requisitos opcionales (testing local)
 

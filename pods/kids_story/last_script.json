@@ -1,24 +1,24 @@
 {
-  "title": "La Semillita Dormilona",
-  "summary": "Tico encuentra una semilla mágica y aprende que, a diferencia de otras cosas, la naturaleza no tiene prisa y requiere paciencia, agua y luz para crecer.",
-  "moral": "Las cosas hermosas y valiosas requieren tiempo, cuidado y mucha paciencia para crecer.",
-  "ambient_audio_prompt": "Warm magical acoustic guitar, playful pizzicato strings, gentle magical forest ambiance, Disney Pixar cinematic score",
+  "title": "El Misterio de las Moras Desaparecidas",
+  "summary": "Tico descubre que su arbusto favorito de moras está vacío. Siguiendo unas pistas, encuentra al osito Bodo, aprendiendo que es mejor pedir las cosas por favor que cogerlas a escondidas.",
+  "moral": "Si necesitas algo, es mejor pedirlo por favor y ser honesto. Compartir fortalece la amistad.",
+  "ambient_audio_prompt": "Cheerful magical forest orchestral music, playful marimbas and soft acoustic guitar, 3D animated movie style",
   "scenes": [
     {
       "scene_number": 1,
       "narrative_phase": "introduction",
-      "visual_prompt": "3D Disney/Pixar style. A friendly squirrel named Tico with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with tiny acorns and a compass. He is standing in a lush, magical forest with giant glowing mushrooms, waving enthusiastically at the camera. Vibrant colors, warm cinematic lighting. NO TEXT.",
-      "audio_text": "¡Hola, amigos! ¿Os acordáis de la súper bellota que compartimos el otro día? ¡Pues hoy tengo otra sorpresa increíble!",
+      "visual_prompt": "3D Disney Pixar style. A friendly squirrel named Tico with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack and a tiny compass. He is standing on a mossy log in a vibrant magical forest, waving enthusiastically at the camera. Warm sunlight filtering through the green canopy.",
+      "audio_text": "¡Hola, amigos! ¿Os acordáis de mí? Soy Tico. ¡Qué alegría volver a veros por el Bosque Mágico!",
       "character": "Tico",
-      "voice_direction": "alegre y muy enérgico",
+      "voice_direction": "alegre y enérgico",
       "camera": {
         "shot_type": "medium",
-        "movement": "dolly_in",
+        "movement": "static",
         "angle": "eye_level"
       },
       "mood": "joyful",
-      "lighting": "bright_daylight",
-      "transition_to_next": "cut",
+      "lighting": "golden_hour",
+      "transition_to_next": "jump",
       "duration_seconds": 8,
       "is_interactive_question": false,
       "pause_for_answer": 0
@@ -26,18 +26,18 @@
     {
       "scene_number": 2,
       "narrative_phase": "introduction",
-      "visual_prompt": "3D Disney/Pixar style. Extreme close-up of Tico's fluffy orange paws opening his small green adventurer's backpack. He pulls out a tiny, glowing blue seed. Detailed textures on the fur and the glowing seed. Magical sparkles floating around the seed. NO TEXT.",
-      "audio_text": "Mirad lo que he encontrado en mi mochila... ¡Una semillita brillante! He decidido plantarla para tener mi propia planta mágica en el bosque.",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel with his green backpack holds up a small woven wooden basket. He points excitedly to his right, where a path leads deeper into the colorful, glowing forest. Rich cinematic lighting.",
+      "audio_text": "La última vez aprendimos a compartir aquella bellota gigante. ¡Hoy he traído mi cesta para recoger mi postre favorito: unas moras muy dulces!",
       "character": "Tico",
-      "voice_direction": "susurrando con asombro",
+      "voice_direction": "emocionado",
       "camera": {
-        "shot_type": "extreme_close_up",
-        "movement": "static",
-        "angle": "high_angle"
+        "shot_type": "medium",
+        "movement": "pan_right",
+        "angle": "eye_level"
       },
-      "mood": "mysterious",
-      "lighting": "soft_diffused",
-      "transition_to_next": "jump",
+      "mood": "exciting",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
       "duration_seconds": 7,
       "is_interactive_question": false,
       "pause_for_answer": 0
@@ -45,17 +45,17 @@
     {
       "scene_number": 3,
       "narrative_phase": "establishing",
-      "visual_prompt": "3D Disney/Pixar style. Tico the orange squirrel using a small twig to dig a tiny hole in soft brown soil. He carefully places the glowing blue seed inside the hole and gently covers it with dirt. Forest background with warm sunbeams. NO TEXT.",
-      "audio_text": "Le hice una camita de tierra muy suave y la tapé con muchísimo cuidado para que estuviera cómoda.",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel arrives at a large, lush green blackberry bush, but there are no berries on it. Tico drops his basket in shock, his hands on his cheeks, big eyes wide open in surprise.",
+      "audio_text": "¡Oh, no! ¡Pero si el arbusto está completamente vacío! ¡No queda ni una sola mora!",
       "character": "Tico",
-      "voice_direction": "tierno y cuidadoso",
+      "voice_direction": "sorprendido y exagerado",
       "camera": {
-        "shot_type": "medium",
-        "movement": "pan_down",
-        "angle": "high_angle"
+        "shot_type": "wide",
+        "movement": "dolly_in",
+        "angle": "eye_level"
       },
-      "mood": "calm",
-      "lighting": "golden_hour",
+      "mood": "mysterious",
+      "lighting": "soft_diffused",
       "transition_to_next": "jump",
       "duration_seconds": 8,
       "is_interactive_question": false,
@@ -64,13 +64,89 @@
     {
       "scene_number": 4,
       "narrative_phase": "establishing",
-      "visual_prompt": "3D Disney/Pixar style. Tico sitting cross-legged right in front of the small dirt mound, staring intensely at it with wide eyes. He rests his chin on his paws, tapping one foot impatiently. Nothing is happening to the dirt. NO TEXT.",
-      "audio_text": "Y entonces me senté a esperar... y esperar... ¡Pero no salía nada! ¡Qué semillita más dormilona!",
+      "visual_prompt": "3D Disney Pixar style. Close up of Tico the squirrel looking directly into the camera lens with an inquisitive expression. He holds his tiny compass up like a magnifying glass.",
+      "audio_text": "¡Es el gran misterio de las moras desaparecidas! Amigos, ¿me ayudáis a investigar qué ha pasado?",
       "character": "Tico",
-      "voice_direction": "impaciente y un poco frustrado",
+      "voice_direction": "intrigado y cómplice",
       "camera": {
-        "shot_type": "close_up",
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "mysterious",
+      "lighting": "soft_diffused",
+      "transition_to_next": "jump",
+      "duration_seconds": 6,
+      "is_interactive_question": true,
+      "pause_for_answer": 3
+    },
+    {
+      "scene_number": 5,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel is crouching on the dirt path, examining the ground. There are distinct, glowing purple footprints leading away from the bush. Tico points at the footprints with a triumphant smile.",
+      "audio_text": "¡Ajá! ¡Mirad lo que he encontrado! Hay pisadas de color morado en el suelo. ¡Seguro que son del ladrón de moras!",
+      "character": "Tico",
+      "voice_direction": "triunfante",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "tracking",
+        "angle": "high_angle"
+      },
+      "mood": "exciting",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 6,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel tiptoes dramatically through a patch of giant colorful mushrooms. He is following the purple footprints. Dappled sunlight hits his orange fur.",
+      "audio_text": "Seguí las huellas moradas con mucho cuidado, de puntillas, para no hacer nada de ruido...",
+      "character": "Tico",
+      "voice_direction": "susurrando",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_left",
+        "angle": "low_angle"
+      },
+      "mood": "mysterious",
+      "lighting": "dramatic_shadows",
+      "transition_to_next": "jump",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 7,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico is hiding behind a large oak tree trunk, peeking out. In the background, Bodo, a small, chubby brown bear cub, is sitting on the grass. Bodo's paws and mouth are covered in purple blackberry juice.",
+      "audio_text": "¡Mirad allí! ¡Las pisadas llevan hasta Bodo, el osito! Y fijaos... ¡tiene las patitas manchadas de zumo de mora!",
+      "character": "Tico",
+      "voice_direction": "emocionado en voz baja",
+      "camera": {
+        "shot_type": "medium",
         "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "tense",
+      "lighting": "soft_diffused",
+      "transition_to_next": "jump",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 8,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico steps out from behind the tree and stands in front of the bear cub, Bodo. Tico has his hands on his hips, looking a bit stern but not mean. Bodo looks down, rubbing his tummy nervously.",
+      "audio_text": "Salí de mi escondite y le pregunté: ¡Bodo! ¿Te has comido tú todas mis moras favoritas?",
+      "character": "Tico",
+      "voice_direction": "firme pero amable",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
         "angle": "eye_level"
       },
       "mood": "tense",
@@ -81,15 +157,72 @@
       "pause_for_answer": 0
     },
     {
-      "scene_number": 5,
+      "scene_number": 9,
       "narrative_phase": "rising_action",
-      "visual_prompt": "3D Disney/Pixar style. Tico the orange squirrel holding a hollow acorn shell like a megaphone. He is shouting into the dirt patch, leaning forward aggressively but comically. A few specks of dust fly away from his shout. NO TEXT.",
-      "audio_text": "Pensé que a lo mejor no me escuchaba desde ahí abajo, así que le grité: ¡Despierta, semillita, que ya es de día!",
+      "visual_prompt": "3D Disney Pixar style. Close up of the bear cub Bodo looking very sad with big glossy eyes, purple stains on his face. Tico is visible in the foreground edge, listening sympathetically.",
+      "audio_text": "Bodo se puso muy triste. Me confesó que tenía mucha hambre, pero le daba vergüenza pedirme que las compartiera con él.",
       "character": "Tico",
-      "voice_direction": "gritando de forma cómica",
+      "voice_direction": "comprensivo y suave",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "dolly_in",
+        "angle": "high_angle"
+      },
+      "mood": "calm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "jump",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 10,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel puts a paw on his chin, looking thoughtful. Then, a bright, friendly smile spreads across his face. He reaches out to hold Bodo the bear cub's paw.",
+      "audio_text": "Al principio me enfadé un poquito... pero luego recordé lo maravilloso que fue compartir aquella gran bellota. ¡Los amigos se ayudan!",
+      "character": "Tico",
+      "voice_direction": "reflexivo y luego feliz",
       "camera": {
         "shot_type": "medium",
         "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "triumphant",
+      "lighting": "golden_hour",
+      "transition_to_next": "jump",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 11,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel is talking directly to Bodo the bear cub. Both look very happy. Tico points up to the very top branches of a nearby giant bush.",
+      "audio_text": "Así que le dije: ¡No pasa nada, Bodo! Solo tenías que pedírmelo por favor. Ven, conozco un sitio donde hay más.",
+      "character": "Tico",
+      "voice_direction": "animado y perdonando",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "crane_up",
+        "angle": "low_angle"
+      },
+      "mood": "joyful",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 12,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel is nimbly climbing the thin, high branches of a tall blackberry bush where large, juicy blackberries grow. Bodo the bear cub watches from below, holding Tico's basket.",
+      "audio_text": "Como Bodo es un osito y pesa mucho, no llegaba a las ramas más altas. ¡Así que yo trepé por él usando mis superpatitas!",
+      "character": "Tico",
+      "voice_direction": "orgulloso y divertido",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "pan_up",
         "angle": "low_angle"
       },
       "mood": "exciting",
@@ -100,171 +233,38 @@
       "pause_for_answer": 0
     },
     {
-      "scene_number": 6,
-      "narrative_phase": "rising_action",
-      "visual_prompt": "3D Disney/Pixar style. Tico holding a green leaf rolled up like a tiny flute. He is puffing his cheeks and blowing into it right next to the dirt mound. Funny, exasperated expression. NO TEXT.",
-      "audio_text": "Incluso le toqué una canción despertador con una hoja, ¡pero la muy traviesa seguía sin asomar la cabecita!",
-      "character": "Tico",
-      "voice_direction": "divertido pero confundido",
-      "camera": {
-        "shot_type": "close_up",
-        "movement": "pan_left",
-        "angle": "eye_level"
-      },
-      "mood": "joyful",
-      "lighting": "bright_daylight",
-      "transition_to_next": "cut",
-      "duration_seconds": 8,
-      "is_interactive_question": false,
-      "pause_for_answer": 0
-    },
-    {
-      "scene_number": 7,
-      "narrative_phase": "rising_action",
-      "visual_prompt": "3D Disney/Pixar style. Tico turns to face the camera directly, pointing at the patch of dirt with a puzzled look. He scratches his head, causing one ear to flop down. Colorful blurred forest background. NO TEXT.",
-      "audio_text": "¡Oye! Vosotros que sois tan listos, ¿qué creéis que necesita una semillita para crecer además de tierra?",
-      "character": "Tico",
-      "voice_direction": "curioso, preguntando a los niños",
-      "camera": {
-        "shot_type": "medium",
-        "movement": "dolly_out",
-        "angle": "eye_level"
-      },
-      "mood": "mysterious",
-      "lighting": "soft_diffused",
-      "transition_to_next": "jump",
-      "duration_seconds": 8,
-      "is_interactive_question": true,
-      "pause_for_answer": 3
-    },
-    {
-      "scene_number": 8,
-      "narrative_phase": "transition",
-      "visual_prompt": "3D Disney/Pixar style. Tico's face suddenly lights up with a big smile, an imaginary 'lightbulb' moment expression. He quickly reaches out of frame and brings back a large acorn cap completely filled with clear, sparkling water. NO TEXT.",
-      "audio_text": "¡Claro, agua! ¡Tenéis toda la razón! Yo también tengo mucha sed cuando me despierto.",
-      "character": "Tico",
-      "voice_direction": "entusiasmado, como si hubiera descubierto un gran secreto",
-      "camera": {
-        "shot_type": "close_up",
-        "movement": "static",
-        "angle": "eye_level"
-      },
-      "mood": "joyful",
-      "lighting": "bright_daylight",
-      "transition_to_next": "jump",
-      "duration_seconds": 7,
-      "is_interactive_question": false,
-      "pause_for_answer": 0
-    },
-    {
-      "scene_number": 9,
-      "narrative_phase": "rising_action",
-      "visual_prompt": "3D Disney/Pixar style. Tico the squirrel gently tipping the acorn cap, pouring sparkling water droplets onto the dirt mound. His expression is very soft and caring. The soil turns a rich, dark brown as it absorbs the water. NO TEXT.",
-      "audio_text": "Le eché un poquito de agua fresca del arroyo, con mucho cuidadito para no asustarla.",
-      "character": "Tico",
-      "voice_direction": "suave y cariñoso",
-      "camera": {
-        "shot_type": "close_up",
-        "movement": "dolly_in",
-        "angle": "high_angle"
-      },
-      "mood": "calm",
-      "lighting": "soft_diffused",
-      "transition_to_next": "cut",
-      "duration_seconds": 8,
-      "is_interactive_question": false,
-      "pause_for_answer": 0
-    },
-    {
-      "scene_number": 10,
-      "narrative_phase": "transition",
-      "visual_prompt": "3D Disney/Pixar style. Wide shot of Tico sitting patiently by the dirt mound. The lighting dramatically shifts from bright daylight to sunset, casting long golden and purple shadows over the forest. Tico yawns but stays put. NO TEXT.",
-      "audio_text": "Pero sabéis qué... tampoco salió al instante. Descubrí que las cosas importantes de la naturaleza necesitan tiempo.",
-      "character": "Tico",
-      "voice_direction": "reflexivo y tranquilo",
-      "camera": {
-        "shot_type": "wide",
-        "movement": "tracking",
-        "angle": "eye_level"
-      },
-      "mood": "calm",
-      "lighting": "golden_hour",
-      "transition_to_next": "jump",
-      "duration_seconds": 8,
-      "is_interactive_question": false,
-      "pause_for_answer": 0
-    },
-    {
-      "scene_number": 11,
-      "narrative_phase": "rising_action",
-      "visual_prompt": "3D Disney/Pixar style. Tico is pushing a giant green fern leaf out of the way, allowing a bright, warm beam of morning sunlight to hit the small patch of dirt perfectly. He smiles proudly. NO TEXT.",
-      "audio_text": "Así que tuve mucha paciencia. Cada día le daba su agüita, y le apartaba las hojas grandes para que le diera bien el solecito.",
-      "character": "Tico",
-      "voice_direction": "orgulloso de su trabajo",
-      "camera": {
-        "shot_type": "medium",
-        "movement": "pan_right",
-        "angle": "low_angle"
-      },
-      "mood": "warm",
-      "lighting": "bright_daylight",
-      "transition_to_next": "cut",
-      "duration_seconds": 7,
-      "is_interactive_question": false,
-      "pause_for_answer": 0
-    },
-    {
-      "scene_number": 12,
-      "narrative_phase": "climax",
-      "visual_prompt": "3D Disney/Pixar style. Extreme close-up of the dark soil. The dirt cracks slightly, and a tiny, bright green glowing sprout pokes its way out of the earth. Magical blue sparkles surround it. NO TEXT.",
-      "audio_text": "¡Y de repente, una mañana... la tierra se movió! ¡Mirad, estaba naciendo!",
-      "character": "Tico",
-      "voice_direction": "muy emocionado y asombrado",
-      "camera": {
-        "shot_type": "extreme_close_up",
-        "movement": "dolly_in",
-        "angle": "high_angle"
-      },
-      "mood": "triumphant",
-      "lighting": "golden_hour",
-      "transition_to_next": "jump",
-      "duration_seconds": 8,
-      "is_interactive_question": false,
-      "pause_for_answer": 0
-    },
-    {
       "scene_number": 13,
-      "narrative_phase": "climax",
-      "visual_prompt": "3D Disney/Pixar style. A sudden dark shadow falls and autumn leaves blow fiercely in the wind. Tico jumps into frame, spreading his arms and using his green backpack and orange body as a shield to protect the tiny glowing sprout from the wind. NO TEXT.",
-      "audio_text": "¡Vino un viento muy fuerte! Pero yo me puse delante para protegerla. ¡No iba a dejar que nada malo le pasara a mi amiguita!",
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel throws handfuls of shiny, dark purple blackberries down into the basket held by Bodo the bear cub. The berries fall through the air in slow motion.",
+      "audio_text": "¡Allá van las moras! ¿Me ayudáis a contar cuántas moras estoy lanzando a la cesta, amigos?",
       "character": "Tico",
-      "voice_direction": "valiente y decidido",
+      "voice_direction": "alegre y preguntón",
       "camera": {
-        "shot_type": "medium",
-        "movement": "static",
-        "angle": "low_angle"
+        "shot_type": "close-up",
+        "movement": "tracking",
+        "angle": "high_angle"
       },
-      "mood": "tense",
-      "lighting": "dramatic_shadows",
+      "mood": "joyful",
+      "lighting": "soft_diffused",
       "transition_to_next": "cut",
-      "duration_seconds": 6,
-      "is_interactive_question": false,
-      "pause_for_answer": 0
+      "duration_seconds": 7,
+      "is_interactive_question": true,
+      "pause_for_answer": 4
     },
     {
       "scene_number": 14,
-      "narrative_phase": "falling_action",
-      "visual_prompt": "3D Disney/Pixar style. The wind stops. The tiny sprout rapidly grows and blossoms into a breathtaking, large glowing blue flower with translucent petals. Tico is watching it, his big eyes reflecting the blue light. NO TEXT.",
-      "audio_text": "Cuando el viento paró... ¡Mirad en qué se convirtió! ¡En la flor más hermosa y brillante de todo el bosque!",
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel and Bodo the bear cub are sitting together on a checkered picnic blanket in the forest, surrounded by fireflies. They are happily eating blackberries from the basket.",
+      "audio_text": "¡Teníais razón! ¡Hicimos un festín estupendo! Bodo aprendió que es mejor pedir las cosas por favor que cogerlas a escondidas.",
       "character": "Tico",
-      "voice_direction": "maravillado y con voz suave",
+      "voice_direction": "satisfecho y feliz",
       "camera": {
-        "shot_type": "close_up",
-        "movement": "crane_up",
+        "shot_type": "wide",
+        "movement": "dolly_out",
         "angle": "eye_level"
       },
-      "mood": "triumphant",
-      "lighting": "soft_diffused",
+      "mood": "warm",
+      "lighting": "golden_hour",
       "transition_to_next": "jump",
       "duration_seconds": 8,
       "is_interactive_question": false,
@@ -272,77 +272,39 @@
     },
     {
       "scene_number": 15,
-      "narrative_phase": "falling_action",
-      "visual_prompt": "3D Disney/Pixar style. Tico the orange squirrel leaning in to gently sniff the glowing blue flower. His eyes are closed in pure joy, and a big smile stretches across his face. The blue glow illuminates his orange fur beautifully. NO TEXT.",
-      "audio_text": "Huele a caramelo de fresa... ¡Qué bien que no me rendí y tuve paciencia todos los días!",
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Close up of Tico the squirrel looking at the camera, giving a thumbs up. He has a tiny purple berry stain on his cheek. The magical forest glows warmly behind him.",
+      "audio_text": "Y yo descubrí que mis moras favoritas saben muchísimo mejor... ¡cuando las comparto con un buen amigo!",
       "character": "Tico",
-      "voice_direction": "feliz y relajado",
+      "voice_direction": "tierno y sincero",
       "camera": {
-        "shot_type": "medium",
-        "movement": "dolly_in",
+        "shot_type": "close-up",
+        "movement": "static",
         "angle": "eye_level"
       },
-      "mood": "joyful",
-      "lighting": "warm",
-      "transition_to_next": "cut",
+      "mood": "warm",
+      "lighting": "golden_hour",
+      "transition_to_next": "jump",
       "duration_seconds": 8,
       "is_interactive_question": false,
       "pause_for_answer": 0
     },
     {
       "scene_number": 16,
-      "narrative_phase": "resolution",
-      "visual_prompt": "3D Disney/Pixar style. Tico turns to the camera, looking directly at the viewer with a warm, friendly smile. He gestures to himself and then points at the camera playfully. The magical forest is bright and peaceful behind him. NO TEXT.",
-      "audio_text": "Y vosotros, ¿alguna vez habéis tenido que ser muy, muy pacientes para conseguir algo súper especial?",
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel waves enthusiastically at the camera. He turns and scampers away with his green backpack into the magical glowing forest alongside Bodo the bear cub.",
+      "audio_text": "¡Nos vemos en la próxima aventura en el Bosque Mágico, amigos! ¡Adiós y no olvidéis decir por favor!",
       "character": "Tico",
-      "voice_direction": "cercano y preguntando directamente",
-      "camera": {
-        "shot_type": "medium",
-        "movement": "static",
-        "angle": "eye_level"
-      },
-      "mood": "warm",
-      "lighting": "bright_daylight",
-      "transition_to_next": "jump",
-      "duration_seconds": 8,
-      "is_interactive_question": true,
-      "pause_for_answer": 3
-    },
-    {
-      "scene_number": 17,
-      "narrative_phase": "resolution",
-      "visual_prompt": "3D Disney/Pixar style. Wide shot of Tico sitting beside his tall, glowing blue flower. A small golden butterfly flutters down and lands on Tico's nose. He crosses his eyes comically to look at it. NO TEXT.",
-      "audio_text": "He aprendido que la paciencia es como una semillita: al principio cuesta mucho esperar, pero al final... ¡siempre te da cosas maravillosas!",
-      "character": "Tico",
-      "voice_direction": "sabio y alegre",
-      "camera": {
-        "shot_type": "wide",
-        "movement": "dolly_out",
-        "angle": "eye_level"
-      },
-      "mood": "calm",
-      "lighting": "golden_hour",
-      "transition_to_next": "cut",
-      "duration_seconds": 8,
-      "is_interactive_question": false,
-      "pause_for_answer": 0
-    },
-    {
-      "scene_number": 18,
-      "narrative_phase": "resolution",
-      "visual_prompt": "3D Disney/Pixar style. Tico the orange squirrel with his green backpack waves goodbye to the camera with both paws. He turns and happily skips down a dirt path into the vibrant, magical forest. Sunbeams light his path. NO TEXT.",
-      "audio_text": "¡Nos vemos en la próxima aventura, amiguitos! ¡Y recordad regar vuestras plantas! ¡Adiós!",
-      "character": "Tico",
-      "voice_direction": "muy enérgico y despidiéndose",
+      "voice_direction": "despidiéndose con mucha energía",
       "camera": {
         "shot_type": "wide",
         "movement": "crane_up",
         "angle": "high_angle"
       },
       "mood": "joyful",
-      "lighting": "bright_daylight",
-      "transition_to_next": "jump",
-      "duration_seconds": 8,
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
       "is_interactive_question": false,
       "pause_for_answer": 0
     }

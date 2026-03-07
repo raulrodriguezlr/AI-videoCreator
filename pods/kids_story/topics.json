@@ -67,8 +67,8 @@
       "educational_value": "El valor de la valentía frente al miedo a la oscuridad y la comprensión práctica de que las sombras solo son objetos que tapan la luz.",
       "references_episode": null,
       "target_emotion": "Valentía",
-      "status": "pending",
-      "episode_id": null,
+      "status": "in_progress",
+      "episode_id": "ep_006_el_baile_de_las_luciérnagas",
       "created_at": "2026-03-07T14:24:25.340383",
       "completed_at": null
     },
@@ -79,8 +79,8 @@
       "educational_value": "El valor ético y social de la honestidad, aprender a hacerse responsable de los propios errores y entender la importancia de pedir perdón.",
       "references_episode": null,
       "target_emotion": "Empatía",
-      "status": "pending",
-      "episode_id": null,
+      "status": "in_progress",
+      "episode_id": "ep_002_el_misterio_de_las_moras_desap",
       "created_at": "2026-03-07T14:24:25.340393",
       "completed_at": null
     }
