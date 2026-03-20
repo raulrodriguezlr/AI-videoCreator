@@ -83,6 +83,42 @@
       "episode_id": "ep_002_el_misterio_de_las_moras_desap",
       "created_at": "2026-03-07T14:24:25.340393",
       "completed_at": null
+    },
+    {
+      "id": "topic_008",
+      "title": "El Misterio de las Sombras Bailarinas",
+      "description": "Tico se asusta al ver sombras enormes y escuchar ruidos extraños cerca de su árbol durante la noche. Armándose de valor y con ayuda de un búho sabio, investiga el origen de los ruidos, descubriendo que solo son luciérnagas y hojas bailando con el viento.",
+      "educational_value": "Superar el miedo a la oscuridad y comprender que investigar lo desconocido (ciencia y observación) nos ayuda a entender el mundo sin temor.",
+      "references_episode": null,
+      "target_emotion": "Valentía",
+      "status": "in_progress",
+      "episode_id": "ep_003_el_misterio_de_las_sombras_bai",
+      "created_at": "2026-03-09T18:05:57.638805",
+      "completed_at": null
+    },
+    {
+      "id": "topic_009",
+      "title": "El Mapa Manchado",
+      "description": "Mientras juega cerca del río, Tico mancha con lodo por accidente el mapa de su aventura anterior y trata de ocultarlo para que sus amigos no se enojen. Finalmente, el remordimiento lo hace confesar, descubriendo que decir la verdad fortalece la amistad.",
+      "educational_value": "El valor de la honestidad, asumir la responsabilidad de nuestros errores y aprender que una disculpa sincera es mejor que una mentira.",
+      "references_episode": "El Gran Tesoro de Bellotas",
+      "target_emotion": "Empatía",
+      "status": "pending",
+      "episode_id": null,
+      "created_at": "2026-03-09T18:05:57.639245",
+      "completed_at": null
+    },
+    {
+      "id": "topic_010",
+      "title": "El Puente de Ramitas",
+      "description": "El arroyo del Bosque Mágico ha crecido y Tico intenta construir un puente rápidamente para cruzar a jugar. Al hacer todo a las prisas sin planear, el puente se desarma, enseñándole que algunas cosas requieren tiempo y cuidado.",
+      "educational_value": "Desarrollar la paciencia, la perseverancia y entender que hacer las cosas con calma y cuidado da mejores resultados que apresurarse.",
+      "references_episode": null,
+      "target_emotion": "Paciencia",
+      "status": "pending",
+      "episode_id": null,
+      "created_at": "2026-03-09T18:05:57.639270",
+      "completed_at": null
     }
   ]
 }
