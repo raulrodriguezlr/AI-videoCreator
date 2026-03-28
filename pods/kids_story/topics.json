@@ -103,8 +103,8 @@
       "educational_value": "El valor de la honestidad, asumir la responsabilidad de nuestros errores y aprender que una disculpa sincera es mejor que una mentira.",
       "references_episode": "El Gran Tesoro de Bellotas",
       "target_emotion": "Empatía",
-      "status": "pending",
-      "episode_id": null,
+      "status": "in_progress",
+      "episode_id": "ep_001_el_mapa_manchado",
       "created_at": "2026-03-09T18:05:57.639245",
       "completed_at": null
     },
@@ -115,9 +115,45 @@
       "educational_value": "Desarrollar la paciencia, la perseverancia y entender que hacer las cosas con calma y cuidado da mejores resultados que apresurarse.",
       "references_episode": null,
       "target_emotion": "Paciencia",
+      "status": "completed",
+      "episode_id": "ep_002_el_puente_de_ramitas",
+      "created_at": "2026-03-09T18:05:57.639270",
+      "completed_at": "2026-03-21T11:07:36.795788"
+    },
+    {
+      "id": "topic_011",
+      "title": "El Misterio de la Semilla Brillante",
+      "description": "Tico encuentra una hermosa semilla y la planta, pero se frustra cuando no crece al día siguiente. Con los consejos de su amigo Berto el castor, descubre que las cosas importantes necesitan tiempo, agua y luz del sol para desarrollarse.",
+      "educational_value": "Desarrollarán el valor de la paciencia y aprenderán conceptos científicos básicos sobre el cuidado y crecimiento de las plantas.",
+      "references_episode": "El Puente de Ramitas",
+      "target_emotion": "Curiosidad y esperanza",
+      "status": "in_progress",
+      "episode_id": "ep_003_el_misterio_de_la_semilla_bril",
+      "created_at": "2026-03-28T09:59:34.267041",
+      "completed_at": null
+    },
+    {
+      "id": "topic_012",
+      "title": "El Festival de las Luciérnagas",
+      "description": "Es la noche del gran festival del Bosque Mágico, pero Tico no quiere salir porque le da miedo la oscuridad. Acompañado de la sabia búho Lita, aprenderá que la noche no es aterradora y que sin oscuridad no se puede ver el hermoso brillo de las luciérnagas.",
+      "educational_value": "Aprenderán a superar el miedo a la oscuridad mediante la valentía y el cambio de perspectiva ante lo desconocido.",
+      "references_episode": null,
+      "target_emotion": "Valentía y asombro",
+      "status": "in_progress",
+      "episode_id": "ep_004_el_festival_de_las_luciérnagas",
+      "created_at": "2026-03-28T09:59:34.267179",
+      "completed_at": null
+    },
+    {
+      "id": "topic_013",
+      "title": "Las Bayas Desaparecidas",
+      "description": "Tico se come por accidente las bayas que su amigo Pipo el oso guardaba para hacer un pastel e intenta esconder las pruebas. Al notar que guardar el secreto le hace sentir un nudo en la panza, decide decir la verdad y ayudar a buscar más.",
+      "educational_value": "Comprenderán la importancia de la honestidad, el valor de pedir perdón y cómo hacerse responsables de sus propios errores.",
+      "references_episode": null,
+      "target_emotion": "Empatía y alivio",
       "status": "pending",
       "episode_id": null,
-      "created_at": "2026-03-09T18:05:57.639270",
+      "created_at": "2026-03-28T09:59:34.267210",
       "completed_at": null
     }
   ]

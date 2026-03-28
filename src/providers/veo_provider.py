@@ -24,7 +24,9 @@ from google import genai
 from google.genai import types
 
 from src.providers.base_provider import BaseVideoProvider, VideoClip
+from src.providers.elevenlabs_provider import ElevenLabsProvider
 from src.utils.api_key_manager import get_api_key_manager
+from src.utils.config_loader import load_json
 from src.utils.progress_manager import is_rate_limit_error, is_content_error
 from src.variables import (
     VEO_MODEL,
@@ -41,7 +43,7 @@ class VeoProvider(BaseVideoProvider):
 
     def __init__(self, pod_config_path: str):
         super().__init__(pod_config_path)
-        self.config = self._load_config(pod_config_path)
+        self.config = load_json(pod_config_path)
         self.pod_dir = os.path.dirname(pod_config_path)
         self.output_dir = os.path.join(self.pod_dir, "output")
         self.assets_dir = os.path.join(self.pod_dir, "assets")
@@ -52,18 +54,17 @@ class VeoProvider(BaseVideoProvider):
         self.key_manager = get_api_key_manager()
         self.client = self.key_manager.get_client()
 
-    def _load_config(self, path: str) -> dict:
-        """Load pod configuration from JSON file."""
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        # ElevenLabs TTS provider — instantiated once, reused across all scenes
+        self.eleven_prov = ElevenLabsProvider(pod_config_path)
 
     def check_availability(self) -> bool:
         """Verify Veo API is accessible."""
         try:
-            # Try a simple API call to verify connectivity
-            self._init_client()
-            print("[VEO] ✅ Google GenAI client inicializado correctamente")
-            return True
+            # Client is already initialized in __init__ via ApiKeyManager
+            if self.client:
+                print("[VEO] ✅ Google GenAI client inicializado correctamente")
+                return True
+            return False
         except Exception as e:
             print(f"[VEO] ❌ Error de conexión: {e}")
             return False
@@ -120,6 +121,8 @@ class VeoProvider(BaseVideoProvider):
         if video is not None:
             gen_params["video"] = video
 
+        # NOTE: negative_prompt is set but Veo 3.1 silently ignores it.
+        # Kept for forward compatibility if future API versions support it.
         if negative_prompt:
             config.negative_prompt = negative_prompt
 
@@ -248,25 +251,109 @@ class VeoProvider(BaseVideoProvider):
             save_dir=save_dir, scene_index=scene_index, narrative_phase=narrative_phase,
         )
 
+    def _generate_clip(
+        self, scene: dict, i: int, clips: List[VideoClip], transition: str,
+        prompt: str, scene_duration: int, ref_images: List[str],
+        negative: Optional[str], narrative_phase: str, clips_dir: str,
+    ) -> VideoClip:
+        """
+        Generate a single clip based on the transition type.
+        Centralizes the if/elif/else logic so it's not duplicated in retry blocks.
+        """
+        if i == 0 or not clips:
+            # First scene — always generate fresh
+            return self.generate_scene(
+                prompt=prompt, duration=scene_duration,
+                seed=scene.get("seed"), reference_images=ref_images,
+                negative_prompt=negative, save_dir=clips_dir,
+                scene_index=i, narrative_phase=narrative_phase,
+            )
+        elif transition == "continue":
+            # Visual continuity: use last frame as seed
+            return self.jump_to_scene(
+                previous_clip=clips[-1], prompt=prompt,
+                reference_images=ref_images, save_dir=clips_dir,
+                scene_index=i, narrative_phase=narrative_phase,
+            )
+        else:
+            # "cut" or "scene_change" — fresh clip with reference images
+            return self.generate_scene(
+                prompt=prompt, duration=scene_duration,
+                seed=scene.get("seed"), reference_images=ref_images,
+                negative_prompt=negative, save_dir=clips_dir,
+                scene_index=i, narrative_phase=narrative_phase,
+            )
+
+    def _handle_scene_error(
+        self, error: Exception, *, i: int, scene: dict, scene_num: int,
+        clips: List[VideoClip], transition: str, prompt: str,
+        scene_duration: int, ref_images: List[str], negative: Optional[str],
+        narrative_phase: str, clips_dir: str, scene_num_str: str,
+        progress_manager=None,
+    ) -> dict:
+        """
+        Handle a scene generation error: retry with rotated key if rate-limited,
+        or mark as failed and signal the main loop to break.
+
+        Returns:
+            dict with keys:
+              - "clip": VideoClip if retry succeeded (caller should append + continue)
+              - "rate_limited": True if all keys exhausted
+              - If neither key is present, caller should break (non-retriable error)
+        """
+        error_msg = str(error)
+        print(f"[VEO] ❌ Error en escena {scene_num}: {error_msg[:120]}")
+
+        if is_rate_limit_error(error):
+            if self.key_manager.rotate_key(error_msg):
+                self.client = self.key_manager.get_client()
+                print(f"[VEO] 🔄 Reintentando escena {scene_num} con {self.key_manager.get_key_label()} ({self.key_manager.get_active_key()})...")
+                try:
+                    clip = self._generate_clip(
+                        scene=scene, i=i, clips=clips, transition=transition,
+                        prompt=prompt, scene_duration=scene_duration,
+                        ref_images=ref_images, negative=negative,
+                        narrative_phase=narrative_phase, clips_dir=clips_dir,
+                    )
+                    self._apply_dubbing(clip, scene, clips_dir, scene_num_str)
+                    self.key_manager.record_success()
+                    print(f"[VEO] ✅ Escena {scene_num} generada con key rotada: {clip.file_path}")
+                    if progress_manager:
+                        progress_manager.mark_scene_completed(
+                            scene_index=i, clip_path=clip.file_path, model_used=VEO_MODEL,
+                        )
+                    return {"clip": clip}
+                except Exception as retry_e:
+                    error_msg = str(retry_e)
+                    print(f"[VEO] ❌ Retry también falló: {error_msg[:120]}")
+
+            # All keys exhausted
+            print(f"[VEO] 🛑 Todas las keys agotadas. Guardando progreso...")
+            if progress_manager:
+                progress_manager.mark_scene_failed(i, error_msg, is_rate_limit=True)
+            return {"rate_limited": True}
+        else:
+            # Non-retriable error
+            print(f"[VEO] 🛑 Error en escena {scene_num}. Guardando progreso y parando.")
+            if progress_manager:
+                progress_manager.mark_scene_failed(i, error_msg)
+            return {}
+
     def _apply_dubbing(self, clip: VideoClip, scene: dict, clips_dir: str, scene_num_str: str) -> None:
         """
-        Genera el TTS con ElevenLabs y lo mezcla al clip (Plan B Doblaje).
+        Genera el TTS con ElevenLabs y reemplaza la pista de audio del clip.
         """
         audio_text = scene.get("audio_text", "")
         character_name = scene.get("character", "")
         if not audio_text or not character_name:
             return
 
-        from src.providers.elevenlabs_provider import ElevenLabsProvider
         from src.utils.audio_mixer import AudioMixer
 
-        config_path = os.path.join(self.pod_dir, "config.json")
-        eleven_prov = ElevenLabsProvider(config_path)
-        
         audio_filename = f"dialogue_{scene_num_str}.wav"
         audio_path = os.path.join(clips_dir, audio_filename)
 
-        generated_audio = eleven_prov.generate_dialogue(audio_text, character_name, audio_path)
+        generated_audio = self.eleven_prov.generate_dialogue(audio_text, character_name, audio_path)
         if generated_audio:
             mixed_path = clip.file_path.replace(".mp4", "_dubbed.mp4")
             final_clip_path = AudioMixer.mix_audio_to_video(
@@ -347,7 +434,7 @@ class VeoProvider(BaseVideoProvider):
             narrative_phase = scene.get("narrative_phase", "")
             prompt = self._build_cinematographic_prompt(scene, narrative_phase)
             negative = scene.get("negative_prompt")
-            transition = scene.get("transition_to_next", "jump")
+            transition = scene.get("transition_to_next", "cut")
             scene_duration = scene.get("duration_seconds", VEO_DURATION_SECONDS)
             # Clamp to valid range (4-8)
             scene_duration = max(4, min(scene_duration, VEO_DURATION_SECONDS))
@@ -357,29 +444,12 @@ class VeoProvider(BaseVideoProvider):
             try:
                 scene_num_str = f"{scene_num:02d}"
 
-                if i == 0 or not clips or transition == "cut":
-                    # First scene, no previous clips, or explicit "cut" transition
-                    # We start a fresh text-to-video generation
-                    clip = self.generate_scene(
-                        prompt=prompt,
-                        duration=scene_duration,
-                        seed=scene.get("seed"),
-                        reference_images=ref_images,
-                        negative_prompt=negative,
-                        save_dir=clips_dir,
-                        scene_index=i,
-                        narrative_phase=narrative_phase,
-                    )
-                else:
-                    # All subsequent scenes with "jump" transition use jump_to for clean sequence cuts
-                    clip = self.jump_to_scene(
-                        previous_clip=clips[-1],
-                        prompt=prompt,
-                        reference_images=ref_images,
-                        save_dir=clips_dir,
-                        scene_index=i,
-                        narrative_phase=narrative_phase,
-                    )
+                clip = self._generate_clip(
+                    scene=scene, i=i, clips=clips, transition=transition,
+                    prompt=prompt, scene_duration=scene_duration,
+                    ref_images=ref_images, negative=negative,
+                    narrative_phase=narrative_phase, clips_dir=clips_dir,
+                )
 
                 self._apply_dubbing(clip, scene, clips_dir, scene_num_str)
 
@@ -399,54 +469,20 @@ class VeoProvider(BaseVideoProvider):
                     )
 
             except Exception as e:
-                error_msg = str(e)
-                print(f"[VEO] ❌ Error en escena {scene_num}: {error_msg[:120]}")
-
-                if is_rate_limit_error(e):
-                    if self.key_manager.rotate_key(error_msg):
-                        self.client = self.key_manager.get_client()
-                        print(f"[VEO] 🔄 Reintentando escena {scene_num} con {self.key_manager.get_key_label()} ({self.key_manager.get_active_key()})...")
-                        try:
-                            # Retry the same scene with the new key
-                            if i == 0 or not clips or transition == "cut":
-                                clip = self.generate_scene(
-                                    prompt=prompt, duration=scene_duration, seed=scene.get("seed"),
-                                    reference_images=ref_images, negative_prompt=negative,
-                                    save_dir=clips_dir, scene_index=i, narrative_phase=narrative_phase,
-                                )
-                            else:
-                                clip = self.jump_to_scene(
-                                    previous_clip=clips[-1], prompt=prompt,
-                                    reference_images=ref_images,
-                                    save_dir=clips_dir, scene_index=i, narrative_phase=narrative_phase,
-                                )
-                            
-                            self._apply_dubbing(clip, scene, clips_dir, scene_num_str)
-                            
-                            clips.append(clip)
-                            self.key_manager.record_success()
-                            print(f"[VEO] ✅ Escena {scene_num} generada con key rotada: {clip.file_path}")
-                            if progress_manager:
-                                progress_manager.mark_scene_completed(
-                                    scene_index=i, clip_path=clip.file_path, model_used=VEO_MODEL,
-                                )
-                            continue
-                        except Exception as retry_e:
-                            error_msg = str(retry_e)
-                            print(f"[VEO] ❌ Retry también falló: {error_msg[:120]}")
-
-                    # All keys exhausted — stop
-                    print(f"[VEO] 🛑 Todas las keys agotadas. Guardando progreso...")
-                    if progress_manager:
-                        progress_manager.mark_scene_failed(i, error_msg, is_rate_limit=True)
+                result = self._handle_scene_error(
+                    e, i=i, scene=scene, scene_num=scene_num,
+                    clips=clips, transition=transition, prompt=prompt,
+                    scene_duration=scene_duration, ref_images=ref_images,
+                    negative=negative, narrative_phase=narrative_phase,
+                    clips_dir=clips_dir, scene_num_str=scene_num_str,
+                    progress_manager=progress_manager,
+                )
+                if result.get("clip"):
+                    clips.append(result["clip"])
+                    continue
+                if result.get("rate_limited"):
                     rate_limited = True
-                    break
-                else:
-                    # Any other error — stop immediately and save progress
-                    print(f"[VEO] 🛑 Error en escena {scene_num}. Guardando progreso y parando.")
-                    if progress_manager:
-                        progress_manager.mark_scene_failed(i, error_msg)
-                    break
+                break
 
         # Final result
         if not clips:
@@ -535,13 +571,6 @@ class VeoProvider(BaseVideoProvider):
         generated.video.save(output_path)
 
         print(f"[VEO] 💾 Descargado: {output_path}")
-
-        # --- DUBBING PLAN B: Strip native audio ---
-        from src.utils.audio_mixer import AudioMixer
-        silent_path = output_path.replace(".mp4", "_silent.mp4")
-        if AudioMixer.strip_audio(output_path, silent_path) == silent_path:
-            os.replace(silent_path, output_path)
-            print(f"[VEO] 🔇 Audio original silenciado (Plan B Doblaje)")
 
         return VideoClip(
             file_path=output_path,
@@ -704,6 +733,9 @@ class VeoProvider(BaseVideoProvider):
         art_style = self.config.get("consistency", {}).get("art_style", "")
         if art_style:
             parts.append(art_style)
+
+        # Anti-subtitle/anti-text guard — always appended
+        parts.append("Absolutely no text, no subtitles, no letters, no watermarks, no written words on screen")
 
         return ". ".join(filter(None, parts))
 

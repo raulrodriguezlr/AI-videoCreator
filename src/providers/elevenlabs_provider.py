@@ -27,8 +27,9 @@ class ElevenLabsProvider:
         if not ELEVENLABS_API_KEY:
             print("[ElevenLabs] ⚠️  ELEVENLABS_API_KEY no configurada en .env o variables.")
 
-        # Map character names to their voice IDs
+        # Map character names to their voice IDs and settings
         self.voice_map = {}
+        self.voice_settings_map = {}
         if os.path.exists(pod_config_path):
             with open(pod_config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
@@ -37,6 +38,10 @@ class ElevenLabsProvider:
                 voice_id = char.get("elevenlabs_voice_id")
                 if name and voice_id:
                     self.voice_map[name] = voice_id
+                # Per-character voice settings (optional)
+                voice_settings = char.get("elevenlabs_voice_settings", {})
+                if name:
+                    self.voice_settings_map[name] = voice_settings
 
     def generate_dialogue(self, text: str, character_name: str, output_path: str) -> Optional[str]:
         """
@@ -65,6 +70,7 @@ class ElevenLabsProvider:
             return None
 
         voice_id = self.voice_map.get(character_name.lower(), self.DEFAULT_VOICE_ID)
+        char_settings = self.voice_settings_map.get(character_name.lower(), {})
         print(f"\n[ElevenLabs] 🗣️  Generando diálogo para {character_name} ({voice_id}): '{text[:50]}...'")
 
         try:
@@ -77,11 +83,14 @@ class ElevenLabsProvider:
             
             payload = {
                 "text": text,
-                "model_id": "eleven_multilingual_v2",
+                "model_id": char_settings.get("model_id", "eleven_multilingual_v2"),
                 "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.75
-                }
+                    "stability": char_settings.get("stability", 0.4),
+                    "similarity_boost": char_settings.get("similarity_boost", 0.75),
+                    "style": char_settings.get("style", 0.5),
+                    "use_speaker_boost": True
+                },
+                "speed": char_settings.get("speed", 1.15)
             }
 
             response = requests.post(

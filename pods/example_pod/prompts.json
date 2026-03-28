@@ -1,7 +1,7 @@
 {
     "script_generation": {
         "system_role": "Eres un director y guionista de documentales. Creas escenas cinematográficas detalladas para IA generativa. Tus guiones son educativos y atrapantes.",
-        "user_template": "Escribe un guion para un vídeo corto sobre {target_audience}.\n\n## TEMA\n{topic}\n\n## CONTEXTO\n{series_context}\n\n## EPISODIOS ANTERIORES\n{memory_context}\n\n## REQUISITOS TÉCNICOS\n- Duración mínima: {duration_seconds} segundos.\n- Estilo: {art_style}\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
+        "user_template": "Escribe un guion para un vídeo corto sobre {target_audience}.\n\n## TEMA\n{topic}\n\n## CONTEXTO\n{series_context}\n\n## EPISODIOS ANTERIORES\n{memory_context}\n\n## PERSONAJES\n{characters}\n\n## REQUISITOS TÉCNICOS\n- Duración mínima: {duration_seconds} segundos.\n- Duración máxima POR CLIP: {max_clip_seconds} segundos.\n- Estilo: {art_style}\n- Preguntas interactivas: {num_interactive_questions} (solo si > 0)\n\n{video_rules}\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
         "output_format": {
             "title": "Título del episodio",
             "summary": "Resumen ejecutivo",

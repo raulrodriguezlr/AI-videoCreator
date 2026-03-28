@@ -86,11 +86,11 @@ class VideoEngine:
             # 3. Mix audio and video together
             if generated_audio_path:
                 mixed_output = final_video_path.replace(".mp4", "_mixed.mp4")
-                mixed_video_path = AudioMixer.mix_audio_to_video(
+                mixed_video_path = AudioMixer.mix_background_audio(
                     video_path=final_video_path,
                     audio_path=generated_audio_path,
                     output_path=mixed_output,
-                    audio_volume=0.3  # Background volume level
+                    bg_volume=0.3  # Background volume level
                 )
                 
                 # Replace the original video output with the mixed one

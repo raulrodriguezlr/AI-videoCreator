@@ -1,0 +1,67 @@
+{
+  "version": "2.0",
+  "description": "Reglas universales de producción de vídeo con IA generativa. Se inyectan automáticamente en todos los pods.",
+  "rules": {
+    "transitions": {
+      "description": "El director del guión (tú) decide libremente qué transición usar según el ritmo y la narrativa. Piensa como un espectador: ¿qué tendría sentido cinematográficamente? USA LOS TRES TIPOS, no solo uno.",
+      "types": {
+        "continue": "Continuación fluida. Misma cámara, mismo ángulo, la acción sigue exactamente donde se dejó. Es como una toma larga que continúa. El motor de vídeo usará el último frame como semilla visual para mantener continuidad perfecta.",
+        "cut": "Corte pequeño. Cambio de ángulo o plano DENTRO del mismo escenario. El diálogo o la acción puede continuar donde se cortó, pero desde otro punto de vista (ej: de plano medio a primer plano, o de frente a perfil). Mantiene la coherencia espacial y temporal.",
+        "scene_change": "Corte grande. Cambio total de escenario, localización o acción. Se inicia una situación completamente nueva. El motor de vídeo generará la toma desde cero usando las imágenes de referencia de los personajes para mantener su apariencia visual consistente."
+      },
+      "when_to_use": {
+        "continue": [
+          "El personaje está hablando una frase larga que necesita más de un clip para terminar. El diálogo se parte entre los clips con 'continue'.",
+          "El personaje camina por un camino y queremos que la toma siga fluyendo sin interrupciones.",
+          "Estamos en un momento emocional que necesita respirar más de 8 segundos (ej: reacción, contemplación).",
+          "Cualquier acción continua que se beneficia de no tener corte: una persecución, un baile, una exploración."
+        ],
+        "cut": [
+          "Queremos dar dinamismo cambiando el ángulo (ej: de frente a perfil, de plano medio a close-up).",
+          "El personaje sigue hablando o la acción sigue pero queremos variar el plano para no aburrir.",
+          "Reacción de otro personaje u objeto en la misma escena.",
+          "Cambio de enfoque dentro del mismo espacio (ej: del personaje al objeto que está mirando)."
+        ],
+        "scene_change": [
+          "Cambio de localización (ej: del bosque a una cueva, de día a noche).",
+          "Salto temporal (ej: 'Al día siguiente...', 'Más tarde...').",
+          "Aparición de un nuevo escenario, estructura o personaje que no estaba en la toma anterior.",
+          "Inicio de una nueva fase narrativa."
+        ]
+      },
+      "forbidden": ["extend"],
+      "golden_rule": "Nunca metas un cambio brusco de escenario, aparición repentina de un nuevo personaje/estructura, o giro dramático DENTRO de un solo clip. Si la trama necesita algo nuevo en pantalla, DIVIDE la acción en 2+ clips con un 'cut' o 'scene_change' entre ellos y cambia el ángulo de cámara. Ejemplo CORRECTO: Clip A = Tico caminando con cara de sorpresa (transition: cut) → Clip B = plano medio de Tico de espaldas viendo la cueva con la sombra. Ejemplo INCORRECTO: un solo clip donde Tico camina y de repente del suelo emerge una cueva."
+    },
+    "lip_sync": {
+      "description": "Reglas CRÍTICAS para sincronización de labios. Veo 3.1 genera lip sync PERFECTO si le das el diálogo entrecomillado en el visual_prompt.",
+      "rules": [
+        "Si el personaje HABLA, INCLUIR una versión corta (4-10 palabras) del diálogo entre comillas dobles dentro del visual_prompt. Ejemplo: '...the squirrel says \"¡Mirad amigos, qué tengo aquí!\"...' Esto permite al motor de vídeo animar los labios exactamente para esas palabras.",
+        "Cuando el personaje habla, la cámara DEBE ser 'close-up' o 'medium' mostrando su cara. Si la cámara es 'wide' o el personaje está de espaldas, el motor no podrá animar los labios.",
+        "El personaje NO debe hablar en off (voz sin verse su cara) a menos que narrativamente tenga sentido (ej: narración contemplativa sobre un paisaje).",
+        "Las frases entrecomilladas en el visual_prompt DEBEN ser en el MISMO IDIOMA que el audio_text."
+      ]
+    },
+    "visual_continuity": {
+      "description": "Reglas para mantener coherencia visual entre clips.",
+      "rules": [
+        "Describir SIEMPRE la apariencia física completa del personaje en cada visual_prompt (no solo su nombre). Incluir ropa, colores, accesorios, textura.",
+        "ABSOLUTAMENTE PROHIBIDO incluir texto, subtítulos, letras, marcas de agua, elementos de UI, carteles, letreros o cualquier contenido escrito en el visual_prompt. Añadir siempre al final del visual_prompt: 'absolutely no text, no subtitles, no letters, no watermarks, no written words'.",
+        "El visual_prompt debe estar en INGLÉS y ser una descripción cinematográfica detallada de exactamente lo que se ve en pantalla.",
+        "Incluir siempre el estilo artístico (ej: '3D Disney Pixar style') al principio del visual_prompt."
+      ]
+    },
+    "pacing": {
+      "description": "Guía de duración por tipo de escena. El director elige libremente dentro de estos rangos.",
+      "guidelines": {
+        "4-5 seconds": "Cambios de plano rápidos, reacciones, transiciones visuales.",
+        "6-7 seconds": "Diálogos cortos, acciones simples, momentos de exploración.",
+        "8 seconds": "Escenas de establecimiento, clímax emocional, momentos importantes que necesitan respirar."
+      }
+    },
+    "camera": {
+      "shot_types": ["wide", "medium", "close-up", "extreme_close_up", "aerial", "over_the_shoulder"],
+      "movements": ["static", "pan_left", "pan_right", "tracking", "dolly_in", "dolly_out", "crane_up"],
+      "angles": ["eye_level", "low_angle", "high_angle", "bird_eye", "dutch_angle"]
+    }
+  }
+}

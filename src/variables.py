@@ -36,8 +36,6 @@ VEO_ASPECT_RATIO = "16:9"
 # Duración por clip: 4, 6 u 8 segundos
 VEO_DURATION_SECONDS = 8
 
-# Generación de personas: "allow_all" | "allow_adult" | "dont_allow" puede que sea en minusculas
-VEO_PERSON_GENERATION = "allow_adult"
 
 # Polling: cada cuántos segundos comprobar si el vídeo está listo
 VEO_POLLING_INTERVAL = 10
@@ -86,32 +84,6 @@ USE_REFERENCE_IMAGES = True
 # Máximo de extensiones por clip (Veo soporta hasta 20)
 SCENE_BUILDER_MAX_EXTENDS = 20
 
-# narrative_phase → tier
-SCENE_TIER_MAP = {
-    # HERO → máxima calidad (escenas clave de la historia)
-    "climax": "hero",
-    "resolution": "hero",
-    "introduction": "hero",
-
-    # STANDARD → rápido pero buena calidad
-    "rising_action": "standard",
-    "falling_action": "standard",
-
-    # FILLER → modelo más económico
-    "transition": "filler",
-    "establishing": "filler",
-
-    # Backward compat (nombres legacy de prompts.json antiguos)
-    "development": "standard",
-    "conclusion": "hero",
-}
-
-# tier → modelo Veo
-TIER_MODEL_MAP = {
-    "hero": "veo-3.1-generate-preview",
-    "standard": "veo-3.1-generate-preview",
-    "filler": "veo-3.1-generate-preview",
-}
 
 # ==========================
 # AUDIO — ElevenLabs Sound Generation
@@ -125,14 +97,4 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 GEMINI_MODEL_NAME = "gemini-3.1-pro-preview"
 #"gemini-3-pro-preview"
 
-# ==========================
-# OUTPUT
-# ==========================
-VIDEO_FPS = 24
 
-# ==========================
-# AUTOMATION (futuro)
-# ==========================
-# 'none' | 'n8n_local' | 'opal'
-AUTOMATION_MODE = "none"
-N8N_URL = "http://localhost:5678"

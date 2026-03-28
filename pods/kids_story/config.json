@@ -22,13 +22,25 @@
             "personality": "curious, brave, sometimes impulsive but always learns from mistakes, loves helping friends",
             "reference_image": "assets/ref_tico.png",
             "voice_description": "young 8-year-old boy, slightly raspy and breathy timbre, high-pitched energetic tone, speaks quickly, European Spanish accent",
-            "elevenlabs_voice_id": "jBpfuIE2acCO8z3wKNLl"
+            "elevenlabs_voice_id": "1tDEBGOo8EqEPApM49eJ",
+            "elevenlabs_voice_settings": {
+                "speed": 1.15,
+                "stability": 0.35,
+                "similarity_boost": 0.75,
+                "style": 0.4
+            }
         },
         {
             "name": "Narrator",
             "role": "storyteller",
             "personality": "warm, encouraging, asks questions to engage viewers, patient and supportive",
-            "elevenlabs_voice_id": "ErXwobaYiN019PkySvjV"
+            "elevenlabs_voice_id": "ErXwobaYiN019PkySvjV",
+            "elevenlabs_voice_settings": {
+                "speed": 1.0,
+                "stability": 0.5,
+                "similarity_boost": 0.8,
+                "style": 0.3
+            }
         }
     ],
     "topic_generation": {

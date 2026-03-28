@@ -14,6 +14,7 @@ from google import genai
 from google.genai import types
 
 from src.utils.api_key_manager import get_api_key_manager
+from src.utils.config_loader import load_json
 from src.utils.memory_manager import MemoryManager
 from src.utils.prompt_manager import PromptManager
 from src.variables import GEMINI_MODEL_NAME, VEO_DURATION_SECONDS
@@ -21,7 +22,7 @@ from src.variables import GEMINI_MODEL_NAME, VEO_DURATION_SECONDS
 
 class ScriptGenerator:
     def __init__(self, pod_config_path: str):
-        self.config = self._load_config(pod_config_path)
+        self.config = load_json(pod_config_path)
         self.pod_dir = os.path.dirname(pod_config_path)
         self.memory_manager = MemoryManager(self.pod_dir)
 
@@ -33,9 +34,7 @@ class ScriptGenerator:
         self.key_manager = get_api_key_manager()
         self.client = self.key_manager.get_client()
 
-    def _load_config(self, path: str) -> dict:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+
 
     def generate_script(self, topic: str) -> Optional[dict]:
         """
@@ -68,6 +67,10 @@ class ScriptGenerator:
         # Get output format from prompts
         output_format = self.prompt_manager.get_output_format("script_generation")
 
+        # Load universal video production rules
+        pods_dir = os.path.dirname(self.pod_dir)  # pods/ directory
+        video_rules_text = PromptManager.load_video_rules(pods_dir)
+
         # Render user prompt template
         system_role = self.prompt_manager.get_system_role("script_generation")
         user_prompt = self.prompt_manager.render_template(
@@ -86,6 +89,7 @@ class ScriptGenerator:
             if interactivity_enabled
             else 0,
             output_format=json.dumps(output_format, indent=2, ensure_ascii=False),
+            video_rules=video_rules_text,
         )
 
         full_prompt = f"{system_role}\n\n{user_prompt}"

@@ -13,6 +13,7 @@ from google import genai
 from google.genai import types
 
 from src.utils.api_key_manager import get_api_key_manager
+from src.utils.config_loader import load_json
 from src.utils.memory_manager import MemoryManager
 from src.utils.prompt_manager import PromptManager
 from src.variables import GEMINI_MODEL_NAME
@@ -22,7 +23,7 @@ class TopicEngine:
     """Genera ideas de temas para nuevos episodios usando Gemini."""
 
     def __init__(self, pod_config_path: str):
-        self.config = self._load_config(pod_config_path)
+        self.config = load_json(pod_config_path)
         self.pod_dir = os.path.dirname(pod_config_path)
         self.memory_manager = MemoryManager(self.pod_dir)
 
@@ -34,9 +35,7 @@ class TopicEngine:
         self.key_manager = get_api_key_manager()
         self.client = self.key_manager.get_client()
 
-    def _load_config(self, path: str) -> Dict[str, Any]:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+
 
     def generate_topics(self, count: int = 5) -> List[Dict[str, Any]]:
         """
@@ -98,10 +97,7 @@ class TopicEngine:
 
         return "\n".join(formatted)
 
-    def get_next_topic(self) -> Optional[Dict[str, Any]]:
-        """Get a single topic for the next episode."""
-        topics = self.generate_topics(count=1)
-        return topics[0] if topics else None
+
 
 
 if __name__ == "__main__":

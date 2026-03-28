@@ -1,12 +1,9 @@
 {
     "episodes": [
         {
-            "title": "El Gran Tesoro de Bellotas",
-            "summary": "Tico la ardilla encuentra un mapa hacia un gran tesoro. En su camino ayuda a un amigo y al encontrar la enorme bellota, descubre que necesita la ayuda de los demás para abrirla, aprendiendo que el verdadero tesoro es compartir.",
-            "moral": "El verdadero valor de un tesoro se encuentra cuando lo compartes con tus amigos."
+            "title": "El Puente de Ramitas",
+            "summary": "Tico la ardilla intenta cruzar un río usando un puente de ramitas frágiles, pero aprende que pedir ayuda a su amigo Berto el castor para construir un puente fuerte es mucho más seguro y divertido.",
+            "moral": "Pedir ayuda y trabajar en equipo hace que las tareas difíciles sean mucho más fáciles."
         }
-    ],
-    "current_state": {
-        "characters": {}
-    }
+    ]
 }
