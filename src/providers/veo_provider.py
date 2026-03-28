@@ -341,14 +341,16 @@ class VeoProvider(BaseVideoProvider):
 
     def _apply_dubbing(self, clip: VideoClip, scene: dict, clips_dir: str, scene_num_str: str) -> None:
         """
-        Genera el TTS con ElevenLabs y lo sincroniza con el audio nativo de Veo
-        antes de reemplazar la pista de audio del clip.
-
-        Pipeline:
-          1. Extraer audio original de Veo → medir duración del habla
-          2. Generar TTS con ElevenLabs
-          3. Time-stretch el TTS para que coincida con la duración del habla de Veo
-          4. Reemplazar el audio del clip con el TTS sincronizado
+        Genera el doblaje final de la escena y reemplaza la pista de audio del clip.
+        
+        Pipeline principal (STS):
+          1. Extraer el audio nativo de Veo (lip-synced).
+          2. Usar ElevenLabs Speech-to-Speech (veo_audio -> voz de personaje).
+             Esto conserva cadencia y timing exacto, encajando perfecto con los labios.
+          3. Reemplazar el audio original con el convertido.
+          
+        Fallback (TTS):
+          Si falla STS, hace Text-to-Speech clásico y lo inyecta como pueda.
         """
         audio_text = scene.get("audio_text", "")
         character_name = scene.get("character", "")
@@ -360,52 +362,51 @@ class VeoProvider(BaseVideoProvider):
         audio_filename = f"dialogue_{scene_num_str}.wav"
         audio_path = os.path.join(clips_dir, audio_filename)
 
-        # --- Step 1: Analyze Veo's native audio for speech timing ---
+        final_audio_to_mix = None
+
+        # --- Step 1: Extract Veo's native audio ---
         veo_audio_path = AudioMixer.extract_audio(clip.file_path)
-        speech_start, speech_end, speech_duration = 0.0, 0.0, 0.0
 
         if veo_audio_path:
-            speech_start, speech_end, speech_duration = AudioMixer.detect_speech_duration(veo_audio_path)
-            # Cleanup extracted Veo audio
+            # --- Step 2: Try Speech-to-Speech (STS) conversion ---
+            converted_audio = self.eleven_prov.convert_voice(
+                source_audio_path=veo_audio_path,
+                character_name=character_name,
+                output_path=audio_path
+            )
+            
+            if converted_audio:
+                final_audio_to_mix = converted_audio
+                print(f"[DUBBING] 🎙️ Audio STS convertido exitosamente")
+            else:
+                print(f"[DUBBING] ⚠️ Falló STS, probando TTS fallback...")
+            
+            # Cleanup extracted native audio
             try:
                 os.remove(veo_audio_path)
             except OSError:
                 pass
 
-        # --- Step 2: Generate TTS with ElevenLabs ---
-        generated_audio = self.eleven_prov.generate_dialogue(audio_text, character_name, audio_path)
-        if not generated_audio:
-            return
+        # --- Fallback: Text-to-Speech (TTS) ---
+        if not final_audio_to_mix:
+            generated_audio = self.eleven_prov.generate_dialogue(audio_text, character_name, audio_path)
+            if generated_audio:
+                final_audio_to_mix = generated_audio
+                print(f"[DUBBING] 🎙️ Audio TTS generado exitosamente")
 
-        # --- Step 3: Time-stretch TTS to match Veo speech duration ---
-        synced_audio = generated_audio
-        if speech_duration > 0.5:
-            synced_audio = AudioMixer.time_stretch_audio(
-                audio_path=generated_audio,
-                target_duration=speech_duration,
-                speech_start_offset=speech_start,
+        # --- Step 3: Mix the dubbing audio back into the video ---
+        if final_audio_to_mix:
+            mixed_path = clip.file_path.replace(".mp4", "_dubbed.mp4")
+            final_clip_path = AudioMixer.mix_audio_to_video(
+                video_path=clip.file_path,
+                audio_path=final_audio_to_mix,
+                output_path=mixed_path,
+                audio_volume=1.0
             )
-        else:
-            print(f"[DUBBING] ⚠️  No se detectó habla en Veo para escena {scene_num_str}, usando TTS sin sync")
-
-        # --- Step 4: Replace audio track ---
-        mixed_path = clip.file_path.replace(".mp4", "_dubbed.mp4")
-        final_clip_path = AudioMixer.mix_audio_to_video(
-            video_path=clip.file_path,
-            audio_path=synced_audio,
-            output_path=mixed_path,
-            audio_volume=1.0
-        )
-        if final_clip_path and final_clip_path != clip.file_path:
-            os.replace(final_clip_path, clip.file_path)
-            print(f"[DUBBING] 🎙️ Audio de {character_name} sincronizado e inyectado en clip {scene_num_str}")
-
-        # Cleanup synced temp file if different from original
-        if synced_audio != generated_audio and os.path.exists(synced_audio):
-            try:
-                os.remove(synced_audio)
-            except OSError:
-                pass
+            
+            if final_clip_path and final_clip_path != clip.file_path:
+                clip.dubbed_path = final_clip_path
+                print(f"[DUBBING] ✅ Audio de {character_name} inyectado al clip {scene_num_str} (Guardado en {os.path.basename(final_clip_path)})")
 
 
     def generate_full_video(
@@ -534,9 +535,16 @@ class VeoProvider(BaseVideoProvider):
 
         # Concatenate clips
         if len(clips) == 1:
-            final_path = clips[0].file_path
+            final_native_path = clips[0].file_path
+            final_dubbed_path = getattr(clips[0], 'dubbed_path', None) or final_native_path
         else:
-            final_path = self._concatenate_clips(clips, output_path)
+            final_native_path = self._concatenate_clips(clips, output_path, use_dubbed=False)
+            
+            # Form final dubbed path
+            output_dir = os.path.dirname(output_path)
+            base_name = os.path.basename(output_path).replace(".mp4", "_dubbed.mp4")
+            dubbed_output_path = os.path.join(output_dir, base_name)
+            final_dubbed_path = self._concatenate_clips(clips, dubbed_output_path, use_dubbed=True)
 
         # Update progress
         if progress_manager:
@@ -545,7 +553,7 @@ class VeoProvider(BaseVideoProvider):
                 print(progress_manager.get_status_summary())
             elif len(clips) >= len(scenes):
                 # ALL scenes completed successfully
-                progress_manager.mark_episode_completed(final_path)
+                progress_manager.mark_episode_completed(final_native_path)
             else:
                 # Partial generation (stopped by error) — don't mark as completed
                 print(f"\n[VEO] ⏸️  Episodio parcial ({len(clips)}/{len(scenes)} clips). Resume con opción 4.")
@@ -556,11 +564,14 @@ class VeoProvider(BaseVideoProvider):
         status = "PARCIAL" if completed_count < total_count else "COMPLETO"
 
         print(f"\n{'='*60}")
-        print(f"[VEO] {'⏸️' if rate_limited else '✅'} Vídeo {status}: {final_path}")
+        print(f"[VEO] {'⏸️' if rate_limited else '✅'} Vídeo {status}:")
+        print(f"[VEO]    Nativo:  {final_native_path}")
+        if final_dubbed_path != final_native_path:
+            print(f"[VEO]    Doblado: {final_dubbed_path}")
         print(f"[VEO]    Clips generados: {completed_count}/{total_count}")
         print(f"{'='*60}\n")
 
-        return final_path
+        return final_dubbed_path
 
     # ==========================================
     # INTERNAL HELPER METHODS
@@ -780,7 +791,7 @@ class VeoProvider(BaseVideoProvider):
 
         return ". ".join(filter(None, parts))
 
-    def _concatenate_clips(self, clips: List[VideoClip], output_path: str) -> str:
+    def _concatenate_clips(self, clips: List[VideoClip], output_path: str, use_dubbed: bool = False) -> str:
         """
         Concatenate multiple video clips into one final video.
         Uses ffmpeg via subprocess for reliability.
@@ -791,7 +802,11 @@ class VeoProvider(BaseVideoProvider):
             with open(concat_list_path, "w") as f:
                 for clip in clips:
                     # ffmpeg requires forward slashes or escaped backslashes
-                    safe_path = clip.file_path.replace("\\", "/")
+                    if use_dubbed and getattr(clip, 'dubbed_path', None) and os.path.exists(clip.dubbed_path):
+                        p = clip.dubbed_path
+                    else:
+                        p = clip.file_path
+                    safe_path = p.replace("\\", "/")
                     f.write(f"file '{safe_path}'\n")
 
             # Run ffmpeg concat

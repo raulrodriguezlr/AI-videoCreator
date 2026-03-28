@@ -23,12 +23,14 @@ class VideoClip:
         seed: Optional[int] = None,
         operation_name: Optional[str] = None,
         video_ref: Any = None,
+        dubbed_path: Optional[str] = None,
     ):
         self.file_path = file_path
         self.duration = duration
         self.seed = seed
         self.operation_name = operation_name
         self.video_ref = video_ref  # Provider-specific reference (e.g., Veo video object)
+        self.dubbed_path = dubbed_path
 
 
 class BaseVideoProvider(ABC):

@@ -116,3 +116,80 @@ class ElevenLabsProvider:
         except Exception as e:
             print(f"[ElevenLabs] ❌ Error generando diálogo: {e}")
             return None
+
+    def convert_voice(self, source_audio_path: str, character_name: str, output_path: str) -> Optional[str]:
+        """
+        Convert the voice in a source audio file to a target character's voice
+        using ElevenLabs Speech-to-Speech API.
+
+        Preserves the original timing, cadence, and intonation — only changes the voice.
+        This is ideal for dubbing: take Veo's native lip-synced audio and convert
+        it to the consistent ElevenLabs voice while keeping perfect sync.
+
+        Args:
+            source_audio_path: Path to the source audio (e.g., extracted from Veo clip).
+            character_name: Name of the character (to lookup their voice ID).
+            output_path: Where to save the converted audio file.
+
+        Returns:
+            Absolute path to the converted audio file, or None if failed.
+        """
+        if not os.path.exists(source_audio_path):
+            print(f"[ElevenLabs STS] ❌ Audio fuente no encontrado: {source_audio_path}")
+            return None
+
+        # Validate cached file
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+            print(f"[ElevenLabs STS] ♻️  Audio ya convertido: {os.path.basename(output_path)}")
+            return output_path
+        elif os.path.exists(output_path):
+            os.remove(output_path)
+
+        if not ELEVENLABS_API_KEY:
+            print("[ElevenLabs STS] ❌ No se puede convertir: falta ELEVENLABS_API_KEY.")
+            return None
+
+        voice_id = self.voice_map.get(character_name.lower(), self.DEFAULT_VOICE_ID)
+        print(f"\n[ElevenLabs STS] 🔄 Convirtiendo voz a {character_name} ({voice_id})...")
+
+        try:
+            url = f"https://api.elevenlabs.io/v1/speech-to-speech/{voice_id}"
+            headers = {
+                "Accept": "audio/mpeg",
+                "xi-api-key": ELEVENLABS_API_KEY
+            }
+
+            # STS uses multipart form data, not JSON
+            with open(source_audio_path, "rb") as audio_file:
+                files = {
+                    "audio": (os.path.basename(source_audio_path), audio_file, "audio/wav")
+                }
+                data = {
+                    "model_id": "eleven_multilingual_sts_v2",
+                    "output_format": "mp3_44100_128"
+                }
+
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    files=files,
+                    data=data,
+                    timeout=120.0
+                )
+
+            if response.status_code == 200:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                size_kb = len(response.content) // 1024
+                print(f"[ElevenLabs STS] ✅ Voz convertida: {os.path.basename(output_path)} ({size_kb} KB)")
+                return output_path
+            else:
+                print(f"[ElevenLabs STS] ❌ Error {response.status_code}: {response.text[:200]}")
+                return None
+
+        except requests.exceptions.Timeout:
+            print("[ElevenLabs STS] ❌ Timeout esperando respuesta de ElevenLabs STS")
+            return None
+        except Exception as e:
+            print(f"[ElevenLabs STS] ❌ Error convirtiendo voz: {e}")
+            return None
