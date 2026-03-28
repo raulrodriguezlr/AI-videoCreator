@@ -12,6 +12,8 @@ from typing import Optional, Dict, Any
 
 from google import genai
 from google.genai import types
+import traceback
+from dotenv import load_dotenv
 
 from src.utils.api_key_manager import get_api_key_manager
 from src.utils.config_loader import load_json
@@ -163,7 +165,6 @@ class ScriptGenerator:
 
 
 if __name__ == "__main__":
-    from dotenv import load_dotenv
     load_dotenv()
 
     try:
@@ -182,5 +183,4 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Error: {e}")
-        import traceback
         traceback.print_exc()

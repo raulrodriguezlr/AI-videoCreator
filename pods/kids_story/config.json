@@ -34,7 +34,7 @@
             "name": "Narrator",
             "role": "storyteller",
             "personality": "warm, encouraging, asks questions to engage viewers, patient and supportive",
-            "elevenlabs_voice_id": "ErXwobaYiN019PkySvjV",
+            "elevenlabs_voice_id": "P5dwwehjO7NwEIcN2F2N",
             "elevenlabs_voice_settings": {
                 "speed": 1.0,
                 "stability": 0.5,

@@ -7,6 +7,8 @@ Usage:
 """
 
 from src.variables import VIDEO_PROVIDER
+from src.providers.veo_provider import VeoProvider
+from src.providers.ltx_provider import LtxProvider
 
 
 def get_provider(pod_config_path: str):
@@ -24,11 +26,9 @@ def get_provider(pod_config_path: str):
         ValueError: If VIDEO_PROVIDER is not recognized.
     """
     if VIDEO_PROVIDER == "veo":
-        from src.providers.veo_provider import VeoProvider
         return VeoProvider(pod_config_path)
 
     elif VIDEO_PROVIDER in ("ltx", "ovi"):  # "ovi" kept for backward compat
-        from src.providers.ltx_provider import LtxProvider
         return LtxProvider(pod_config_path)
 
     else:

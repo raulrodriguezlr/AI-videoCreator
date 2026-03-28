@@ -7,7 +7,9 @@ basándose en la serie y episodios anteriores.
 
 import os
 import json
+import sys
 from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
 
 from google import genai
 from google.genai import types
@@ -101,8 +103,6 @@ class TopicEngine:
 
 
 if __name__ == "__main__":
-    import sys
-    from dotenv import load_dotenv
     load_dotenv()
 
     pod_path = "pods/kids_story/config.json"

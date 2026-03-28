@@ -1,5 +1,7 @@
 import os
 import subprocess
+import re
+from typing import Optional, Tuple
 
 
 class AudioMixer:
@@ -208,7 +210,6 @@ class AudioMixer:
             stderr = result.stderr
 
             # Parse silence_start and silence_end from ffmpeg output
-            import re
             silence_starts = [float(m) for m in re.findall(r"silence_start:\s*([\d.]+)", stderr)]
             silence_ends = [float(m) for m in re.findall(r"silence_end:\s*([\d.]+)", stderr)]
 

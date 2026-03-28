@@ -25,6 +25,7 @@ from google.genai import types
 
 from src.providers.base_provider import BaseVideoProvider, VideoClip
 from src.providers.elevenlabs_provider import ElevenLabsProvider
+from src.utils.audio_mixer import AudioMixer
 from src.utils.api_key_manager import get_api_key_manager
 from src.utils.config_loader import load_json
 from src.utils.progress_manager import is_rate_limit_error, is_content_error
@@ -356,8 +357,6 @@ class VeoProvider(BaseVideoProvider):
         character_name = scene.get("character", "")
         if not audio_text or not character_name:
             return
-
-        from src.utils.audio_mixer import AudioMixer
 
         audio_filename = f"dialogue_{scene_num_str}.wav"
         audio_path = os.path.join(clips_dir, audio_filename)
