@@ -341,7 +341,14 @@ class VeoProvider(BaseVideoProvider):
 
     def _apply_dubbing(self, clip: VideoClip, scene: dict, clips_dir: str, scene_num_str: str) -> None:
         """
-        Genera el TTS con ElevenLabs y reemplaza la pista de audio del clip.
+        Genera el TTS con ElevenLabs y lo sincroniza con el audio nativo de Veo
+        antes de reemplazar la pista de audio del clip.
+
+        Pipeline:
+          1. Extraer audio original de Veo → medir duración del habla
+          2. Generar TTS con ElevenLabs
+          3. Time-stretch el TTS para que coincida con la duración del habla de Veo
+          4. Reemplazar el audio del clip con el TTS sincronizado
         """
         audio_text = scene.get("audio_text", "")
         character_name = scene.get("character", "")
@@ -353,18 +360,52 @@ class VeoProvider(BaseVideoProvider):
         audio_filename = f"dialogue_{scene_num_str}.wav"
         audio_path = os.path.join(clips_dir, audio_filename)
 
+        # --- Step 1: Analyze Veo's native audio for speech timing ---
+        veo_audio_path = AudioMixer.extract_audio(clip.file_path)
+        speech_start, speech_end, speech_duration = 0.0, 0.0, 0.0
+
+        if veo_audio_path:
+            speech_start, speech_end, speech_duration = AudioMixer.detect_speech_duration(veo_audio_path)
+            # Cleanup extracted Veo audio
+            try:
+                os.remove(veo_audio_path)
+            except OSError:
+                pass
+
+        # --- Step 2: Generate TTS with ElevenLabs ---
         generated_audio = self.eleven_prov.generate_dialogue(audio_text, character_name, audio_path)
-        if generated_audio:
-            mixed_path = clip.file_path.replace(".mp4", "_dubbed.mp4")
-            final_clip_path = AudioMixer.mix_audio_to_video(
-                video_path=clip.file_path,
+        if not generated_audio:
+            return
+
+        # --- Step 3: Time-stretch TTS to match Veo speech duration ---
+        synced_audio = generated_audio
+        if speech_duration > 0.5:
+            synced_audio = AudioMixer.time_stretch_audio(
                 audio_path=generated_audio,
-                output_path=mixed_path,
-                audio_volume=1.0  # Dialogue should be at 100% volume
+                target_duration=speech_duration,
+                speech_start_offset=speech_start,
             )
-            if final_clip_path and final_clip_path != clip.file_path:
-                os.replace(final_clip_path, clip.file_path)
-                print(f"[DUBBING] 🎙️ Audio de {character_name} inyectado exitosamente al clip {scene_num_str}")
+        else:
+            print(f"[DUBBING] ⚠️  No se detectó habla en Veo para escena {scene_num_str}, usando TTS sin sync")
+
+        # --- Step 4: Replace audio track ---
+        mixed_path = clip.file_path.replace(".mp4", "_dubbed.mp4")
+        final_clip_path = AudioMixer.mix_audio_to_video(
+            video_path=clip.file_path,
+            audio_path=synced_audio,
+            output_path=mixed_path,
+            audio_volume=1.0
+        )
+        if final_clip_path and final_clip_path != clip.file_path:
+            os.replace(final_clip_path, clip.file_path)
+            print(f"[DUBBING] 🎙️ Audio de {character_name} sincronizado e inyectado en clip {scene_num_str}")
+
+        # Cleanup synced temp file if different from original
+        if synced_audio != generated_audio and os.path.exists(synced_audio):
+            try:
+                os.remove(synced_audio)
+            except OSError:
+                pass
 
 
     def generate_full_video(

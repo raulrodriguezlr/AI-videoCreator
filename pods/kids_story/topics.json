@@ -151,10 +151,10 @@
       "educational_value": "Comprenderán la importancia de la honestidad, el valor de pedir perdón y cómo hacerse responsables de sus propios errores.",
       "references_episode": null,
       "target_emotion": "Empatía y alivio",
-      "status": "pending",
-      "episode_id": null,
+      "status": "completed",
+      "episode_id": "ep_005_las_bayas_desaparecidas",
       "created_at": "2026-03-28T09:59:34.267210",
-      "completed_at": null
+      "completed_at": "2026-03-28T11:03:38.586921"
     }
   ]
 }
