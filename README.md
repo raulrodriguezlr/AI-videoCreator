@@ -1,4 +1,4 @@
-# AI-videoCreator v1.0 🎬
+# AI-videoCreator v2.0 🎬
 
 Generador automático de vídeos usando IA. Crea vídeos con guión, narración y audio sincronizado de forma nativa.
 
@@ -13,17 +13,26 @@ python -m src.main --pod kids_story --topic "Tico aprende sobre la paciencia"
 ## Arquitectura
 
 ```
-main.py (orquestador)
+cli.py → PipelineOrchestrator (orquestador)
   │
   ├── TopicEngine → Gemini genera temas
   ├── ScriptEngine → Gemini genera guion cinematográfico
+  ├── ProgressManager → Persistencia de estado (resume)
+  ├── EpisodeManager → Organización de episodios
   └── VideoEngine (router)
         │
         ├── VeoProvider → Google Veo 3.1 API (producción, cloud)
-        │     └── Scene Builder: generate → jump_to
+        │     ├── Scene Builder: generate → jump_to
+        │     └── Dubbing: Veo audio → ElevenLabs STS → voz de personaje
         │
-        └── LtxProvider → LTX-2 via ComfyUI (local, GPU)
-              └── Genera con audio nativo (Gemma 3)
+        ├── LtxProvider → LTX-2 via ComfyUI (local, GPU)
+        │     └── Genera con audio nativo (Gemma 3)
+        │
+        ├── ElevenLabsProvider → Doblaje (STS + TTS fallback)
+        ├── LyriaProvider → Música ambiental (ElevenLabs Sound Gen)
+        └── AudioMixer → FFmpeg: mezcla, extracción, time-stretch
+
+  ApiKeyManager → Rotación automática de API keys (failover 429)
 ```
 
 ## Requisitos
@@ -38,7 +47,6 @@ main.py (orquestador)
 
 - **ComfyUI** corriendo en `http://127.0.0.1:8188` (para LtxProvider)
 - **NVIDIA GPU 12GB+** (RTX 4070 Ti o similar)
-- **ffmpeg** instalado (para concatenar clips)
 
 ## Instalación paso a paso 
 
@@ -114,14 +122,18 @@ ELEVENLABS_API_KEY=tu_api_key_de_elevenlabs
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `VIDEO_PROVIDER` | `"veo"` | Provider de vídeo: `"veo"` (cloud) o `"ovi"` (local) |
+| `VIDEO_PROVIDER` | `"veo"` | Provider de vídeo: `"veo"` (cloud) o `"ltx"` (local) |
 | `VEO_MODEL` | `"veo-3.1-generate-preview"` | Modelo de Veo a usar |
 | `VEO_RESOLUTION` | `"720p"` | Resolución: `"720p"`, `"1080p"`, `"4k"` |
 | `VEO_ASPECT_RATIO` | `"16:9"` | Ratio: `"16:9"` o `"9:16"` |
 | `VEO_DURATION_SECONDS` | `8` | Segundos por clip: 4, 6 u 8 |
-| `GEMINI_MODEL_NAME` | `"gemini-2.5-flash-preview-05-20"` | Modelo Gemini para scripts |
-| `OVI_COMFYUI_URL` | `"http://127.0.0.1:8188"` | URL de ComfyUI local |
-| `OVI_QUANTIZATION` | `"fp4"` | Cuantización: `"fp4"`, `"fp8"`, `"fp16"` |
+| `VEO_POLLING_INTERVAL` | `10` | Segundos entre cada check de generación |
+| `VEO_TIMEOUT` | `360` | Timeout máximo de espera (6 min) |
+| `GEMINI_MODEL_NAME` | `"gemini-3.1-pro-preview"` | Modelo Gemini para scripts y temas |
+| `LTX_COMFYUI_URL` | `"http://127.0.0.1:8188"` | URL de ComfyUI local |
+| `LTX_CHECKPOINT` | `"ltx-2-19b-dev-fp4.safetensors"` | Checkpoint del modelo LTX-2 |
+| `LTX_WIDTH` / `LTX_HEIGHT` | `768` / `512` | Resolución local (divisible por 64) |
+| `USE_REFERENCE_IMAGES` | `True` | Usar imágenes de referencia para consistencia |
 
 ## Uso
 
@@ -150,11 +162,22 @@ python -m src.main --check-provider
 ```
 ### Lanzar el modo interactivo (Recomendado)
 
-El modo interactivo es un menú que te guía paso a paso para crear vídeos, generar temas, o retomar episodios pausados.
+El modo interactivo es un menú que te guía paso a paso para crear vídeos, generar temas, retomar episodios pausados, aplicar doblaje manual o gestionar voces.
 
 ```bash
 python -m src.main --pod kids_story --interactive
 ```
+
+El menú interactivo incluye:
+1. 📝 Ver temas disponibles
+2. 🆕 Generar nuevos temas con IA
+3. ▶️ Crear vídeo completo (Auto Topic)
+4. 🔄 Continuar episodio incompleto
+5. 📋 Ver episodios generados
+6. ❌ Borrar un tema
+7. 🎯 Crear vídeo de un tema específico
+8. 🎙️ Doblaje Manual (Aplicar STS a un vídeo nativo)
+9. 🗣️ Gestor de Voces (Cambiar voces con ElevenLabs + Gemini)
 
 ### Retomar un episodio fallido o rate-limited
 
@@ -164,11 +187,24 @@ Si se agotan tus tokens de Veo 3.1 o quieres parar, el proceso guarda cada clip 
 python -m src.main --pod kids_story --resume last
 ```
 
-### Cambiar a testing local (Ovi)
+### Otros comandos CLI
+
+```bash
+# Listar temas generados
+python -m src.main --pod kids_story --list-topics
+
+# Listar episodios
+python -m src.main --pod kids_story --list-episodes
+
+# Borrar un tema por ID
+python -m src.main --pod kids_story --delete-topic topic_001
+```
+
+### Cambiar a testing local (LTX)
 
 En `src/variables.py`:
 ```python
-VIDEO_PROVIDER = "ovi"  # Cambia de "veo" a "ovi"
+VIDEO_PROVIDER = "ltx"  # Cambia de "veo" a "ltx"
 ```
 
 Asegúrate de que ComfyUI está corriendo en `http://127.0.0.1:8188`.
@@ -179,28 +215,51 @@ Asegúrate de que ComfyUI está corriendo en `http://127.0.0.1:8188`.
 AI-videoCreator/
 ├── .env                          # API keys (secretos)
 ├── requirements.txt              # Dependencias Python
+├── BITACORA.md                   # Cuaderno de bitácora técnico
 ├── src/
-│   ├── main.py                   # Orquestador principal
+│   ├── main.py                   # Punto de entrada
+│   ├── cli.py                    # CLI + Menú interactivo
 │   ├── variables.py              # TODA la configuración
 │   ├── engines/
+│   │   ├── pipeline_orchestrator.py  # Orquesta Script → Video → Memory
 │   │   ├── script_engine.py      # Gemini → Guión cinematográfico
 │   │   ├── topic_engine.py       # Gemini → Ideas de temas
 │   │   └── video_engine.py       # Router → delega al provider
 │   ├── providers/
 │   │   ├── __init__.py           # Factory (get_provider)
-│   │   ├── base_provider.py      # Clase abstracta
+│   │   ├── base_provider.py      # Clase abstracta (VideoClip, BaseVideoProvider)
 │   │   ├── veo_provider.py       # Google Veo 3.1 (producción)
-│   │   └── ovi_provider.py       # ComfyUI local (testing)
+│   │   ├── ltx_provider.py       # LTX-2 via ComfyUI (testing local)
+│   │   ├── elevenlabs_provider.py # Doblaje: STS + TTS fallback
+│   │   └── lyria_provider.py     # Música ambiental (ElevenLabs Sound Gen)
 │   └── utils/
-│       ├── memory_manager.py     # Memoria episódica
-│       └── prompt_manager.py     # Templates de prompts
+│       ├── api_key_manager.py    # Rotación de API keys (failover 429)
+│       ├── audio_mixer.py        # FFmpeg: mezcla, extracción, sync
+│       ├── config_loader.py      # Carga de JSON
+│       ├── episode_manager.py    # Gestión de episodios y carpetas
+│       ├── manual_dubbing.py     # Doblaje manual post-generación
+│       ├── memory_manager.py     # Memoria episódica (universe_memory)
+│       ├── progress_manager.py   # Persistencia de progreso (resume)
+│       ├── prompt_manager.py     # Templates de prompts
+│       ├── resume_handler.py     # Lógica de --resume
+│       ├── topic_manager.py      # CRUD de temas
+│       └── voice_manager.py      # Gestión de voces ElevenLabs
 ├── pods/
+│   ├── video_rules.json          # Reglas de producción universales
+│   ├── example_pod/              # Plantilla para nuevos pods
 │   └── kids_story/
 │       ├── config.json           # Configuración del pod
 │       ├── prompts.json          # Templates de prompts
+│       ├── topics.json           # Temas generados
 │       ├── universe_memory.json  # Memoria de episodios
-│       ├── assets/               # Archivos generados (clips, frames)
-│       └── output/               # Vídeos finales
+│       ├── assets/               # Reference images de personajes
+│       └── output/               # Episodios generados
+│           └── ep_001_.../
+│               ├── script.json
+│               ├── progress.json
+│               ├── metadata.json
+│               ├── clips/        # Clips individuales
+│               └── final.mp4     # Vídeo concatenado
 └── README.md
 ```
 
@@ -210,10 +269,17 @@ El `VeoProvider` replica la lógica de Google Flow Scene Builder:
 
 1. **Escena 1**: Genera vídeo de cero con `generate_scene()` (texto → vídeo)
 2. **Escenas 2..N**: Para cada escena siguiente:
-   - **Extend** (misma escena, más larga): `extend_scene()` — añade +7s al clip anterior
-   - **Jump To** (corte a nueva escena): `jump_to_scene()` — extrae último frame del clip anterior → lo usa como seed visual para el siguiente clip
+   - **Continue** (continuación fluida): `jump_to_scene()` — extrae último frame → lo usa como seed visual para el siguiente clip
+   - **Cut** (cambio de plano en misma escena): `generate_scene()` con reference images
+   - **Scene Change** (nueva localización): `generate_scene()` con reference images
 3. **Character Consistency**: Usa `referenceImages` (hasta 3 imágenes de referencia por personaje)
-4. **Audio**: Veo 3.1 genera audio sincronizado nativamente (narración, diálogos, efectos)
+4. **Audio nativo**: Veo 3.1 genera audio sincronizado nativamente (narración, diálogos, efectos)
+5. **Doblaje automático**: Cada clip pasa por el pipeline STS de ElevenLabs:
+   - Extrae audio nativo de Veo (lip-synced)
+   - Convierte la voz via Speech-to-Speech (conserva cadencia y timing)
+   - Si STS falla → fallback a TTS clásico
+6. **Música ambiental**: LyriaProvider genera música de fondo con ElevenLabs Sound Generation
+7. **Resiliencia**: Cada clip generado se persiste inmediatamente. Si falla, `--resume` retoma donde se quedó
 
 ## Cómo crear un pod nuevo (Onboarding)
 
@@ -261,12 +327,17 @@ Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
 
 ## Roadmap
 
+- [x] Sistema de doblaje automático (ElevenLabs STS + TTS fallback)
+- [x] Música ambiental automática (ElevenLabs Sound Generation)
+- [x] Rotación automática de API keys (failover 429)
+- [x] Sistema de resume/progreso (nunca se pierde un clip)
+- [x] Menú interactivo completo (9 opciones)
+- [x] Doblaje manual post-generación
+- [x] Gestor de voces interactivo
 - [ ] Automatización con n8n (local/cloud)
 - [ ] Google Opal integration
 - [ ] Modelos de vídeo adicionales (providers)
 - [ ] LoRA para character consistency local
 - [ ] Publicación automática a YouTube
-## Futuras mejoras
-
-Ahora las escenas se extienden cogiendo el ultimo frame y partiendo de ahi genera el siguiente clip, esto hace que vaya todo de seguido pero 
-no mantiene ni las voces(las imagenes si son iguales pero no las voces). Al hacer esto, no hay cortes entre escenas, no puede haber un corte de escena a otra escena diferente. Supongo que se puede cambiar con promting y no necesariarmente con codigo.
+- [ ] Migración de `print()` a `logging` (para automatización)
+- [ ] Tests unitarios

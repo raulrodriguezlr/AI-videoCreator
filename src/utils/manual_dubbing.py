@@ -148,6 +148,13 @@ class ManualDubber:
         audio_filename = f"dialogue_manual_{scene_num_str}.wav"
         audio_path = os.path.join(clips_dir, audio_filename)
         
+        # Eliminar posible cache previo para forzar nueva voz
+        if os.path.exists(audio_path):
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
+        
         converted_audio = self.eleven_prov.convert_voice(
             source_audio_path=veo_audio_path,
             character_name=character_name,
@@ -199,6 +206,13 @@ class ManualDubber:
         # 2. STS conversion sobre la pista global
         audio_filename = "dialogue_final_manual.wav"
         audio_path = os.path.join(ep_dir, audio_filename)
+        
+        # Eliminar posible cache previo para forzar nueva voz
+        if os.path.exists(audio_path):
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
         
         print("🔄 Convertiendo voz en todo el vídeo con ElevenLabs...")
         converted_audio = self.eleven_prov.convert_voice(

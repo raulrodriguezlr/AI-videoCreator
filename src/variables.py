@@ -86,10 +86,23 @@ SCENE_BUILDER_MAX_EXTENDS = 20
 
 
 # ==========================
-# AUDIO — ElevenLabs Sound Generation
+# AUDIO & VOZ — ElevenLabs
 # ==========================
-# Used for ambient background music generation (replaces Gemini TTS which only does speech)
+# Used for TTS (Text-to-Speech) and STS (Speech-to-Speech) dubbing, and ambient background music.
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+
+# Modelos
+ELEVENLABS_TTS_MODEL = "eleven_multilingual_v2"
+ELEVENLABS_STS_MODEL = "eleven_multilingual_sts_v2"
+ELEVENLABS_OUTPUT_FORMAT = "mp3_44100_128"
+
+# Voice Settings por defecto (si el character no los tiene en config.json)
+ELEVENLABS_DEFAULT_VOICE_ID = "pNInz6obbf5cNed9uQcd"  # Voice genérica (Pippa u otra)
+ELEVENLABS_DEFAULT_STABILITY = 0.5
+ELEVENLABS_DEFAULT_SIMILARITY_BOOST = 0.8  # STS se beneficia de valores >= 0.8
+ELEVENLABS_DEFAULT_STYLE = 0.3
+ELEVENLABS_DEFAULT_USE_SPEAKER_BOOST = True
+ELEVENLABS_DEFAULT_SPEED = 1.15
 
 # ==========================
 # LLM — Gemini (Script + Topic Generation)

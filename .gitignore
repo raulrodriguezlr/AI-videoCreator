@@ -22,15 +22,15 @@ env/
 .env.production
 
 # --- Generated Assets (regenerable) ---
-#pods/*/assets/*.png
-#pods/*/assets/*.mp3
-#pods/*/assets/*.mp4
-#pods/*/output/
+pods/*/assets/*.png
+pods/*/assets/*.mp3
+pods/*/assets/*.mp4
+pods/*/output/
 
 # --- Media files (generated, not source) ---
-#*.mp4
-#*.mp3
-#*.wav
+*.mp4
+*.mp3
+*.wav
 
 # --- PDFs (generated docs) ---
 *.pdf
