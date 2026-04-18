@@ -1,0 +1,331 @@
+{
+  "title": "El Puente de Ramitas",
+  "summary": "Tico la ardilla intenta cruzar un río usando un puente de ramitas frágiles, pero aprende que pedir ayuda a su amigo Berto el castor para construir un puente fuerte es mucho más seguro y divertido.",
+  "moral": "Pedir ayuda y trabajar en equipo hace que las tareas difíciles sean mucho más fáciles.",
+  "ambient_audio_prompt": "Upbeat acoustic guitar, magical orchestral chimes, soothing sounds of a flowing forest stream, cheerful nature sounds",
+  "scenes": [
+    {
+      "scene_number": 1,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, looks directly at the camera smiling happily. The squirrel says \"¡Hola, amigos! Soy Tico\". Lush magical forest background with glowing particles and large ancient trees. Warm cinematic lighting, vibrant colors. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Hola, amigos! Soy Tico, ¡vuestro explorador favorito!",
+      "character": "Tico",
+      "voice_direction": "muy alegre y enérgico",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "continue",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 2,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney Pixar style. Tico, the orange squirrel with the green backpack and tiny compass, walks happily along a dirt path surrounded by glowing blue mushrooms and bright green ferns. He looks around with wonder. The squirrel says \"Bienvenidos al Bosque Mágico\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Bienvenidos al Bosque Mágico. ¡Hoy hace un día perfecto para vivir una aventura nueva!",
+      "character": "Tico",
+      "voice_direction": "entusiasta y acogedor",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "tracking",
+        "angle": "eye_level"
+      },
+      "mood": "exciting",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 3,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Tico, the orange squirrel with the green backpack, stops suddenly. His furry ears perk up and he cups one paw to his ear, listening intently. The squirrel says \"Escuchad... ¿oís ese sonido?\". Soft dappled sunlight shines through the leaves. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Escuchad... ¿oís ese sonido del agua? ¡Vamos a investigar de dónde viene!",
+      "character": "Tico",
+      "voice_direction": "intrigado, bajando un poco la voz",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "mysterious",
+      "lighting": "soft_diffused",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 4,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. A sparkling blue stream flowing rapidly over smooth grey rocks. On the other side of the stream, a pile of giant, glowing golden acorns rests on soft moss. Tico, the orange squirrel with the green backpack, stands on the near riverbank looking excitedly across the water. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Ala! Es el Arroyo Brillante. ¡Y mirad cuántas bellotas doradas hay al otro lado!",
+      "character": "Tico",
+      "voice_direction": "fascinado y muy sorprendido",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_right",
+        "angle": "high_angle"
+      },
+      "mood": "joyful",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 5,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. Tico, the orange squirrel with the green backpack and tiny compass, looks down at the fast-moving water. He rubs his chin with a slightly worried and disappointed expression. The squirrel says \"Pero el agua va súper rápido\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Pero el agua va súper rápido. Y yo, pues... ¡soy una ardilla, no sé nadar muy bien!",
+      "character": "Tico",
+      "voice_direction": "un poco decepcionado y pensativo",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "high_angle"
+      },
+      "mood": "tense",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 6,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, the orange squirrel with the green backpack, gets a bright idea. He smiles widely and starts picking up tiny, thin dry twigs from the ground. The squirrel says \"Construiré un puente con estas ramitas\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Pero soy muy listo! Dije: 'Construiré un puente con estas ramitas pequeñitas'.",
+      "character": "Tico",
+      "voice_direction": "orgulloso y decidido",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_in",
+        "angle": "low_angle"
+      },
+      "mood": "triumphant",
+      "lighting": "golden_hour",
+      "transition_to_next": "continue",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 7,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, the orange squirrel with the green backpack, holds up a bunch of very thin, fragile twigs towards the camera. He looks playfully at the viewer. The squirrel says \"¿Vosotros creéis que estas ramitas tan finas aguantarán mi peso?\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¿Vosotros creéis que estas ramitas tan finas aguantarán mi peso?",
+      "character": "Tico",
+      "voice_direction": "curioso, haciendo una pregunta directa a los niños",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "exciting",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": true,
+      "pause_for_answer": 4
+    },
+    {
+      "scene_number": 8,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, the orange squirrel with the green backpack, places one paw cautiously on a flimsy bridge made of thin twigs over the edge of the stream. The twigs instantly snap and bend. Tico pulls back quickly in surprise. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Ay, ay, ay! ¡Casi me caigo al agua! El puente de ramitas se ha roto en pedacitos nada más pisarlo.",
+      "character": "Tico",
+      "voice_direction": "asustado primero, luego aliviado",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_left",
+        "angle": "eye_level"
+      },
+      "mood": "tense",
+      "lighting": "bright_daylight",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 9,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, the orange squirrel with the green backpack, sits on a mossy rock with his arms crossed, looking frustrated and sad at a pile of broken twigs. The squirrel says \"Era imposible para una ardilla sola\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Lo intenté otra vez juntando más ramitas, pero nada. Era imposible para una ardilla sola. Me puse un poquito triste.",
+      "character": "Tico",
+      "voice_direction": "triste y desanimado",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_out",
+        "angle": "high_angle"
+      },
+      "mood": "calm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 10,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. From behind Tico's shoulder, we see a friendly brown beaver wearing a little yellow hard hat waddling towards him. Tico, the orange squirrel, turns around and his face lights up with joy. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Pero entonces... ¡apareció mi gran amigo Berto el castor! Él es el mejor constructor de todo el bosque.",
+      "character": "Tico",
+      "voice_direction": "recuperando la alegría, emocionado",
+      "camera": {
+        "shot_type": "over_the_shoulder",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "continue",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 11,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Tico, the orange squirrel with the green backpack, looks up at Berto the brown beaver pleadingly. The squirrel says \"¡Berto! ¿Me ayudas a hacer un puente fuerte?\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Rápidamente le pregunté: '¡Berto! ¿Me ayudas a hacer un puente fuerte para cruzar al otro lado?'",
+      "character": "Tico",
+      "voice_direction": "con tono suplicante y esperanzado",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "low_angle"
+      },
+      "mood": "exciting",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 12,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel with the green backpack and Berto the brown beaver are pushing a thick, sturdy wooden log together towards the edge of the stream. Both characters look determined, sweating slightly but smiling. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Berto dijo que sí al instante! Juntos, empujamos un tronco súper grande y unas ramas muy gordas.",
+      "character": "Tico",
+      "voice_direction": "haciendo esfuerzo al hablar, pero muy contento",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "tracking",
+        "angle": "eye_level"
+      },
+      "mood": "triumphant",
+      "lighting": "bright_daylight",
+      "transition_to_next": "continue",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 13,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. The heavy wooden log falls perfectly across the sparkling blue stream with a splash, connecting both riverbanks solidly. Tico the orange squirrel and Berto the beaver cheer with their hands in the air. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "A la de una, a la de dos... ¡y a la de tres! ¡Plom! El gran tronco cruzó el arroyo formando un puente perfecto.",
+      "character": "Tico",
+      "voice_direction": "narrando con ritmo, culminando en un grito de victoria",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_right",
+        "angle": "high_angle"
+      },
+      "mood": "triumphant",
+      "lighting": "golden_hour",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 14,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel with the green backpack walks proudly across the thick sturdy log bridge alongside Berto the beaver. Below them, the water flows fast, but they are completely safe. The squirrel says \"¡Yupi! Pasamos por encima\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Yupi! Pasamos por encima de nuestro puente súper seguro, sin mojarnos ni un solo pelito.",
+      "character": "Tico",
+      "voice_direction": "alegre y victorioso",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "tracking",
+        "angle": "low_angle"
+      },
+      "mood": "joyful",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 15,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel with the green backpack holds a giant glowing golden acorn. He takes a happy bite, then looks up at the camera. The squirrel says \"¿Vosotros habéis pedido ayuda a un amigo alguna vez?\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Mmm, las bellotas doradas estaban riquísimas! Oye, ¿vosotros habéis pedido ayuda a un amigo alguna vez?",
+      "character": "Tico",
+      "voice_direction": "masticando al principio, luego muy directo y amigable",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "calm",
+      "lighting": "golden_hour",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": true,
+      "pause_for_answer": 5
+    },
+    {
+      "scene_number": 16,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel with the green backpack gives a big warm hug to Berto the brown beaver next to the pile of golden acorns. The squirrel says \"Hacer las cosas en equipo siempre es mejor\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Yo hoy he aprendido algo genial: ¡hacer las cosas en equipo siempre es mucho mejor que hacerlas solo!",
+      "character": "Tico",
+      "voice_direction": "tierno y reflexivo",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_out",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "golden_hour",
+      "transition_to_next": "continue",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 17,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel stands on the far side of the stream, waving goodbye enthusiastically to the camera as the sun sets over the beautiful Magic Forest, casting a warm orange glow. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Muchas gracias por acompañarme hoy! ¡Hasta la próxima aventura en el Bosque Mágico!",
+      "character": "Tico",
+      "voice_direction": "despidiéndose, voz alta y feliz",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "crane_up",
+        "angle": "high_angle"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    }
+  ]
+}

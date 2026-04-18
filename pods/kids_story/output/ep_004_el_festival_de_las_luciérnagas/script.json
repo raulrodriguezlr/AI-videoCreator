@@ -1,0 +1,331 @@
+{
+  "title": "El Festival de las Luciérnagas",
+  "summary": "Tico ayuda a una pequeña luciérnaga perdida llamada Chispita a encontrar su luz y a su familia justo a tiempo para el mágico Festival de las Luciérnagas.",
+  "moral": "Nuestra luz interior brilla con más fuerza cuando somos valientes, estamos felices y ayudamos a los demás.",
+  "ambient_audio_prompt": "Magical orchestral music with gentle chimes, xylophones, and a soft, enchanting nighttime melody.",
+  "scenes": [
+    {
+      "scene_number": 1,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney Pixar style. A friendly squirrel named Tico with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass. He is standing in a magical forest with vibrant green leaves. Tico looks directly at the camera with a big, enthusiastic smile. He says \"¡Hola, amigos! Soy Tico.\" Warm cinematic lighting. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Hola, amigos! Soy Tico. ¡Qué alegría veros de nuevo en el Bosque Mágico!",
+      "character": "Tico",
+      "voice_direction": "muy alegre y enérgico",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 2,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney Pixar style. The same friendly squirrel Tico with bright orange fur and green backpack is stretching his arms cheerfully. He points to a sturdy wooden bridge in the background. Tico says \"¡Todavía recuerdo el puente!\" Warm cinematic lighting. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Todavía recuerdo el puente que construimos con Berto el castor! Pero hoy os voy a contar una aventura nocturna.",
+      "character": "Tico",
+      "voice_direction": "emocionado, recordando",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_left",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "golden_hour",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 3,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. Twilight in the forest. Tico, the orange squirrel with big eyes and a green backpack, is looking down with a concerned expression at a tiny, dull grey bug (a baby firefly) sitting on a large green leaf. Tico says \"¡Pobrecita, estaba muy triste!\" Soft blueish light. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Iba de camino al Festival de las Luciérnagas cuando vi a Chispita. ¡Pobrecita, estaba muy triste!",
+      "character": "Tico",
+      "voice_direction": "con pena y ternura",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "dolly_in",
+        "angle": "high_angle"
+      },
+      "mood": "calm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "continue",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 4,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. Tico, the bright orange squirrel with a green backpack, gently touches the leaf where the sad baby firefly sits. Tico looks worried but determined. He says \"No podía brillar.\" Deep blue shadows. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Chispita se había perdido y tenía tanto miedo que su colita... ¡no podía brillar! Así no la encontraría su familia.",
+      "character": "Tico",
+      "voice_direction": "preocupado",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "tense",
+      "lighting": "moonlit",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 5,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel walks bravely through the dark blue forest, carrying the baby firefly carefully on a large leaf. Tico looks confident. He says \"¡Yo te ayudaré!\" Magical moonlight filtering through the trees. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Entonces le dije: ¡No llores, Chispita! ¡Yo te ayudaré a encontrar el Gran Sauce donde es la fiesta!",
+      "character": "Tico",
+      "voice_direction": "decidido y valiente",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "tracking",
+        "angle": "eye_level"
+      },
+      "mood": "exciting",
+      "lighting": "moonlit",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 6,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, the orange squirrel with big eyes, holds up the tiny compass attached to his green backpack. He examines it carefully in the dim moonlight. He says \"¡Mi brújula mágica!\" absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Para no perderme en la oscuridad, saqué de mi mochila... ¡mi brújula mágica!",
+      "character": "Tico",
+      "voice_direction": "orgulloso",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "low_angle"
+      },
+      "mood": "mysterious",
+      "lighting": "moonlit",
+      "transition_to_next": "continue",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 7,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel looks directly at the camera, holding his compass and pointing forward with one tiny paw. He says \"¿Hacia dónde vamos?\" The forest is slightly dark and mysterious. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Pero el bosque es muy grande. Decidme amigos, ¿hacia dónde creéis que debemos ir? ¿Hacia la cueva o hacia los árboles altos?",
+      "character": "Tico",
+      "voice_direction": "curioso, preguntando al público",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "mysterious",
+      "lighting": "moonlit",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": true,
+      "pause_for_answer": 4
+    },
+    {
+      "scene_number": 8,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel with his green backpack walks towards a massive, towering willow tree that is completely dark. Tico looks surprised. He says \"¡Es el Gran Sauce!\" Silhouettes of branches against a dark blue sky. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Exacto, hacia los árboles altos! Así llegamos al Gran Sauce. Pero... ¡Oh, no! Estaba completamente a oscuras.",
+      "character": "Tico",
+      "voice_direction": "sorprendido y un poco asustado",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "crane_up",
+        "angle": "low_angle"
+      },
+      "mood": "tense",
+      "lighting": "dramatic_shadows",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 9,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. The tiny unlit baby firefly shivers on the leaf. Tico the orange squirrel leans in very close, looking sympathetic and sweet. He says \"Estaba asustada.\" Deep shadows with soft rim light on Tico. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Chispita empezó a temblar. Seguía sin tener luz y pensaba que su familia se había ido sin ella.",
+      "character": "Tico",
+      "voice_direction": "suave y compasivo",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "sad",
+      "lighting": "moonlit",
+      "transition_to_next": "continue",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 10,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel points to his heart with one paw, smiling warmly at the baby firefly. Tico says \"¡Tienes que sonreír!\" Soft silver moonlight illuminating Tico's face. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Yo recordé algo muy importante y le dije: ¡Las luciérnagas brillan más cuando están felices y sonríen!",
+      "character": "Tico",
+      "voice_direction": "iluminado, recordando una gran idea",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "moonlit",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 11,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Tico the bright orange squirrel with a green backpack is doing a very silly, exaggerated dance, standing on one leg and crossing his eyes comically. He says \"¡Mira qué cara!\" The forest background is blurred. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Para hacerla reír, ¡me puse a hacer el baile de la ardilla loquita moviendo la cola por todas partes!",
+      "character": "Tico",
+      "voice_direction": "muy gracioso y riendo",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "moonlit",
+      "transition_to_next": "continue",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 12,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. A close-up of the baby firefly. She is suddenly smiling broadly, and a warm, glowing yellow light begins to emanate from her tail, illuminating Tico's orange face right next to her. Tico says \"¡Estás brillando!\" Warm golden glow mixing with the blue night. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Y funcionó! Chispita soltó una carcajada y, de repente... ¡su luz se encendió! Brillaba muchísimo.",
+      "character": "Tico",
+      "voice_direction": "maravillado y emocionado",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "dolly_out",
+        "angle": "eye_level"
+      },
+      "mood": "triumphant",
+      "lighting": "dramatic_shadows",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 13,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Wide shot. Hundreds of glowing yellow fireflies suddenly appear out of the darkness of the enormous willow tree, swirling in a beautiful glowing vortex around Tico and the baby firefly. Tico points at them and says \"¡Mirad qué luces!\" Breathtaking magical glowing light. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "La luz de Chispita era tan alegre que despertó al resto. ¡Miles de luciérnagas salieron de las ramas del Gran Sauce!",
+      "character": "Tico",
+      "voice_direction": "con asombro y magia",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "crane_up",
+        "angle": "low_angle"
+      },
+      "mood": "exciting",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 14,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel watches happily as two larger adult fireflies nuzzle the small baby firefly in the air. Tico holds his paws to his chest, looking moved. He says \"¡Qué bonito!\" Warm golden bokeh background. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Su familia la vio brillar y volaron rápidamente a abrazarla. ¡Por fin estaban todos juntos otra vez!",
+      "character": "Tico",
+      "voice_direction": "muy feliz y tierno",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 15,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico the orange squirrel with his green backpack looks directly at the camera with a bright, earnest expression, bathed in the soft golden light of the fireflies. He says \"¿Habéis ayudado hoy?\" absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Y vosotros, amigos, ¿alguna vez habéis hecho reír a un amigo que estaba triste o asustado?",
+      "character": "Tico",
+      "voice_direction": "cercano, preguntando",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "calm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "continue",
+      "duration_seconds": 7,
+      "is_interactive_question": true,
+      "pause_for_answer": 4
+    },
+    {
+      "scene_number": 16,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico the squirrel sits cheerfully under the illuminated magical willow tree, looking up at the beautiful floating yellow lights. Tico smiles warmly and says \"¡La luz está dentro!\" Magical golden lighting filtering everywhere. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Hoy he aprendido que todos tenemos una luz interior, y brilla mucho más cuando somos valientes y hacemos felices a los demás.",
+      "character": "Tico",
+      "voice_direction": "reflexivo, contento",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "pan_right",
+        "angle": "eye_level"
+      },
+      "mood": "triumphant",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 17,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Tico the friendly orange squirrel waves goodbye enthusiastically to the camera, with his green adventurer's backpack bobbing. Dozens of fireflies dance around him. Tico says \"¡Adiós, amigos!\" Bright, magical, cinematic. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡El Festival de las Luciérnagas fue el mejor del mundo! ¡Nos vemos en la próxima aventura, amigos! ¡Adiós!",
+      "character": "Tico",
+      "voice_direction": "muy alegre y despidiéndose",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_out",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "soft_diffused",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    }
+  ]
+}

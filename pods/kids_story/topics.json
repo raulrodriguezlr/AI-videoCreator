@@ -155,6 +155,42 @@
       "episode_id": "ep_005_las_bayas_desaparecidas",
       "created_at": "2026-03-28T09:59:34.267210",
       "completed_at": "2026-03-28T11:03:38.586921"
+    },
+    {
+      "id": "topic_014",
+      "title": "El Misterio de las Luces Bailarinas",
+      "description": "Tico tiene miedo de salir de su madriguera por la noche, pero su amigo Berto el castor lo invita a ver un espectáculo único al otro lado del río. Al cruzar juntos, Tico descubre un claro lleno de luciérnagas y se da cuenta de que la oscuridad no da miedo, sino que esconde cosas hermosas.",
+      "educational_value": "Superar el miedo a la oscuridad y aprender sobre fenómenos científicos simples de la naturaleza.",
+      "references_episode": "El Puente de Ramitas",
+      "target_emotion": "Valentía y asombro",
+      "status": "in_progress",
+      "episode_id": null,
+      "created_at": "2026-04-02T16:37:36.383902",
+      "completed_at": null
+    },
+    {
+      "id": "topic_015",
+      "title": "La Semilla Perezosa",
+      "description": "Tico planta una bellota mágica y se siente muy frustrado cuando nota que no crece al día siguiente. El pequeño bebé mapache se queda a su lado para regar la tierra todos los días, enseñándole a Tico que las cosas más maravillosas requieren tiempo y constancia.",
+      "educational_value": "El valor de la paciencia, el manejo de la frustración y el proceso de crecimiento de las plantas.",
+      "references_episode": "Las Bayas Desaparecidas",
+      "target_emotion": "Curiosidad y esperanza",
+      "status": "completed",
+      "episode_id": "ep_006_la_semilla_perezosa",
+      "created_at": "2026-04-02T16:37:36.383970",
+      "completed_at": "2026-04-02T16:55:39.169234"
+    },
+    {
+      "id": "topic_016",
+      "title": "El Tesoro Roto de la Lechuza",
+      "description": "Mientras juega a las escondidas, Tico rompe por accidente un viejo caracol brillante que le pertenece a la sabia Doña Lechuza y decide esconder los pedazos. Después de sentir un dolor en la barriga por guardar el secreto, decide confesar la verdad y descubre el poder liberador de la honestidad.",
+      "educational_value": "La importancia de decir la verdad, asumir la responsabilidad de los propios errores y pedir perdón.",
+      "references_episode": null,
+      "target_emotion": "Empatía y alivio",
+      "status": "pending",
+      "episode_id": null,
+      "created_at": "2026-04-02T16:37:36.384001",
+      "completed_at": null
     }
   ]
 }

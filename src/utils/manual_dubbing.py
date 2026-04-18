@@ -31,16 +31,24 @@ class ManualDubber:
             ep_dir = os.path.join(pod_output_dir, name)
             if not os.path.isdir(ep_dir) or not name.startswith("ep_"):
                 continue
-            progress_file = os.path.join(ep_dir, "progress.json")
-            if os.path.exists(progress_file):  
+            script_file = os.path.join(ep_dir, "script.json")
+            meta_file = os.path.join(ep_dir, "metadata.json")
+            
+            if os.path.exists(script_file):  
                 try:
-                    with open(progress_file, "r", encoding="utf-8") as f:
-                        data = json.load(f)
+                    with open(script_file, "r", encoding="utf-8") as f:
+                        script_data = json.load(f)
+                        
+                    title = name
+                    if os.path.exists(meta_file):
+                        with open(meta_file, "r", encoding="utf-8") as f:
+                            title = json.load(f).get("title", name)
+                            
                     episodes.append({
                         "dir": ep_dir,
                         "name": name,
-                        "title": data.get("title", name),
-                        "script": data.get("script", {})
+                        "title": title,
+                        "script": script_data
                     })
                 except Exception:
                     continue
@@ -105,8 +113,8 @@ class ManualDubber:
                     return
                 
                 # Buscar el clip que corresponde a esta escena
-                # Por convención el VeoProvider usa scene_01.mp4, scene_02.mp4
-                expected_filename = f"scene_{scene_num:02d}.mp4"
+                # Por convención el VeoProvider usa clip_01.mp4, clip_02.mp4
+                expected_filename = f"clip_{scene_num:02d}.mp4"
                 target_clip_path = os.path.join(clips_dir, expected_filename)
                 
                 if target_clip_path not in available_clips:
@@ -172,63 +180,54 @@ class ManualDubber:
             return None
 
     def _dub_all_clips(self, available_clips: List[str], scenes: List[dict], ep_dir: str, clips_dir: str):
-        print(f"\n🚀 Iniciando doblaje masivo de {len(available_clips)} clips...")
+        # El usuario ha pedido doblar EXPRESAMENTE final.mp4 en vez de clip por clip.
+        final_mp4 = os.path.join(ep_dir, "final.mp4")
+        if not os.path.exists(final_mp4):
+            print("❌ No se encontró final.mp4 en este episodio. Se necesita el vídeo completo para esta operación.")
+            return
+
+        character_name = scenes[0].get("character", "Narrator") if scenes else "Narrator"
+        print(f"\n🚀 Iniciando doblaje global STS sobre: {os.path.basename(final_mp4)}")
+        print(f"👉 Usaremos la voz del personaje: {character_name}")
         
-        dubbed_paths = []
-        
-        # We need to process them in expected sequential order to concat them later
-        for scene_num in range(1, len(scenes) + 1):
-            expected_filename = f"scene_{scene_num:02d}.mp4"
-            target_clip_path = os.path.join(clips_dir, expected_filename)
-            
-            if target_clip_path in available_clips:
-                res = self._dub_single_clip(target_clip_path, scenes[scene_num - 1], clips_dir, scene_num)
-                # Fallback to native path if dubbing failed or scene has no dialogue
-                dubbed_paths.append(res if res else target_clip_path)
-            else:
-                # Clip missing from available? Maybe it failed generation originally or was already dubbed
-                # Let's see if a dubbed version exists from auto pipeline
-                auto_dubbed = target_clip_path.replace(".mp4", "_dubbed.mp4")
-                if os.path.exists(auto_dubbed):
-                    dubbed_paths.append(auto_dubbed)
-                elif os.path.exists(target_clip_path):
-                    dubbed_paths.append(target_clip_path)
-                else:
-                    print(f"⚠️ Escena {scene_num} saltada por archivo faltante.")
-        
-        if not dubbed_paths:
-            print("❌ No se generaron rutas válidas para concatenar.")
+        # 1. Extraer audio global
+        veo_audio_path = AudioMixer.extract_audio(final_mp4)
+        if not veo_audio_path:
+            print("❌ No se pudo extraer audio de final.mp4.")
             return
             
-        # Concat final video
-        final_dubbed_manually = os.path.join(ep_dir, "final_dubbed_manually.mp4")
-        print(f"\n🎬 Concatenando {len(dubbed_paths)} clips en {final_dubbed_manually}...")
+        # 2. STS conversion sobre la pista global
+        audio_filename = "dialogue_final_manual.wav"
+        audio_path = os.path.join(ep_dir, audio_filename)
         
-        concat_list_path = os.path.join(clips_dir, "_manual_concat_list.txt")
+        print("🔄 Convertiendo voz en todo el vídeo con ElevenLabs...")
+        converted_audio = self.eleven_prov.convert_voice(
+            source_audio_path=veo_audio_path,
+            character_name=character_name,
+            output_path=audio_path
+        )
+        
         try:
-            with open(concat_list_path, "w") as f:
-                for p in dubbed_paths:
-                    safe_path = p.replace("\\", "/")
-                    f.write(f"file '{safe_path}'\n")
-
-            result = subprocess.run(
-                [
-                    "ffmpeg", "-y",
-                    "-f", "concat",
-                    "-safe", "0",
-                    "-i", concat_list_path,
-                    "-c", "copy",
-                    final_dubbed_manually,
-                ],
-                capture_output=True,
-                text=True,
-            )
-
-            if result.returncode == 0:
-                print(f"✅ ¡Concatenación exitosa! Tu vídeo final está en: {final_dubbed_manually}")
-            else:
-                print(f"❌ ffmpeg concat error: {result.stderr[:200]}")
-                
-            os.remove(concat_list_path)
-        except Exception as e:
-            print(f"❌ Error al concatenar: {e}")
+            os.remove(veo_audio_path)
+        except OSError:
+            pass
+            
+        if not converted_audio:
+            print("❌ Falló el doblaje STS en el archivo completo.")
+            return
+            
+        # 3. Mezclar el audio global convertido de vuelta al mp4
+        mixed_path = os.path.join(ep_dir, "final_dubbed_manually.mp4")
+        print("\n🎛️ Mezclando nueva pista doblada con el vídeo global...")
+        final_clip_path = AudioMixer.mix_audio_to_video(
+            video_path=final_mp4,
+            audio_path=converted_audio,
+            output_path=mixed_path,
+            audio_volume=1.0
+        )
+        
+        if final_clip_path:
+            print(f"\n✅ ¡Doblaje completo exitoso! Tu vídeo final manual está en:")
+            print(f"   -> {final_clip_path}")
+        else:
+            print("❌ Falló el inyectado de audio final.")

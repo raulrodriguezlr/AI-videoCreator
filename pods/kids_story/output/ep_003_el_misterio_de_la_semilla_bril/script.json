@@ -1,0 +1,312 @@
+{
+  "title": "El Misterio de la Semilla Brillante",
+  "summary": "Tico encuentra una semilla mágica que brilla en la oscuridad. Tras intentar plantarla en diferentes lugares sin éxito, descubre que cada ser tiene su entorno ideal para florecer.",
+  "moral": "Todas las cosas y personas tienen un lugar especial donde pueden brillar de verdad, solo hay que ser pacientes y observar.",
+  "ambient_audio_prompt": "Magical orchestral forest music with a sparkling glockenspiel, upbeat and wondrous, Pixar style",
+  "scenes": [
+    {
+      "scene_number": 1,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, stands in a vibrant magical forest waving at the camera. The squirrel says \"¡Hola amiguitos! Soy Tico.\". Lush green trees and glowing mushrooms in the background. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Hola amiguitos! Soy Tico. ¿Os acordáis del puente que construí con mi amigo Berto el castor? Pues hoy...",
+      "character": "Tico",
+      "voice_direction": "alegre y enérgico",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 2,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. Close-up on the small paws of Tico, a friendly squirrel with bright orange fur and a green backpack with a tiny compass. He is holding a mysterious, glowing blue seed. The squirrel says \"¡Mirad esto tan misterioso!\". The blue light from the seed reflects on his fur. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "...explorando el bosque, he encontrado algo súper misterioso en el suelo. ¡Mirad esto tan misterioso!",
+      "character": "Tico",
+      "voice_direction": "emocionado y susurrando",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "mysterious",
+      "lighting": "soft_diffused",
+      "transition_to_next": "continue",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 3,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, looks directly at the camera holding the glowing blue seed. The squirrel says \"¿Qué creéis que debo hacer?\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Es una semilla mágica brillante. Pero... ¿Qué creéis que debo hacer con una semilla?",
+      "character": "Tico",
+      "voice_direction": "curioso, preguntando a la audiencia",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "exciting",
+      "lighting": "golden_hour",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 7,
+      "is_interactive_question": true,
+      "pause_for_answer": 4
+    },
+    {
+      "scene_number": 4,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, is walking happily along a dirt path in the forest holding the seed. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Eso es! ¡Tengo que plantarla! Así que me puse a buscar el lugar perfecto en el bosque.",
+      "character": "Tico",
+      "voice_direction": "decidido y contento",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "tracking",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "bright_daylight",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 5,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, stands in a very bright, sunny meadow. He places the glowing blue seed on the ground. The sunlight is intense. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Primero fui al gran prado soleado. Hacía mucho calor y había mucha luz.",
+      "character": "Tico",
+      "voice_direction": "narrativo",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_right",
+        "angle": "high_angle"
+      },
+      "mood": "calm",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 6,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, looks sad. The seed in his paws is losing its blue glow. The squirrel says \"¡Ay, no le gustaba el sol!\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Pero de repente... ¡la semilla dejó de brillar! ¡Ay, no le gustaba el sol!",
+      "character": "Tico",
+      "voice_direction": "preocupado",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "tense",
+      "lighting": "bright_daylight",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 7,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, stands near a river. The squirrel says \"La semilla temblaba de frío.\". The seed in his hands looks dull and grey. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Luego fui al río, cerquita del puente. Pero con tanta agua, la semilla temblaba de frío.",
+      "character": "Tico",
+      "voice_direction": "triste, empatizando con la semilla",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "tense",
+      "lighting": "soft_diffused",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 8,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, is sitting on a rock near the river, scratching his chin in thought. The squirrel says \"Me senté a pensar un ratito.\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Entonces, me senté a pensar un ratito... Si no le gusta el sol fuerte, ni el río frío...",
+      "character": "Tico",
+      "voice_direction": "pensativo",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "calm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "continue",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 9,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, looks at the camera. The squirrel says \"¿En la luz o en la oscuridad?\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¿Dónde brillaba más la semilla cuando la encontré? ¿En la luz o en la oscuridad?",
+      "character": "Tico",
+      "voice_direction": "intrigado, preguntando a los niños",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "mysterious",
+      "lighting": "soft_diffused",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": true,
+      "pause_for_answer": 4
+    },
+    {
+      "scene_number": 10,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, runs quickly towards the massive, dark roots of a giant ancient oak tree. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Claro! ¡En la oscuridad! Así que corrí rápido hacia las grandes raíces del Gran Roble.",
+      "character": "Tico",
+      "voice_direction": "emocionado, revelando un secreto",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "tracking",
+        "angle": "low_angle"
+      },
+      "mood": "exciting",
+      "lighting": "dramatic_shadows",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 11,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, digs a small hole in the dark soil under the tree roots. The blue seed in his hand is glowing extremely bright now, illuminating his face. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Allí siempre hay sombrita fresca. Hice un agujerito con mis patitas, y la puse dentro.",
+      "character": "Tico",
+      "voice_direction": "concentrado y feliz",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "mysterious",
+      "lighting": "moonlit",
+      "transition_to_next": "continue",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 12,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, pats the dirt over the hole gently. The squirrel says \"¡Esperé muy calladito aquí!\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "La tapé con un poquito de tierra oscura y... ¡esperé muy calladito aquí!",
+      "character": "Tico",
+      "voice_direction": "susurrando, con anticipación",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "calm",
+      "lighting": "dramatic_shadows",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 13,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. A magnificent, magical plant with glowing bright blue neon leaves sprouts beautifully from the dark ground. Tico, a friendly squirrel with bright orange fur and a green adventurer's backpack, watches in pure amazement, his face bathed in the bright blue light. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Hala! ¡Empezó a crecer al instante! ¡Una flor de luz preciosa iluminando la oscuridad!",
+      "character": "Tico",
+      "voice_direction": "asombrado, maravillado",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "dolly_out",
+        "angle": "low_angle"
+      },
+      "mood": "triumphant",
+      "lighting": "moonlit",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 14,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, speaks to the camera with a gentle smile. The glowing blue plant is slightly blurred in the background. The squirrel says \"Para que las cosas brillen de verdad.\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Me di cuenta de que, a veces, solo tenemos que encontrar el lugar adecuado para que las cosas brillen de verdad.",
+      "character": "Tico",
+      "voice_direction": "tierno y reflexivo",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "moonlit",
+      "transition_to_next": "continue",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 15,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, points at the glowing blue plant beside him. The squirrel says \"Cuidaré de esta plantita todos los días.\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Qué aventura tan chula! Cuidaré de esta plantita todos los días para que nunca se apague.",
+      "character": "Tico",
+      "voice_direction": "alegre y orgulloso",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "pan_left",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "moonlit",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 16,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Tico, a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green adventurer's backpack with acorns and a tiny compass, waves cheerfully at the camera. The glowing magical plant shines beautifully next to him in the dark forest. The squirrel says \"¡Hasta pronto, exploradores del bosque!\". absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Hasta pronto, exploradores del bosque! Nos vemos en el próximo misterio.",
+      "character": "Tico",
+      "voice_direction": "despidiéndose con mucha energía",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "moonlit",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    }
+  ]
+}
