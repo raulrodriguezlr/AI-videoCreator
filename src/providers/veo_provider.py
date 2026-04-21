@@ -473,7 +473,9 @@ class VeoProvider(BaseVideoProvider):
                 continue
 
             narrative_phase = scene.get("narrative_phase", "")
-            prompt = self._build_cinematographic_prompt(scene, narrative_phase)
+            # The transition that LED to this scene (from previous scene's transition_to_next)
+            incoming_transition = scenes[i - 1].get("transition_to_next", "cut") if i > 0 else "scene_change"
+            prompt = self._build_cinematographic_prompt(scene, narrative_phase, incoming_transition=incoming_transition)
             negative = scene.get("negative_prompt")
             transition = scene.get("transition_to_next", "cut")
             scene_duration = scene.get("duration_seconds", VEO_DURATION_SECONDS)
@@ -724,10 +726,11 @@ class VeoProvider(BaseVideoProvider):
                     ref_images.append(full_path)
         return ref_images
 
-    def _build_cinematographic_prompt(self, scene: dict, narrative_phase: str = "") -> str:
+    def _build_cinematographic_prompt(self, scene: dict, narrative_phase: str = "", incoming_transition: str = "cut") -> str:
         """
         Build a detailed cinematographic prompt from scene metadata.
         Combines visual_prompt with camera, mood, lighting, and audio info.
+        Injects defensive guards based on the incoming transition type.
         """
         parts = []
 
@@ -784,6 +787,20 @@ class VeoProvider(BaseVideoProvider):
         art_style = self.config.get("consistency", {}).get("art_style", "")
         if art_style:
             parts.append(art_style)
+
+        # --- Defensive guards based on incoming transition ---
+        if incoming_transition == "continue":
+            # This scene will be generated via jump_to_scene (image-to-video from last frame).
+            # Veo tends to "morph" from the seed frame to the new prompt if they differ.
+            # We inject a strong continuity instruction to prevent this.
+            parts.append("This shot is a smooth, uninterrupted continuation of the previous shot. "
+                         "Maintain the exact same character position, props, background, lighting, "
+                         "and camera angle. Do not introduce any new objects or change the scene. "
+                         "The action flows seamlessly as if this is one continuous take")
+
+        # Anatomy stabilization — always appended
+        parts.append("Character anatomy must remain stable and consistent throughout the entire clip. "
+                     "Hands, fingers and limbs must not deform, multiply or teleport")
 
         # Anti-subtitle/anti-text guard — always appended
         parts.append("Absolutely no text, no subtitles, no letters, no watermarks, no written words on screen")

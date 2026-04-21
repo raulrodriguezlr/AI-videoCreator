@@ -153,6 +153,9 @@ class PromptManager:
             golden = tr.get("golden_rule", "")
             if golden:
                 lines.append(f"\n⚠️ REGLA DE ORO: {golden}")
+            anti_morph = tr.get("anti_morphing_rule", "")
+            if anti_morph:
+                lines.append(f"\n🚫 REGLA ANTI-MORPHING: {anti_morph}")
             sections.append("\n".join(lines))
 
         # --- Lip sync ---
@@ -168,6 +171,22 @@ class PromptManager:
         if vc:
             lines = ["## CONTINUIDAD VISUAL"]
             for rule in vc.get("rules", []):
+                lines.append(f"- {rule}")
+            sections.append("\n".join(lines))
+
+        # --- Prop continuity ---
+        pc_props = rules.get("prop_continuity", {})
+        if pc_props:
+            lines = ["## CONTINUIDAD DE OBJETOS (PROPS) — CRÍTICO"]
+            for rule in pc_props.get("rules", []):
+                lines.append(f"- {rule}")
+            sections.append("\n".join(lines))
+
+        # --- Anatomy guard ---
+        ag = rules.get("anatomy_guard", {})
+        if ag:
+            lines = ["## PROTECCIÓN ANATÓMICA (EVITAR GLITCHES DE MANOS/CUERPO)"]
+            for rule in ag.get("rules", []):
                 lines.append(f"- {rule}")
             sections.append("\n".join(lines))
 

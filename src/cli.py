@@ -13,6 +13,7 @@ from src.variables import VIDEO_PROVIDER, LTX_COMFYUI_URL
 from src.engines.pipeline_orchestrator import PipelineOrchestrator
 from src.utils.manual_dubbing import ManualDubber
 from src.utils.voice_manager import VoiceManager
+from src.utils.video_analyzer import VideoAnalyzer
 
 load_dotenv()
 
@@ -35,6 +36,7 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
         print("7. 🎯 Crear vídeo de un tema específico")
         print("8. 🎙️  Doblaje Manual (Aplicar STS a un vídeo nativo)")
         print("9. 🗣️  Gestor de Voces (Cambiar voces con ElevenLabs + Gemini)")
+        print("10. 🕵️  Analizador de Vídeo (Debug visual con Gemini Pro)")
         print("0. Salir")
         
         choice = input("\n> ").strip()
@@ -136,6 +138,37 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
         elif choice == "9":
             voice_mgr = VoiceManager(pod_config_path)
             voice_mgr.interactive_voice_editor()
+        elif choice == "10":
+            analyzer = VideoAnalyzer(pod_config_path)
+            pod_output_dir = os.path.join("pods", pod_name, "output")
+            episodes_with_video = []
+
+            if os.path.exists(pod_output_dir):
+                for name in sorted(os.listdir(pod_output_dir)):
+                    ep_dir = os.path.join(pod_output_dir, name)
+                    if not os.path.isdir(ep_dir) or not name.startswith("ep_"):
+                        continue
+                    final_mp4 = os.path.join(ep_dir, "final.mp4")
+                    final_dubbed = os.path.join(ep_dir, "final_dubbed.mp4")
+                    
+                    if os.path.exists(final_mp4):
+                        episodes_with_video.append({"ep_dir": ep_dir, "name": f"{name} (Nativo)", "video": final_mp4})
+                    if os.path.exists(final_dubbed):
+                        episodes_with_video.append({"ep_dir": ep_dir, "name": f"{name} (Doblado)", "video": final_dubbed})
+
+            if not episodes_with_video:
+                print("❌ No hay episodios con vídeos finales (final.mp4) para analizar.")
+            else:
+                print("\n🕵️ Elige un vídeo generado para someter a análisis visual:")
+                for idx, ep in enumerate(episodes_with_video, 1):
+                    print(f"  {idx}. {ep['name']} -> {os.path.basename(ep['video'])}")
+                
+                pick = input(f"\nSelecciona (1-{len(episodes_with_video)}): ").strip()
+                if pick.isdigit() and 1 <= int(pick) <= len(episodes_with_video):
+                    chosen = episodes_with_video[int(pick) - 1]
+                    analyzer.analyze_video(chosen["video"], chosen["ep_dir"])
+                else:
+                    print("❌ Selección no válida.")
         else:
             print("❌ Opción no válida.")
 

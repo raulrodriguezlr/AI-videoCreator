@@ -1,6 +1,7 @@
 import os
 import json
 from src.engines.script_engine import ScriptGenerator
+from src.engines.reviewer_engine import ReviewerEngine
 from src.engines.video_engine import VideoEngine
 from src.utils.progress_manager import ProgressManager
 
@@ -18,7 +19,7 @@ class PipelineOrchestrator:
     def run_full_pipeline(self, topic: str, topic_id: str = None) -> None:
         """Ejecuta el pipeline completo de vídeo para un tema específico."""
         print(f"\n📝 Tema del episodio: {topic}\n")
-        print("--- PASO 1/3: GENERACIÓN DE GUIÓN ---")
+        print("--- PASO 1/4: GENERACIÓN DE GUIÓN ---")
         script_engine = ScriptGenerator(self.pod_config_path)
 
         script = script_engine.generate_script(topic)
@@ -26,8 +27,16 @@ class PipelineOrchestrator:
             print("❌ Error generando guion. Abortando pipeline.")
             return
 
-        print(f"✅ Guion generado: '{script.get('title')}'")
+        print(f"✅ Guion borrador generado: '{script.get('title')}'")
         print(f"   Escenas: {len(script.get('scenes', []))}\n")
+
+        print("--- PASO 2/4: REVISIÓN DEL GUION (Director) ---")
+        reviewer_engine = ReviewerEngine(self.pod_config_path)
+        refined_script = reviewer_engine.review_script(script)
+        
+        # Si fallase catastróficamente, usaremos el borrador
+        if refined_script:
+            script = refined_script
 
         episode = self.episode_mgr.create_episode(topic, script)
         episode_id = episode["episode_id"]
@@ -44,7 +53,7 @@ class PipelineOrchestrator:
         except OSError:
             pass
 
-        print("--- PASO 2/3: GENERACIÓN DE VÍDEO ---")
+        print("--- PASO 3/4: GENERACIÓN DE VÍDEO ---")
         progress = ProgressManager(episode_dir)
         progress.create_progress(
             episode_id=episode_id,
@@ -72,6 +81,6 @@ class PipelineOrchestrator:
             print(f"   Puedes continuar usando la Opción 4 del menú interactivo o flag --resume")
             return
 
-        print("--- PASO 3/3: GUARDANDO EN MEMORIA ---")
+        print("--- PASO 4/4: GUARDANDO EN MEMORIA ---")
         script_engine.save_episode_to_memory(script)
         print(f"✅ Episodio guardado en memoria.\n")
