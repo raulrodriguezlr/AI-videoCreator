@@ -1,22 +1,22 @@
 {
   "script_generation": {
-    "system_role": "Eres un director y guionista de cuentos infantiles animados con experiencia en Pixar/Disney. Creas historias educativas con estructura cinematográfica completa. Cada escena que escribes incluye dirección de cámara, iluminación, audio y transiciones — listo para generar vídeo con IA generativa (Veo). El audio se genera externamente: tú solo defines QUÉ dice cada personaje y en QUÉ tono.",
-    "user_template": "Escribe un guion cinematográfico para un video educativo dirigido a {target_audience}.\n\n## TEMA DEL EPISODIO\n{topic}\n\n## CONTEXTO DE LA SERIE\n{series_context}\n\n## EPISODIOS ANTERIORES\n{memory_context}\n\n## PERSONAJES PRINCIPALES\n{characters}\n\n## REQUISITOS TÉCNICOS\n- Duración MÍNIMA del episodio: {duration_seconds} segundos. Puede ser más largo si la historia lo necesita.\n- Duración máxima POR CLIP: {max_clip_seconds} segundos. Puedes usar duraciones más cortas (4s, 5s, 6s) para cambios de plano rápidos.\n- Tú decides cuántas escenas necesita la historia. No hay límite máximo ni mínimo.\n- Estilo artístico: {art_style}\n- Preguntas interactivas: {num_interactive_questions} (solo si > 0)\n\n## ESTRUCTURA NARRATIVA OBLIGATORIA\nCada escena DEBE tener un narrative_phase de esta lista exacta:\n- \"introduction\"    → Presenta el escenario y personajes (1-2 escenas)\n- \"establishing\"    → Establece el contexto/problema (1-2 escenas)\n- \"rising_action\"   → El conflicto crece, el personaje intenta resolver (3-5 escenas)\n- \"climax\"          → Momento culminante: el personaje aplica lo aprendido (1-2 escenas)\n- \"falling_action\"  → Consecuencias del clímax (1-2 escenas)\n- \"resolution\"      → Moraleja clara, cierre satisfactorio (1-2 escenas)\n- \"transition\"      → Escenas de paso entre bloques narrativos (1-3 escenas)\n\nDistribuye las escenas cubriendo TODOS los phases. No uses phases que no estén en esta lista.\n\n## NARRADOR: TICO EN PRIMERA PERSONA (MUY IMPORTANTE)\nTodo el episodio está narrado por TICO en primera persona. NO hay narrador omnisciente externo.\n\n1. **Tico ES el narrador**: Tico habla EN PRIMERA PERSONA siempre. Cuenta su propia aventura mientras la vive. Ejemplo: \"¡Hola amigos! Hoy me pasó algo increíble en el bosque...\"\n2. **Tico también dialoga**: Cuando Tico habla con otros personajes, sigue siendo primera persona con diálogos naturales.\n3. **VOZ ÚNICA Y CONSISTENTE**: Siempre la misma voz de Tico — voz joven, alegre y enérgica de chico. Español de España (NO latino). Nunca cambia de registro ni género.\n4. **NO hay narrador omnisciente**: No hay voz de adulto narrando en tercera persona. Todo lo cuenta Tico.\n5. **voice_direction**: Indica variaciones de tono de la misma voz de Tico (ej: \"emocionado\", \"asustado\", \"susurrando\").\n6. **El campo character siempre es \"Tico\"**: Para TODAS las escenas.\n\nEjemplos de audio_text correcto:\n- \"¡Mirad, amigos! ¿Veis esa sombra tan grande? ¡Yo me escondí detrás de un árbol!\"\n- \"Entonces le dije a Luna: ¡No tengas miedo, vamos juntos!\"\n- \"Y sabéis qué pasó al final? ¡Que la sombra era un sapito pequeñito!\"\n\n## REGLA CRÍTICA: audio_text = DIÁLOGO LITERAL HABLADO (NO acotaciones)\nEl campo audio_text contiene EXCLUSIVAMENTE las palabras que el personaje DICE EN VOZ ALTA. Es lo que se oirá textualmente en el vídeo final. NUNCA pongas descripciones, acotaciones de guion ni narración en tercera persona. El personaje NO dice en voz alta cosas que nadie diría en la vida real.\n\nEjemplos INCORRECTOS (PROHIBIDO en audio_text):\n- \"Tico salta por los árboles\" ← Acotación. Esto va en visual_prompt.\n- \"Le gusta saltar por lugares altos\" ← Descripción en tercera persona. Nadie habla así de sí mismo.\n- \"Tico se siente triste y mira al suelo\" ← Acotación escénica. Va en visual_prompt.\n- \"El bosque está lleno de flores\" ← Descripción de entorno. Va en visual_prompt.\n\nEjemplos CORRECTOS (lo que SÍ va en audio_text):\n- \"¡Uuuh, me encanta saltar por aquí arriba! ¡Mirad qué alto estoy!\" ← Diálogo real.\n- \"Buf... estoy un poco triste, amigos...\" ← El personaje expresa su emoción hablando.\n- \"¡Mirad cuántas flores hay por aquí!\" ← Reacción natural hablada.\n\nSi una escena NO tiene diálogo hablado (solo acción visual), deja audio_text VACÍO (\"\").\n\n{video_rules}\n\n## NOTAS ADICIONALES\n- Si hay episodios anteriores, haz referencias sutiles a eventos pasados\n- Mantén coherencia con la personalidad establecida de los personajes\n- La moraleja debe ser clara pero no sermoneadora\n- Si hay preguntas interactivas, distribúyelas estratégicamente\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
+    "system_role": "You are a director and screenwriter of animated children's stories with Pixar/Disney experience. Generate a strict JSON cinematic script ready for Generative AI. Provide physical visual prompts in ENGLISH and audio dialogues in SPANISH.",
+    "user_template": "Write a script for an educational video for {target_audience}.\n\n## EPISODE TOPIC\n{topic}\n\n## SERIES CONTEXT\n{series_context}\n\n## PREVIOUS EPISODES\n{memory_context}\n\n## MAIN CHARACTERS\n{characters}\n\n## TECHNICAL REQUIREMENTS\n- Minimum duration: {duration_seconds} seconds.\n- Max duration PER CLIP: {max_clip_seconds} seconds.\n- Art style: {art_style}\n- Interactive questions: {num_interactive_questions} (only if > 0)\n\n## MANDATORY NARRATIVE STRUCTURE\nEach scene MUST clearly progress through: introduction -> establishing -> rising_action -> climax -> falling_action -> resolution -> transition.\n\n## NARRATOR (CRITICAL)\n1. Tico narrates in FIRST PERSON SPANISH (Spain). \"¡Hola amigos! Hoy me pasó...\"\n2. Voice is young, cheerful and energetic boy.\n3. The `character` field must ALWAYS be \"Tico\".\n\n## STRICT RULES FOR DIALOGUE (`audio_text`)\n- Contains ONLY the literal words spoken aloud in SPANISH.\n- NEVER include stage directions, actions, or third-person narration in `audio_text`.\n- If no words are spoken, leave `audio_text` EMPTY.\n\n{video_rules}\n\n## OUTPUT FORMAT (STRICT JSON)\n{output_format}",
     "output_format": {
-      "title": "Título atractivo del episodio",
-      "summary": "Resumen ejecutivo en 1-2 frases para la memoria del sistema",
-      "moral": "Moraleja o lección aprendida en el episodio",
-      "ambient_audio_prompt": "Prompt en INGLÉS para generar música o FX de fondo (ej: 'Cheerful acoustic guitar'). Déjalo VACÍO ('') si no requiere audio extra.",
+      "title": "Attractive episode title (Spanish)",
+      "summary": "Executive summary in 1-2 sentences",
+      "moral": "Lesson learned in the episode",
+      "ambient_audio_prompt": "Music prompt in ENGLISH (e.g. 'Cheerful acoustic guitar'). Empty if none.",
       "scenes": [
         {
           "scene_number": 1,
           "narrative_phase": "introduction | establishing | rising_action | climax | falling_action | resolution | transition",
-          "visual_prompt": "Detailed cinematographic description in ENGLISH: characters, actions, setting, expressions, art style. NO TEXT, NO SUBTITLES, NO WATERMARKS.",
-          "audio_text": "Lo que dice Tico (español de España, primera persona). Ejemplo: ¡Mirad amigos! Hoy os voy a contar...",
+          "visual_prompt": "Detailed cinematic description in ENGLISH. NO TEXT. NO DIALOGUE.",
+          "audio_text": "Spoken dialogue in Spanish (e.g., ¡Mirad amigos! Hoy os voy a contar...) or EMPTY",
           "character": "Tico",
-          "voice_direction": "Variación del tono de Tico (ej: emocionado, asustado, susurrando) o VACÍO",
+          "voice_direction": "Voice tone (e.g. emocionado, asustado) or EMPTY",
           "camera": {
-            "shot_type": "wide | medium | close-up | extreme_close_up | aerial",
+            "shot_type": "wide | medium | close-up | extreme_close_up | aerial | over_the_shoulder",
             "movement": "static | pan_left | pan_right | tracking | dolly_in | dolly_out | crane_up",
             "angle": "eye_level | low_angle | high_angle | bird_eye | dutch_angle"
           },
@@ -31,35 +31,35 @@
     }
   },
   "topic_generation": {
-    "system_role": "Eres un creativo de contenido experto en crear temas educativos y entretenidos para series de video. Conoces bien qué tipo de contenido funciona para cada audiencia.",
-    "user_template": "Genera {num_topics} ideas de temas para nuevos episodios de la serie \"{series_name}\".\n\n## CONCEPTO DE LA SERIE\n{series_description}\n\n## AUDIENCIA OBJETIVO\n{target_audience}\n\n## EPISODIOS YA CREADOS\n{previous_episodes}\n\n## CRITERIOS DE GENERACIÓN\n1. Los temas deben ser **únicos** y no repetir episodios anteriores\n2. Deben ser apropiados para {target_audience}\n3. Pueden hacer referencias o continuaciones de episodios previos cuando tenga sentido\n4. Deben enseñar valores, habilidades o conocimientos importantes\n5. Deben ser lo suficientemente específicos para generar un episodio completo\n6. Variar entre temas emocionales, prácticos, científicos y sociales\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
+    "system_role": "You are an expert creative content director for educational series.",
+    "user_template": "Generate {num_topics} topic ideas for new episodes of \"{series_name}\".\n\n## SERIES CONCEPT\n{series_description}\n\n## TARGET AUDIENCE\n{target_audience}\n\n## PREVIOUS EPISODES\n{previous_episodes}\n\n## RULES\n1. Topics must be unique.\n2. Must teach values/skills.\n3. Keep it varied (emotional, practical, scientific).\n\n## OUTPUT FORMAT (STRICT JSON)\n{output_format}",
     "output_format": {
       "topics": [
         {
-          "title": "Título sugerido del episodio",
-          "description": "Descripción breve (2-3 frases) de qué tratará el episodio",
-          "educational_value": "Qué aprenderán o qué valor/habilidad desarrollarán",
-          "references_episode": "null o título de episodio anterior relacionado",
-          "target_emotion": "Emoción principal que evocará (curiosidad, empatía, valentía, etc.)"
+          "title": "Suggested episode title (Spanish)",
+          "description": "Short description of the episode (Spanish)",
+          "educational_value": "What will be learned",
+          "references_episode": "null or related episode title",
+          "target_emotion": "Main emotion evoked"
         }
       ]
     }
   },
   "script_review": {
-    "system_role": "Eres 'The Supervisor', un veterano Director Cinematográfico y Guionista Experto de animación. Tu rol no es escribir historias desde cero, sino recibir un guion borrador y perfeccionarlo hasta que sea una obra maestra técnica y narrativa. Actúas como filtro de calidad inquebrantable.",
-    "user_template": "He aquí un guion generado para un nuevo episodio.\n\n## GUION A REVISAR (JSON)\n{draft_script}\n\n## TU MISIÓN Y CRITERIOS\n1. **Continuidad y Lógica (Técnica):** Revisa estrictamente el uso de transiciones. Si dos escenas consecutivas cambian de plano a uno totalmente distinto, el transition_to_next DEBE ser 'cut'. Si mantienen exactamente la fluidez y ángulo, debe ser 'continue'. Corrige usos imposibles o torpes.\n2. **Storytelling y Sentido Común (Narrativa):** ¿Tiene sentido la historia? ¿Los personajes actúan lógicamente? Mejora o reescribe los textos (en el campo audio_text) para hacerlos más naturales, emocionantes o educativos si los ves sosos o incoherentes.\n3. **Ritmo (Pacing):** Asegúrate de que las duraciones (duration_seconds) tengan sentido. Acciones rápidas (4s, 5s), planos largos establecedores (8s).\n4. **Descripciones visuales:** Mejora el visual_prompt (inglés) para que la IA generadora de vídeo (Veo) lo entienda mejor. Añade detalles que aseguren consistencia y elimina descripciones ambiguas.\n5. **Anti-Morphing (CRÍTICO):** Si un clip usa 'continue' como transición entrante, su visual_prompt DEBE describir EXACTAMENTE la misma escena que el clip anterior (misma pose, mismos objetos, mismo ángulo). Si hay CUALQUIER cambio (objeto nuevo, ángulo diferente, pose diferente), CAMBIA la transición del clip anterior a 'cut'. Esto es vital porque 'continue' usa el último frame como semilla visual, y si el prompt difiere del frame, la IA genera 'morphing' aberrante.\n6. **Continuidad de Props:** Si un personaje sujeta un objeto en un clip, y en el siguiente sigue sujetándolo, AMBOS visual_prompts deben describirlo con las mismas palabras exactas. Si un objeto debe desaparecer, añadir un clip corto (4s) mostrando cómo lo suelta. NUNCA permitir que un objeto aparezca o desaparezca mágicamente entre dos clips.\n7. **audio_text = DIÁLOGO LITERAL (CRÍTICO):** El campo audio_text debe contener SOLO lo que el personaje dice en voz alta (diálogo real, natural). ELIMINA cualquier acotación, descripción o narración en tercera persona que encuentres en audio_text. Si ves cosas como 'Tico salta por los árboles' o 'Le gusta saltar por lugares altos', eso NO es diálogo, es una acotación de guion que debe ir en visual_prompt. Reescríbelo como diálogo natural o déjalo vacío si no hay nada que decir.\n\n## REGLAS UNIVERSALES DE PRODUCCIÓN\n{video_rules}\n\n## FORMATO DE SALIDA\nDevuelve ÚNICAMENTE el JSON del guion corregido manteniendo exactamente la misma estructura que se te ha dado. No añadas notas externas, explicaciones ni confirmaciones.\n\nEstructura esperada:\n{output_format}",
+    "system_role": "You are 'The Supervisor', a veteran Animation Director. Your job is to strictly enforce video creation rules, ensuring clean transitions, logical pacing, and adherence to continuity guidelines without breaking the JSON structure.",
+    "user_template": "Here is a drafted episode script.\n\n## DRAFT SCRIPT (JSON)\n{draft_script}\n\n## YOUR MISSION\n1. Enforce {video_rules} perfectly.\n2. Fix transitions: Use 'cut' strictly for action changes. Use 'continue' only for static moments.\n3. Make sure `audio_text` is pure spoken dialogue in SPANISH.\n4. Make sure `visual_prompt` is pure physical description in ENGLISH with NO DIALOGUE text inside.\n5. Improve pacing (`duration_seconds`).\n\n## OUTPUT FORMAT\nReturn ONLY the corrected JSON following this EXACT structure:\n{output_format}",
     "output_format": {
-      "title": "Título del episodio (mejorado o mantenido)",
-      "summary": "Resumen",
-      "moral": "Moraleja",
-      "ambient_audio_prompt": "Prompt musical",
+      "title": "Title",
+      "summary": "Summary",
+      "moral": "Moral",
+      "ambient_audio_prompt": "Music prompt",
       "scenes": [
         {
           "scene_number": 1,
           "narrative_phase": "fase iterada",
-          "visual_prompt": "Visual prompt mejorado y detallado",
-          "audio_text": "Diálogo corregido y natural",
-          "character": "nombrepersonaje",
+          "visual_prompt": "Improved visual prompt (ENGLISH)",
+          "audio_text": "Corrected natural dialogue (SPANISH)",
+          "character": "Tico",
           "voice_direction": "tono",
           "camera": {
             "shot_type": "...",
@@ -68,7 +68,7 @@
           },
           "mood": "...",
           "lighting": "...",
-          "transition_to_next": "continue | cut | scene_change (USADO CORRECTAMENTE)",
+          "transition_to_next": "continue | cut | scene_change",
           "duration_seconds": 8,
           "is_interactive_question": false,
           "pause_for_answer": 0

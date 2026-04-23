@@ -359,7 +359,15 @@ class VeoProvider(BaseVideoProvider):
             return
 
         audio_filename = f"dialogue_{scene_num_str}.wav"
-        audio_path = os.path.join(clips_dir, audio_filename)
+        
+        # Save dialogues to 'audio' folder if inside an episode directory structure
+        parent_dir = os.path.dirname(clips_dir)
+        if os.path.basename(clips_dir) == "clips":
+            audio_dir = os.path.join(parent_dir, "audio")
+            os.makedirs(audio_dir, exist_ok=True)
+            audio_path = os.path.join(audio_dir, audio_filename)
+        else:
+            audio_path = os.path.join(clips_dir, audio_filename)
 
         final_audio_to_mix = None
 
@@ -811,21 +819,58 @@ class VeoProvider(BaseVideoProvider):
         """
         Concatenate multiple video clips into one final video.
         Uses ffmpeg via subprocess for reliability.
+        Includes a normalization step to ensure all clips have identical audio streams (AAC 44.1kHz).
         """
         try:
+            print("[VEO] 🔄 Normalizando pistas de audio (inyectando silencio si es necesario) para concatenar...")
+            normalized_paths = []
+            
+            for i, clip in enumerate(clips):
+                if use_dubbed and getattr(clip, 'dubbed_path', None) and os.path.exists(clip.dubbed_path):
+                    p = clip.dubbed_path
+                else:
+                    p = clip.file_path
+                    
+                norm_path = os.path.join(self.assets_dir, f"_norm_{i}_{int(time.time())}.mp4")
+                
+                # Validar si el clip tiene pista de audio
+                from src.utils.audio_mixer import AudioMixer
+                has_audio = AudioMixer._probe_has_audio(p)
+                
+                if has_audio:
+                    # Re-codificamos el audio a aac y copiamos video para estandarizar
+                    cmd = [
+                        "ffmpeg", "-y", "-i", p,
+                        "-c:v", "copy", "-c:a", "aac", "-ac", "2", "-ar", "44100",
+                        norm_path
+                    ]
+                else:
+                    # El clip no tiene audio, inyectamos una pista de silencio AAC
+                    cmd = [
+                        "ffmpeg", "-y",
+                        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                        "-i", p,
+                        "-map", "1:v", "-map", "0:a",
+                        "-c:v", "copy", "-c:a", "aac", "-shortest",
+                        norm_path
+                    ]
+                
+                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                
+                if os.path.exists(norm_path):
+                    normalized_paths.append(norm_path)
+                else:
+                    normalized_paths.append(p) # fallback
+            
             # Create concat file list for ffmpeg
             concat_list_path = os.path.join(self.assets_dir, "_concat_list.txt")
             with open(concat_list_path, "w") as f:
-                for clip in clips:
-                    # ffmpeg requires forward slashes or escaped backslashes
-                    if use_dubbed and getattr(clip, 'dubbed_path', None) and os.path.exists(clip.dubbed_path):
-                        p = clip.dubbed_path
-                    else:
-                        p = clip.file_path
+                for p in normalized_paths:
                     safe_path = p.replace("\\", "/")
                     f.write(f"file '{safe_path}'\n")
 
             # Run ffmpeg concat
+            print("[VEO] 🔄 Pegando todos los clips normalizados...")
             result = subprocess.run(
                 [
                     "ffmpeg", "-y",
@@ -839,13 +884,20 @@ class VeoProvider(BaseVideoProvider):
                 text=True,
             )
 
+            # Cleanup temp normalization files
+            for p in normalized_paths:
+                if "_norm_" in p and os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except:
+                        pass
+            if os.path.exists(concat_list_path):
+                os.remove(concat_list_path)
+
             if result.returncode != 0:
-                print(f"[VEO] ⚠️  ffmpeg error: {result.stderr[:200]}")
-                # Fallback: return first clip
+                print(f"[VEO] ⚠️  ffmpeg error al concatenar:\n{result.stderr[-500:]}")
                 return clips[0].file_path
 
-            # Cleanup temp file
-            os.remove(concat_list_path)
             return output_path
 
         except FileNotFoundError:

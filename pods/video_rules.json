@@ -1,80 +1,78 @@
 {
-  "version": "2.1",
-  "description": "Reglas universales de producción de vídeo con IA generativa. Se inyectan automáticamente en todos los pods.",
+  "version": "2.2",
+  "description": "Universal video production rules for Generative AI. Injected automatically into all pods.",
   "rules": {
     "transitions": {
-      "description": "El director del guión (tú) decide libremente qué transición usar según el ritmo y la narrativa. Piensa como un espectador: ¿qué tendría sentido cinematográficamente? USA LOS TRES TIPOS, no solo uno.",
+      "description": "Choose the most appropriate transition based on pacing and narrative. Use all three types.",
       "types": {
-        "continue": "Continuación fluida estática. ÚSALA ÚNICAMENTE para prolongar un diálogo en estático (personaje quieto hablando) o para un paneo lento de un paisaje vacío sin personajes. El motor de vídeo usará el último frame como semilla visual. IMPORTANTE: El visual_prompt del clip siguiente debe ser EXACTAMENTE el mismo texto que el anterior. Si hay movimiento físico, cambio de pose o aparición de objetos, usa 'cut'.",
-        "cut": "Corte pequeño. Cambio de ángulo o plano DENTRO del mismo escenario. El diálogo o la acción puede continuar donde se cortó, pero desde otro punto de vista. Mantiene la coherencia espacial y temporal. Este es el motor MÁS SEGURO y DEBE SER TU TRANSICIÓN PRINCIPAL. Úsala siempre que el personaje empiece una nueva acción.",
-        "scene_change": "Corte grande. Cambio total de escenario, localización o acción. Se inicia una situación completamente nueva. El motor de vídeo generará la toma desde cero usando las imágenes de referencia de los personajes para mantener su apariencia visual consistente."
+        "continue": "Fluid static continuation. ONLY use to prolong static dialogue or a slow pan over an empty landscape. The visual_prompt MUST be exactly the same as the previous clip. If there is physical movement, pose change, or new objects, use 'cut'.",
+        "cut": "Small cut. Change of angle/shot within the same scene. Action/dialogue continues but from another viewpoint. Main transition to be used.",
+        "scene_change": "Large cut. Complete change of location or action. A completely new situation begins."
       },
       "when_to_use": {
         "continue": [
-          "El personaje está COMPLETAMENTE QUIETO hablando una frase larga y el diálogo se parte entre clips.",
-          "Un paneo lento sobre un paisaje vacío sin personajes."
+          "Character is COMPLETELY STILL speaking a long phrase.",
+          "Slow pan over an empty landscape."
         ],
         "cut": [
-          "CUALQUIER acción que implique movimiento físico del personaje (caminar, correr, saltar).",
-          "Queremos dar dinamismo cambiando el ángulo (ej: de frente a perfil, de plano medio a close-up).",
-          "Reacción de otro personaje u objeto en la misma escena.",
-          "Cambio de enfoque dentro del mismo espacio (ej: del personaje al objeto que está mirando).",
-          "El personaje coge, suelta, muestra o interactúa con un objeto.",
-          "Cambio de pose notable del personaje."
+          "Any physical movement (walking, running, grabbing).",
+          "Changing angle or shot type (e.g. medium to close-up).",
+          "Character interacts with an object.",
+          "Noticeable pose change."
         ],
         "scene_change": [
-          "Cambio de localización (ej: del bosque a una cueva, de día a noche).",
-          "Salto temporal (ej: 'Al día siguiente...', 'Más tarde...').",
-          "Aparición de un nuevo escenario, estructura o personaje que no estaba en la toma anterior."
+          "Location change (e.g. forest to cave).",
+          "Time skip.",
+          "New character or structure appears."
         ]
       },
       "forbidden": ["extend"],
-      "golden_rule": "NUNCA pidas a un personaje que haga más de UNA acción física principal por clip. Simplifica radicalmente. Ejemplo CORRECTO: 'El personaje camina'. Ejemplo CORRECTO: 'El personaje mira un objeto'. Ejemplo INCORRECTO: 'El personaje camina, se agacha, coge el objeto y sonríe a la cámara' (ESTO ROMPERÁ LA IA Y CREARÁ MUTACIONES). DIVIDE la acción en múltiples clips con 'cut'. NUNCA metas un cambio brusco de escenario o aparición repentina de un nuevo personaje DENTRO de un solo clip.",
-      "anti_morphing_rule": "NUNCA uses 'continue' para acciones en movimiento. 'continue' está prohibido si el personaje cambia de pose, interactúa con un objeto nuevo o el ángulo de cámara cambia. Si usas 'continue' cuando hay movimiento, la IA intentará 'fundir' (morphing) el cuerpo creando aberraciones visuales graves (extremidades que se teletransportan o derriten). En caso de duda, SIEMPRE usar 'cut'."
+      "golden_rule": "NEVER ask a character to perform more than ONE main physical action per clip/scene. Divide actions using 'cut'. NEVER introduce a sudden scene change or new character WITHIN a single clip.",
+      "anti_morphing_rule": "NEVER use 'continue' for moving actions. 'continue' will cause severe morphing if used during a pose change or camera angle change. When in doubt, ALWAYS use 'cut'."
     },
     "lip_sync": {
-      "description": "Reglas para cuando un personaje habla. IMPORTANTE: PROHIBIDO incluir diálogos en visual_prompt.",
+      "description": "Rules for when a character speaks.",
       "rules": [
-        "BAJO NINGÚN CONCEPTO INCLUYAS DIÁLOGOS TEXTUALES ni lo que el personaje dice dentro del visual_prompt (ej: PROHIBIDO usar 'The character says...'). El visual_prompt es SOLO para describir acciones físicas, entorno y emociones. El diálogo debe ir EXCLUSIVAMENTE en el campo audio_text.",
-        "Cuando el personaje habla, la cámara debería ser preferiblemente 'close-up' o 'medium' mostrando su cara para que el generador enfoque sus rasgos.",
-        "El personaje NO debe hablar en off (voz sin verse su cara) a menos que narrativamente tenga sentido (ej: narración contemplativa sobre un paisaje)."
+        "DO NOT include textual dialogues or what the character is saying inside the visual_prompt (e.g., 'The character says...' is FORBIDDEN). The visual_prompt is strictly for physical actions, environment, and emotions.",
+        "All spoken dialogue goes EXCLUSIVELY in the audio_text field.",
+        "When a character speaks, prefer 'close-up' or 'medium' shots to show their face.",
+        "No speaking off-camera unless narratively justified."
       ]
     },
     "visual_continuity": {
-      "description": "Reglas para mantener coherencia visual entre clips.",
+      "description": "Rules to maintain visual coherence.",
       "rules": [
-        "Describir SIEMPRE la apariencia física completa del personaje en cada visual_prompt (no solo su nombre). Incluir ropa, colores, accesorios, textura.",
-        "ABSOLUTAMENTE PROHIBIDO incluir texto, subtítulos, letras, marcas de agua, elementos de UI, carteles, letreros o cualquier contenido escrito en el visual_prompt. Añadir siempre al final del visual_prompt: 'absolutely no text, no subtitles, no letters, no watermarks, no written words'.",
-        "El visual_prompt debe estar en INGLÉS y ser una descripción cinematográfica detallada de exactamente lo que se ve en pantalla.",
-        "Incluir siempre el estilo artístico (ej: '3D Disney Pixar style') al principio del visual_prompt.",
-        "NUNCA describir un objeto con dos conceptos visuales contradictorios que la IA pueda interpretar de formas opuestas. Ejemplo INCORRECTO: 'crystal acorn' (la IA entiende 'acorn' como marrón y 'crystal' como azul/transparente, y genera un morphing interno donde la bellota se transforma en cristal). Ejemplo CORRECTO: 'glowing blue gemstone shaped like an acorn' o simplemente 'small blue crystal'. Elige UNA identidad visual clara y simple para cada objeto.",
-        "Los objetos mágicos o fantásticos deben describirse por lo que PARECEN visualmente, no por lo que SON narrativamente. Si es una bellota mágica que brilla, descríbela como 'a small glowing blue gem' en el visual_prompt. La explicación narrativa va en el audio_text."
+        "ALWAYS describe the full physical appearance of characters in every visual_prompt (clothing, colors, accessories).",
+        "ABSOLUTELY PROHIBITED to include text, subtitles, watermarks, or any written content in the visual_prompt. Always append: 'absolutely no text, no subtitles, no letters, no watermarks, no written words'.",
+        "The visual_prompt MUST be in ENGLISH.",
+        "Always prefix the visual_prompt with the art style (e.g., '3D Disney Pixar style').",
+        "DO NOT use contradictory visual concepts for an object (e.g., 'crystal acorn'). Use one clear visual identity."
       ]
     },
     "prop_continuity": {
-      "description": "Reglas CRÍTICAS para evitar la desaparición y morphing de objetos.",
+      "description": "CRITICAL rules to prevent object morphing and disappearance.",
       "rules": [
-        "Si un personaje SUJETA un objeto en un clip, y en el clip siguiente sigue sujetándolo, ese objeto DEBE describirse explícitamente en AMBOS visual_prompts con las mismas palabras.",
-        "Si un objeto debe DESAPARECER narrativamente (ej: el personaje lo suelta), dedicar un clip corto (4s) mostrando la acción de soltarlo. NUNCA hacer que un objeto desaparezca entre clips sin mostrar cómo.",
-        "PROHIBIDO que un objeto aparezca de la nada en las manos del personaje. Si necesita coger algo, mostrar la acción de cogerlo en un clip con 'cut' previo.",
-        "Los props (mochilas, sombreros, herramientas) deben describirse con las MISMAS PALABRAS exactas en todos los visual_prompts donde aparezcan. Ejemplo: si es 'small green fabric backpack', usar SIEMPRE esas mismas palabras, no cambiar a 'bag' o 'satchel'."
+        "If a character holds an object in consecutive clips, explicitly describe it in BOTH visual_prompts using the EXACT SAME WORDS.",
+        "If an object must disappear, dedicate a short clip showing the character dropping it.",
+        "Objects cannot magically appear. Show the character grabbing it using a 'cut'.",
+        "Use consistent naming for props across all prompts (e.g., always 'small green fabric backpack')."
       ]
     },
     "anatomy_guard": {
-      "description": "Instrucciones defensivas contra errores anatómicos de la IA generativa.",
+      "description": "Defensive rules against anatomical AI errors.",
       "rules": [
-        "Evitar prompts que requieran gestos complejos con dedos o manos (señalar, contar, agarrar objetos pequeños). Preferir gestos amplios y simples (brazos abiertos, mano en la cintura, abrazar).",
-        "Cuando el personaje gesticula, mantener un plano medio o wide. Los close-ups de manos generan artefactos.",
-        "No pedir al personaje que sostenga más de un objeto a la vez.",
-        "Si un personaje interactúa con agua, barro u otros materiales fluidos, usar planos amplios (wide/medium) para evitar artefactos en la simulación de física."
+        "Avoid complex finger or hand gestures (pointing, counting). Prefer broad actions (open arms, hand on hip).",
+        "During gestures, use medium or wide shots. Close-ups of hands cause artifacts.",
+        "Do not hold more than one object at a time.",
+        "For fluid interactions (water, mud), use wide or medium shots."
       ]
     },
     "pacing": {
-      "description": "Guía de duración por tipo de escena. El director elige libremente dentro de estos rangos.",
+      "description": "Scene duration guidelines.",
       "guidelines": {
-        "4-5 seconds": "Cambios de plano rápidos, reacciones, transiciones visuales.",
-        "6-7 seconds": "Diálogos cortos, acciones simples, momentos de exploración.",
-        "8 seconds": "Escenas de establecimiento, clímax emocional, momentos importantes que necesitan respirar."
+        "4-5 seconds": "Fast cuts, reactions, visual transitions.",
+        "6-7 seconds": "Short dialogue, simple action, exploration.",
+        "8 seconds": "Establishing scenes, emotional climax, important moments."
       }
     },
     "camera": {

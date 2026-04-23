@@ -14,6 +14,11 @@
             "title": "La Semilla Perezosa",
             "summary": "Tico encuentra una semilla brillante y decide plantarla. Al ver que no crece inmediatamente, aprende, tras varios intentos de ayudarla, que las grandes cosas requieren tiempo y paciencia.",
             "moral": "Algunas cosas buenas toman tiempo; la paciencia y el amor son tan importantes como el esfuerzo."
+        },
+        {
+            "title": "El Accidente en el Río",
+            "summary": "Tico intenta recuperar su barco de juguete del río por sí solo, pero resbala y cae al agua. Aprende sobre el peligro de jugar solo cerca de corrientes fuertes y la importancia de pedir ayuda.",
+            "moral": "No debemos tomar riesgos innecesarios cerca del agua; es mejor pedir ayuda a un adulto cuando algo se cae al río."
         }
     ]
 }

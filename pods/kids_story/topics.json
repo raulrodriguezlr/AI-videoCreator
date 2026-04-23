@@ -199,10 +199,10 @@
       "educational_value": "El valor de la honestidad, asumir la responsabilidad de los propios errores y la importancia de pedir perdón.",
       "references_episode": "El Puente de Ramitas",
       "target_emotion": "Empatía",
-      "status": "in_progress",
+      "status": "completed",
       "episode_id": "ep_008_el_accidente_en_el_río",
       "created_at": "2026-04-22T00:00:31.162121",
-      "completed_at": null
+      "completed_at": "2026-04-22T00:15:39.027272"
     },
     {
       "id": "topic_018",
