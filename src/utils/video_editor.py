@@ -116,7 +116,7 @@ class VideoEditor:
             return
 
         # 4. Nombre del archivo de salida
-        default_name = f"{ep_name}.mp4"
+        default_name = f"{ep_name}_dubbed.mp4"
         out_name = input(f"\n💾 Nombre del archivo final (Por defecto: '{default_name}'): ").strip()
         if not out_name:
             out_name = default_name

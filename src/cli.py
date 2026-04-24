@@ -15,6 +15,7 @@ from src.utils.manual_dubbing import ManualDubber
 from src.utils.voice_manager import VoiceManager
 from src.utils.video_analyzer import VideoAnalyzer
 from src.utils.video_editor import VideoEditor
+from src.utils.youtube_uploader import YoutubeUploader
 
 load_dotenv()
 
@@ -39,6 +40,7 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
         print("9. 🗣️  Gestor de Voces (Cambiar voces con ElevenLabs + Gemini)")
         print("10. 🕵️  Analizador de Vídeo (Debug visual con Gemini Pro)")
         print("11. ✂️  Editor de Vídeos (Unir clips a medida)")
+        print("12. 📤  Subir episodio a YouTube")
         print("0. Salir")
         
         choice = input("\n> ").strip()
@@ -179,6 +181,64 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
         elif choice == "11":
             editor = VideoEditor(pod_name, pod_config_path)
             editor.run_interactive()
+        elif choice == "12":
+            uploader = YoutubeUploader(pod_name, pod_dir=os.path.join("pods", pod_name))
+            pod_output_dir = os.path.join("pods", pod_name, "output")
+            episodes_with_video = []
+
+            if os.path.exists(pod_output_dir):
+                for name in sorted(os.listdir(pod_output_dir)):
+                    ep_dir = os.path.join(pod_output_dir, name)
+                    if not os.path.isdir(ep_dir) or not name.startswith("ep_"):
+                        continue
+                        
+                    final_mp4 = os.path.join(ep_dir, f"{name}.mp4")
+                    final_dubbed = os.path.join(ep_dir, f"{name}_dubbed.mp4")
+                    final_manual = os.path.join(ep_dir, f"{name}_dubbed_manually.mp4")
+                    
+                    if not os.path.exists(final_mp4):
+                        final_mp4 = os.path.join(ep_dir, "final.mp4") # Legacy
+                    if not os.path.exists(final_dubbed):
+                        final_dubbed = os.path.join(ep_dir, "final_dubbed.mp4") # Legacy
+                    
+                    videos = []
+                    if os.path.exists(final_manual):
+                        videos.append({"path": final_manual, "type": "Doblado Manualmente"})
+                    if os.path.exists(final_dubbed):
+                        videos.append({"path": final_dubbed, "type": "Doblado Automático"})
+                    if os.path.exists(final_mp4):
+                        videos.append({"path": final_mp4, "type": "Nativo (Sin voz/Texto)"})
+                        
+                    if videos:
+                        episodes_with_video.append({
+                            "ep_dir": ep_dir, 
+                            "name": name,
+                            "videos": videos
+                        })
+
+            if not episodes_with_video:
+                print("❌ No hay episodios con vídeos generados listos para subir.")
+            else:
+                print("\n📤 Elige el episodio que quieres subir a YouTube:")
+                for idx, ep in enumerate(episodes_with_video, 1):
+                    print(f"  {idx}. {ep['name']} ({len(ep['videos'])} versiones)")
+                
+                pick = input(f"\nSelecciona episodio (1-{len(episodes_with_video)}): ").strip()
+                if pick.isdigit() and 1 <= int(pick) <= len(episodes_with_video):
+                    chosen_ep = episodes_with_video[int(pick) - 1]
+                    
+                    print(f"\n📽️ Versiones disponibles para '{chosen_ep['name']}':")
+                    for v_idx, vid in enumerate(chosen_ep['videos'], 1):
+                        print(f"  {v_idx}. {vid['type']} -> {os.path.basename(vid['path'])}")
+                        
+                    v_pick = input(f"\nSelecciona qué versión subir (1-{len(chosen_ep['videos'])}): ").strip()
+                    if v_pick.isdigit() and 1 <= int(v_pick) <= len(chosen_ep['videos']):
+                        chosen_vid = chosen_ep['videos'][int(v_pick) - 1]
+                        uploader.upload_video(chosen_vid['path'], chosen_ep['ep_dir'])
+                    else:
+                        print("❌ Selección de vídeo no válida.")
+                else:
+                    print("❌ Selección de episodio no válida.")
         else:
             print("❌ Opción no válida.")
 

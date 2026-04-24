@@ -112,6 +112,16 @@ ELEVENLABS_API_KEY=tu_clave_de_elevenlabs_aqui
 ```
 *(Si no tienes clave, consigue una gratis en [Google AI Studio](https://aistudio.google.com/apikey) y [ElevenLabs](https://elevenlabs.io)).*
 
+### Paso 6: Configurar subida a YouTube (Opcional)
+Si quieres que el menú interactivo pueda subir los vídeos directamente a tu canal de YouTube (Opción 12), necesitas unas credenciales de autorización especiales para ese Pod:
+1. Ve a [Google Cloud Console](https://console.cloud.google.com/).
+2. En el menú superior izquierdo (las tres rayitas), ve a **"APIs y servicios"** > **"Biblioteca"**, busca "YouTube Data API v3" y actívala.
+3. Ve a **"Pantalla de consentimiento de OAuth"** (en "Público" o en el menú de la izquierda). Asegúrate de que el estado es **"Prueba"** y añade tu correo de YouTube en **"Usuarios de prueba"**.
+4. Ve a **"Credenciales"** > **"Crear Credenciales"** > **"ID de cliente de OAuth"**.
+5. Elige "App de escritorio" en el desplegable y dale a crear.
+6. **Descarga el archivo JSON**, renómbralo exactamente a `client_secret.json` y guárdalo dentro de la carpeta de tu Pod (ej: `pods/kids_story/client_secret.json`).
+7. La próxima vez que uses la Opción 12, se abrirá el navegador para que autorices a la aplicación. El token seguro se guardará localmente y no se subirá a GitHub.
+
 ## Configuración
 
 ### `.env` — Secretos (crear si no existe)
@@ -349,10 +359,15 @@ Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
 - [x] Analizador visual de consistencia (Gemini Pro)
 - [x] Editor de vídeos CLI (unión de clips personalizada)
 - [x] Generación de metadatos SEO para YouTube
+- [x] Publicación manual a YouTube con OAuth 2.0 (Opción 12)
+- [ ] Generación automática de miniaturas para YouTube (Thumbnails)
+- [ ] Exportación en formato vertical (9:16) con auto-cropping para Shorts / TikTok
+- [ ] Doblaje multi-idioma automático para canales internacionales
+- [ ] Motor de Efectos de Sonido (SFX) para sincronizar ruidos de ambiente (pisadas, viento, etc.)
+- [ ] Interfaz web (Dashboard local) para gestionar los Pods y la Memoria de Personajes más fácilmente
+- [ ] Integración con Google Opal
 - [ ] Automatización con n8n (local/cloud)
-- [ ] Google Opal integration
 - [ ] Modelos de vídeo adicionales (providers)
 - [ ] LoRA para character consistency local
-- [ ] Publicación automática a YouTube API
-- [ ] Migración de `print()` a `logging` (para automatización)
+- [ ] Migración de `print()` a `logging` (para automatización y servidores)
 - [ ] Tests unitarios
