@@ -188,9 +188,10 @@ class ManualDubber:
 
     def _dub_all_clips(self, available_clips: List[str], scenes: List[dict], ep_dir: str, clips_dir: str):
         # El usuario ha pedido doblar EXPRESAMENTE final.mp4 en vez de clip por clip.
-        final_mp4 = os.path.join(ep_dir, "final.mp4")
+        ep_name = os.path.basename(ep_dir)
+        final_mp4 = os.path.join(ep_dir, f"{ep_name}.mp4")
         if not os.path.exists(final_mp4):
-            print("❌ No se encontró final.mp4 en este episodio. Se necesita el vídeo completo para esta operación.")
+            print(f"❌ No se encontró {ep_name}.mp4 en este episodio. Se necesita el vídeo completo para esta operación.")
             return
 
         character_name = scenes[0].get("character", "Narrator") if scenes else "Narrator"
@@ -200,12 +201,14 @@ class ManualDubber:
         # 1. Extraer audio global
         veo_audio_path = AudioMixer.extract_audio(final_mp4)
         if not veo_audio_path:
-            print("❌ No se pudo extraer audio de final.mp4.")
+            print(f"❌ No se pudo extraer audio de {os.path.basename(final_mp4)}.")
             return
             
         # 2. STS conversion sobre la pista global
         audio_filename = "dialogue_final_manual.wav"
-        audio_path = os.path.join(ep_dir, audio_filename)
+        audio_dir = os.path.join(ep_dir, "audio")
+        os.makedirs(audio_dir, exist_ok=True)
+        audio_path = os.path.join(audio_dir, audio_filename)
         
         # Eliminar posible cache previo para forzar nueva voz
         if os.path.exists(audio_path):
@@ -231,7 +234,8 @@ class ManualDubber:
             return
             
         # 3. Mezclar el audio global convertido de vuelta al mp4
-        mixed_path = os.path.join(ep_dir, "final_dubbed_manually.mp4")
+        ep_name = os.path.basename(ep_dir)
+        mixed_path = os.path.join(ep_dir, f"{ep_name}_dubbed_manually.mp4")
         print("\n🎛️ Mezclando nueva pista doblada con el vídeo global...")
         final_clip_path = AudioMixer.mix_audio_to_video(
             video_path=final_mp4,

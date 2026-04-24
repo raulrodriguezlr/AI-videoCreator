@@ -26,14 +26,17 @@
           "New character or structure appears."
         ]
       },
-      "forbidden": ["extend"],
+      "forbidden": [
+        "extend"
+      ],
       "golden_rule": "NEVER ask a character to perform more than ONE main physical action per clip/scene. Divide actions using 'cut'. NEVER introduce a sudden scene change or new character WITHIN a single clip.",
       "anti_morphing_rule": "NEVER use 'continue' for moving actions. 'continue' will cause severe morphing if used during a pose change or camera angle change. When in doubt, ALWAYS use 'cut'."
     },
     "lip_sync": {
       "description": "Rules for when a character speaks.",
       "rules": [
-        "DO NOT include textual dialogues or what the character is saying inside the visual_prompt (e.g., 'The character says...' is FORBIDDEN). The visual_prompt is strictly for physical actions, environment, and emotions.",
+        "ABSOLUTELY FORBIDDEN: Do NOT write 'The squirrel says ...', 'The character says ...' or ANY 'X says \"...\"' pattern inside visual_prompt. This is the MOST IMPORTANT RULE.",
+        "The visual_prompt must contain ONLY physical descriptions: actions, environment, expressions, poses. ZERO dialogue text.",
         "All spoken dialogue goes EXCLUSIVELY in the audio_text field.",
         "When a character speaks, prefer 'close-up' or 'medium' shots to show their face.",
         "No speaking off-camera unless narratively justified."
@@ -73,12 +76,34 @@
         "4-5 seconds": "Fast cuts, reactions, visual transitions.",
         "6-7 seconds": "Short dialogue, simple action, exploration.",
         "8 seconds": "Establishing scenes, emotional climax, important moments."
-      }
+      },
+      "tip": "Clips can have natural silence or ambient sounds. But if a clip is mostly action with very little speech (under 20 characters), consider using 4 seconds to keep the pacing tight."
     },
     "camera": {
-      "shot_types": ["wide", "medium", "close-up", "extreme_close_up", "aerial", "over_the_shoulder"],
-      "movements": ["static", "pan_left", "pan_right", "tracking", "dolly_in", "dolly_out", "crane_up"],
-      "angles": ["eye_level", "low_angle", "high_angle", "bird_eye", "dutch_angle"]
+      "shot_types": [
+        "wide",
+        "medium",
+        "close-up",
+        "extreme_close_up",
+        "aerial",
+        "over_the_shoulder"
+      ],
+      "movements": [
+        "static",
+        "pan_left",
+        "pan_right",
+        "tracking",
+        "dolly_in",
+        "dolly_out",
+        "crane_up"
+      ],
+      "angles": [
+        "eye_level",
+        "low_angle",
+        "high_angle",
+        "bird_eye",
+        "dutch_angle"
+      ]
     }
   }
 }

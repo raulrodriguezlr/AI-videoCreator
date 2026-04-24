@@ -4,6 +4,7 @@ from src.engines.script_engine import ScriptGenerator
 from src.engines.reviewer_engine import ReviewerEngine
 from src.engines.video_engine import VideoEngine
 from src.utils.progress_manager import ProgressManager
+from src.utils.youtube_generator import YoutubeMetadataGenerator
 
 class PipelineOrchestrator:
     """
@@ -66,7 +67,7 @@ class PipelineOrchestrator:
         try:
             final_video_path = video_engine.generate(
                 script,
-                output_path=os.path.join(episode_dir, "final.mp4"),
+                output_path=os.path.join(episode_dir, f"{os.path.basename(episode_dir)}.mp4"),
                 episode_dir=episode_dir,
                 progress_manager=progress,
             )
@@ -84,3 +85,10 @@ class PipelineOrchestrator:
         print("--- PASO 4/4: GUARDANDO EN MEMORIA ---")
         script_engine.save_episode_to_memory(script)
         print(f"✅ Episodio guardado en memoria.\n")
+
+        print("--- PASO 5/5: METADATOS YOUTUBE ---")
+        try:
+            yt_generator = YoutubeMetadataGenerator()
+            yt_generator.generate_and_save(script, episode_dir)
+        except Exception as e:
+            print(f"⚠️ Error generando metadatos de YouTube: {e}")

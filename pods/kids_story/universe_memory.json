@@ -1,24 +1,9 @@
 {
     "episodes": [
         {
-            "title": "El Puente de Ramitas",
-            "summary": "Tico la ardilla intenta cruzar un río usando un puente de ramitas frágiles, pero aprende que pedir ayuda a su amigo Berto el castor para construir un puente fuerte es mucho más seguro y divertido.",
-            "moral": "Pedir ayuda y trabajar en equipo hace que las tareas difíciles sean mucho más fáciles."
-        },
-        {
-            "title": "Las Bayas Desaparecidas",
-            "summary": "Tico va en busca de sus bayas azules favoritas y descubre que han desaparecido. Siguiendo unas misteriosas huellas, encuentra a un bebé mapache hambriento y aprende la alegría de compartir.",
-            "moral": "Compartir con los demás nos hace mucho más felices que guardarlo todo para nosotros mismos."
-        },
-        {
-            "title": "La Semilla Perezosa",
-            "summary": "Tico encuentra una semilla brillante y decide plantarla. Al ver que no crece inmediatamente, aprende, tras varios intentos de ayudarla, que las grandes cosas requieren tiempo y paciencia.",
-            "moral": "Algunas cosas buenas toman tiempo; la paciencia y el amor son tan importantes como el esfuerzo."
-        },
-        {
-            "title": "El Accidente en el Río",
-            "summary": "Tico intenta recuperar su barco de juguete del río por sí solo, pero resbala y cae al agua. Aprende sobre el peligro de jugar solo cerca de corrientes fuertes y la importancia de pedir ayuda.",
-            "moral": "No debemos tomar riesgos innecesarios cerca del agua; es mejor pedir ayuda a un adulto cuando algo se cae al río."
+            "title": "El Gran Puente de Ramitas",
+            "summary": "Tico la ardilla se encuentra con un arroyo que no puede cruzar. Con la ayuda de los espectadores, aprende a usar ramitas para construir un puente y alcanzar una bellota dorada.",
+            "moral": "Pensar con paciencia y usar la creatividad nos ayuda a superar cualquier obstáculo."
         }
     ]
 }

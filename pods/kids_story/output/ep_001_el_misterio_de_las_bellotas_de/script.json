@@ -1,0 +1,369 @@
+{
+  "title": "El Misterio de las Bellotas Desaparecidas",
+  "summary": "Tico pierde sus preciadas bellotas y, al seguir las pistas, descubre que un pajarito hambriento las tomó. Aprende el valor de investigar antes de enfadarse y la alegría de compartir.",
+  "moral": "Siempre es mejor preguntar y entender la situación antes de enfadarse, y compartir con quienes lo necesitan nos hace más felices.",
+  "ambient_audio_prompt": "Cheerful and acoustic woodland music with playful pizzicato strings, warm flute melodies, and a gentle rhythm",
+  "scenes": [
+    {
+      "scene_number": 1,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, stands in a lush magical forest. He smiles brightly and waves one paw warmly at the camera. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "¡Hola amigos! Soy Tico. ¡Bienvenidos al Bosque Mágico!",
+      "character": "Tico",
+      "voice_direction": "alegre y enérgico",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 2,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, looks down at an empty small dirt hole near a giant oak tree trunk with wide, shocked eyes. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "¡Hoy me ha pasado algo increíble! Mis bellotas mágicas...",
+      "character": "Tico",
+      "voice_direction": "sorprendido",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "high_angle"
+      },
+      "mood": "mysterious",
+      "lighting": "bright_daylight",
+      "transition_to_next": "continue",
+      "duration_seconds": 5,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 3,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, looks down at an empty small dirt hole near a giant oak tree trunk with wide, shocked eyes. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "...¡han desaparecido por completo!",
+      "character": "Tico",
+      "voice_direction": "dramático",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "high_angle"
+      },
+      "mood": "mysterious",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 4,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 4,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. Wide shot of a giant oak tree surrounded by green ferns. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, has both paws on his hips, looking around the green ferns. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "Fui un momentito a beber agua al río y dejé mis bellotas aquí.",
+      "character": "Tico",
+      "voice_direction": "pensativo",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_right",
+        "angle": "eye_level"
+      },
+      "mood": "calm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 5,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, crouches down near the mud. He looks closely at tiny bird footprints pressed into the brown soil. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "Pero esperad... ¡Mirad aquí abajo!",
+      "character": "Tico",
+      "voice_direction": "emocionado",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "high_angle"
+      },
+      "mood": "exciting",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 5,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 6,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, turns his head to look directly at the camera with an enthusiastic expression, tilting his head. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "¿Veis esas pequeñas huellas en el barro? ¿Me ayudáis a seguirlas?",
+      "character": "Tico",
+      "voice_direction": "curioso y amigable",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "exciting",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": true,
+      "pause_for_answer": 3
+    },
+    {
+      "scene_number": 7,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, carefully sneaks forward on tiptoes behind a row of large green leaves. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "¡Genial! Vamos allá, con mucho cuidado para no hacer ruido.",
+      "character": "Tico",
+      "voice_direction": "susurrando, misterioso",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "tracking",
+        "angle": "eye_level"
+      },
+      "mood": "tense",
+      "lighting": "dramatic_shadows",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 8,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, gently pushes aside thick green bush branches with his paws to look through them. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "Las huellas nos llevan hasta estos arbustos de moras...",
+      "character": "Tico",
+      "voice_direction": "intrigado",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "mysterious",
+      "lighting": "soft_diffused",
+      "transition_to_next": "cut",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 9,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. A tiny, fluffy blue bird sits on a mossy log, resting next to a pile of smooth brown acorns. The bird looks down with droopy eyes. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, stands nearby watching. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "¡Ahí están mis bellotas! Y... ¿quién las tiene? ¡Es un pajarito azul!",
+      "character": "Tico",
+      "voice_direction": "sorprendido",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_left",
+        "angle": "eye_level"
+      },
+      "mood": "tense",
+      "lighting": "soft_diffused",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 10,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, stands with a softened, concerned facial expression, looking warmly at the tiny, fluffy blue bird on the mossy log. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "Pero, un momento... el pajarito está muy triste.",
+      "character": "Tico",
+      "voice_direction": "compasivo",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "calm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "cut",
+      "duration_seconds": 5,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 11,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, turns his face directly to the camera with a thoughtful expression, bringing one paw up to his chin. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "¿Qué creéis que deberíamos hacer? ¿Enfadarnos o preguntarle qué le pasa?",
+      "character": "Tico",
+      "voice_direction": "reflexivo",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": true,
+      "pause_for_answer": 3
+    },
+    {
+      "scene_number": 12,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, smiles broadly and opens his arms in a welcoming gesture towards the camera. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "¡Eso es! Siempre es mejor preguntar primero y ser amables.",
+      "character": "Tico",
+      "voice_direction": "animado y afirmativo",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_out",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 13,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, stands near the mossy log. He gestures gently towards the tiny, fluffy blue bird sitting on the log. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "El pajarito me contó que tenía mucha hambre y se había perdido en el bosque.",
+      "character": "Tico",
+      "voice_direction": "suave y empático",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 14,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. The tiny, fluffy blue bird cheerfully pecks at a smooth brown acorn on the mossy log, looking very happy. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "Así que, en lugar de enfadarme...",
+      "character": "Tico",
+      "voice_direction": "alegre",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "high_angle"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 5,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 15,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, sits next to the tiny, fluffy blue bird on the mossy log. Both have smooth brown acorns in front of them, enjoying a sunny afternoon. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "...decidí compartir mis deliciosas bellotas con él.",
+      "character": "Tico",
+      "voice_direction": "orgulloso y feliz",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_right",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 16,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, turns to the camera with a big, bright smile. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "¡Compartir hace que la comida sepa mucho mejor!",
+      "character": "Tico",
+      "voice_direction": "entusiasta",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 17,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, smiles warmly while sitting next to the tiny, fluffy blue bird on the mossy log. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "Y además, hoy he ganado un nuevo gran amigo.",
+      "character": "Tico",
+      "voice_direction": "dulce",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "triumphant",
+      "lighting": "golden_hour",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 18,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, walks casually towards the camera along a sunlit forest path. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "Recuerda, si alguien comete un error, a veces solo necesita un poco de ayuda y comprensión.",
+      "character": "Tico",
+      "voice_direction": "calmado y educativo",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "tracking",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 19,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Tico, a bright orange squirrel with big expressive eyes, wearing a small green fabric adventurer's backpack with a tiny compass attached, stands on the sunlit forest path, smiling brightly and waving happily at the camera. absolutely no text, no subtitles, no letters, no watermarks, no written words",
+      "audio_text": "¡Hasta la próxima aventura en el Bosque Mágico, amigos!",
+      "character": "Tico",
+      "voice_direction": "muy alegre y despidiéndose",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "crane_up",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    }
+  ]
+}

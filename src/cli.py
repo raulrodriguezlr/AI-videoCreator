@@ -14,6 +14,7 @@ from src.engines.pipeline_orchestrator import PipelineOrchestrator
 from src.utils.manual_dubbing import ManualDubber
 from src.utils.voice_manager import VoiceManager
 from src.utils.video_analyzer import VideoAnalyzer
+from src.utils.video_editor import VideoEditor
 
 load_dotenv()
 
@@ -37,6 +38,7 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
         print("8. 🎙️  Doblaje Manual (Aplicar STS a un vídeo nativo)")
         print("9. 🗣️  Gestor de Voces (Cambiar voces con ElevenLabs + Gemini)")
         print("10. 🕵️  Analizador de Vídeo (Debug visual con Gemini Pro)")
+        print("11. ✂️  Editor de Vídeos (Unir clips a medida)")
         print("0. Salir")
         
         choice = input("\n> ").strip()
@@ -148,8 +150,13 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
                     ep_dir = os.path.join(pod_output_dir, name)
                     if not os.path.isdir(ep_dir) or not name.startswith("ep_"):
                         continue
-                    final_mp4 = os.path.join(ep_dir, "final.mp4")
-                    final_dubbed = os.path.join(ep_dir, "final_dubbed.mp4")
+                    final_mp4 = os.path.join(ep_dir, f"{name}.mp4")
+                    final_dubbed = os.path.join(ep_dir, f"{name}_dubbed.mp4")
+                    
+                    if not os.path.exists(final_mp4):
+                        final_mp4 = os.path.join(ep_dir, "final.mp4") # Legacy fallback
+                    if not os.path.exists(final_dubbed):
+                        final_dubbed = os.path.join(ep_dir, "final_dubbed.mp4") # Legacy fallback
                     
                     if os.path.exists(final_mp4):
                         episodes_with_video.append({"ep_dir": ep_dir, "name": f"{name} (Nativo)", "video": final_mp4})
@@ -157,7 +164,7 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
                         episodes_with_video.append({"ep_dir": ep_dir, "name": f"{name} (Doblado)", "video": final_dubbed})
 
             if not episodes_with_video:
-                print("❌ No hay episodios con vídeos finales (final.mp4) para analizar.")
+                print("❌ No hay episodios con vídeos finales generados para analizar.")
             else:
                 print("\n🕵️ Elige un vídeo generado para someter a análisis visual:")
                 for idx, ep in enumerate(episodes_with_video, 1):
@@ -169,6 +176,9 @@ def run_interactive_menu(pod_name, pod_config_path, topic_mgr, episode_mgr):
                     analyzer.analyze_video(chosen["video"], chosen["ep_dir"])
                 else:
                     print("❌ Selección no válida.")
+        elif choice == "11":
+            editor = VideoEditor(pod_name, pod_config_path)
+            editor.run_interactive()
         else:
             print("❌ Opción no válida.")
 
