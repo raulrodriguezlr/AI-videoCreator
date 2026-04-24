@@ -39,7 +39,7 @@ class YoutubeMetadataGenerator:
         Moraleja: {moral}
         
         Sigue estas reglas:
-        - El título debe ser atractivo (ej: ¡Aventuras Mágicas! ✨ | Tico la ardilla en...)
+        - El título DEBE terminar obligatoriamente con el sufijo " | Las Aventuras de Tico en el Bosque Mágico". La primera parte del título la inventas tú para que sea atractiva (ej: ¡Misión: Cruzar el Arroyo! ✨ | Las Aventuras de Tico en el Bosque Mágico).
         - La descripción debe empezar con un saludo animado.
         - Cuenta un poco de qué va sin hacer mucho spoiler.
         - Haz una pregunta a los niños para que dejen comentarios.
@@ -59,6 +59,14 @@ class YoutubeMetadataGenerator:
             )
 
             data = json.loads(response.text)
+            
+            # Garantizar que el sufijo esté presente pase lo que pase
+            suffix = " | Las Aventuras de Tico en el Bosque Mágico"
+            if not data.get("titulo_youtube", "").endswith(suffix):
+                # Limpiar posibles variaciones que haya metido Gemini al final
+                base_title = data.get("titulo_youtube", "").split(" | ")[0]
+                data["titulo_youtube"] = f"{base_title}{suffix}"
+                
             print("[YouTube] ✅ Metadatos generados con éxito.")
             return data
 

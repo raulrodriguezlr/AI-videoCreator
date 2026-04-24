@@ -12,25 +12,31 @@ python -m src.main --pod kids_story --topic "Tico aprende sobre la paciencia"
 
 ## Arquitectura
 
-```
-cli.py → PipelineOrchestrator (orquestador)
+```text
+cli.py (Menú interactivo / Comandos)
   │
-  ├── TopicEngine → Gemini genera temas
-  ├── ScriptEngine → Gemini genera guion cinematográfico
-  ├── ProgressManager → Persistencia de estado (resume)
-  ├── EpisodeManager → Organización de episodios
-  └── VideoEngine (router)
+  ├── Herramientas CLI (VideoEditor, VideoAnalyzer, VoiceManager, ManualDubber)
+  │
+  └── PipelineOrchestrator (Orquestador central)
         │
-        ├── VeoProvider → Google Veo 3.1 API (producción, cloud)
-        │     ├── Scene Builder: generate → jump_to
-        │     └── Dubbing: Veo audio → ElevenLabs STS → voz de personaje
+        ├── TopicEngine → Gemini genera temas
+        ├── ScriptEngine → Gemini genera guion cinematográfico
+        ├── ReviewerEngine → IA "Director" que audita y mejora el guion (QC)
+        ├── ProgressManager → Persistencia de estado (resume)
+        ├── EpisodeManager → Organización de archivos y carpetas
         │
-        ├── LtxProvider → LTX-2 via ComfyUI (local, GPU)
-        │     └── Genera con audio nativo (Gemma 3)
+        ├── VideoEngine (router)
+        │     │
+        │     ├── VeoProvider → Google Veo 3.1 API (producción, cloud)
+        │     │     ├── Scene Builder: generate (para cortes) o jump_to (para continuaciones)
+        │     │     └── Dubbing: Veo audio nativo → ElevenLabs STS → voz de personaje
+        │     │
+        │     ├── LtxProvider → LTX-2 via ComfyUI (local, GPU)
+        │     │
+        │     ├── LyriaProvider → Música ambiental (ElevenLabs Sound Gen)
+        │     └── AudioMixer → FFmpeg: mezcla, extracción, time-stretch
         │
-        ├── ElevenLabsProvider → Doblaje (STS + TTS fallback)
-        ├── LyriaProvider → Música ambiental (ElevenLabs Sound Gen)
-        └── AudioMixer → FFmpeg: mezcla, extracción, time-stretch
+        └── YoutubeMetadataGenerator → Gemini genera título SEO y descripción
 
   ApiKeyManager → Rotación automática de API keys (failover 429)
 ```
@@ -178,6 +184,8 @@ El menú interactivo incluye:
 7. 🎯 Crear vídeo de un tema específico
 8. 🎙️ Doblaje Manual (Aplicar STS a un vídeo nativo)
 9. 🗣️ Gestor de Voces (Cambiar voces con ElevenLabs + Gemini)
+10. 🕵️ Analizador de Vídeo (Debug visual con Gemini Pro)
+11. ✂️ Editor de Vídeos (Unir clips a medida)
 
 ### Retomar un episodio fallido o rate-limited
 
@@ -258,8 +266,12 @@ AI-videoCreator/
 │               ├── script.json
 │               ├── progress.json
 │               ├── metadata.json
-│               ├── clips/        # Clips individuales
-│               └── final.mp4     # Vídeo concatenado
+│               ├── youtube_metadata.json # Título y descripción SEO para YT
+│               ├── clips/        # Clips individuales de vídeo (.mp4)
+│               ├── frames/       # Fotogramas clave para transiciones continuas
+│               ├── audio/        # Pistas de doblaje
+│               ├── ep_XXX_...mp4             # Vídeo concatenado nativo
+│               └── ep_XXX_..._dubbed.mp4     # Vídeo concatenado doblado
 └── README.md
 ```
 
@@ -331,13 +343,16 @@ Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
 - [x] Música ambiental automática (ElevenLabs Sound Generation)
 - [x] Rotación automática de API keys (failover 429)
 - [x] Sistema de resume/progreso (nunca se pierde un clip)
-- [x] Menú interactivo completo (9 opciones)
+- [x] Menú interactivo completo (11 opciones)
 - [x] Doblaje manual post-generación
 - [x] Gestor de voces interactivo
+- [x] Analizador visual de consistencia (Gemini Pro)
+- [x] Editor de vídeos CLI (unión de clips personalizada)
+- [x] Generación de metadatos SEO para YouTube
 - [ ] Automatización con n8n (local/cloud)
 - [ ] Google Opal integration
 - [ ] Modelos de vídeo adicionales (providers)
 - [ ] LoRA para character consistency local
-- [ ] Publicación automática a YouTube
+- [ ] Publicación automática a YouTube API
 - [ ] Migración de `print()` a `logging` (para automatización)
 - [ ] Tests unitarios
