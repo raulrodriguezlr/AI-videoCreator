@@ -83,7 +83,7 @@ def resume_episode(resume_value: str, pod_name: str = None):
     try:
         final_video_path = video_engine.generate(
             script,
-            output_path=os.path.join(episode_dir, "final.mp4"),
+            output_path=os.path.join(episode_dir, f"{os.path.basename(episode_dir)}.mp4"),
             episode_dir=episode_dir,
             resume_from=resume_from,
             progress_manager=progress,

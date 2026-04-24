@@ -1,20 +1,20 @@
 {
     "script_generation": {
-        "system_role": "Eres un director y guionista de documentales. Creas escenas cinematográficas detalladas para IA generativa. Tus guiones son educativos y atrapantes.",
-        "user_template": "Escribe un guion para un vídeo corto sobre {target_audience}.\n\n## TEMA\n{topic}\n\n## CONTEXTO\n{series_context}\n\n## EPISODIOS ANTERIORES\n{memory_context}\n\n## PERSONAJES\n{characters}\n\n## REQUISITOS TÉCNICOS\n- Duración mínima: {duration_seconds} segundos.\n- Duración máxima POR CLIP: {max_clip_seconds} segundos.\n- Estilo: {art_style}\n- Preguntas interactivas: {num_interactive_questions} (solo si > 0)\n\n{video_rules}\n\n## FORMATO DE SALIDA (JSON estricto)\n{output_format}",
+        "system_role": "You are a documentary director and screenwriter. You create detailed cinematic scenes for Generative AI. Provide physical visual prompts in ENGLISH and audio dialogues in SPANISH.",
+        "user_template": "Write a short video script for {target_audience}.\n\n## TOPIC\n{topic}\n\n## CONTEXT\n{series_context}\n\n## PREVIOUS EPISODES\n{memory_context}\n\n## CHARACTERS\n{characters}\n\n## TECHNICAL REQUIREMENTS\n- Minimum duration: {duration_seconds} seconds.\n- Max duration PER CLIP: {max_clip_seconds} seconds.\n- Art style: {art_style}\n- Interactive questions: {num_interactive_questions} (only if > 0)\n\n{video_rules}\n\n## OUTPUT FORMAT (STRICT JSON)\n{output_format}",
         "output_format": {
-            "title": "Título del episodio",
-            "summary": "Resumen ejecutivo",
-            "moral": "Moraleja o conclusión principal",
-            "ambient_audio_prompt": "Prompt EN INGLÉS para ElevenLabs: ej. 'Dark synthwave ambient music, sci-fi mystery'",
+            "title": "Episode title (Spanish)",
+            "summary": "Executive summary",
+            "moral": "Main conclusion or moral",
+            "ambient_audio_prompt": "Audio prompt in ENGLISH: e.g. 'Dark synthwave ambient music, sci-fi mystery'",
             "scenes": [
                 {
                     "scene_number": 1,
                     "narrative_phase": "introduction",
-                    "visual_prompt": "Detailed description in ENGLISH of the visuals. NO TEXT.",
-                    "audio_text": "Texto que dirá el narrador (en español).",
+                    "visual_prompt": "Detailed description in ENGLISH of the visuals. NO TEXT. NO DIALOGUE.",
+                    "audio_text": "Text spoken by the narrator (SPANISH).",
                     "character": "Narrador",
-                    "voice_direction": "Tono de voz (ej: misterioso, urgente)",
+                    "voice_direction": "Voice tone (e.g. misterioso, urgente)",
                     "camera": {
                         "shot_type": "wide",
                         "movement": "pan_right",
@@ -29,16 +29,16 @@
         }
     },
     "topic_generation": {
-        "system_role": "Eres un experto creador de contenido.",
-        "user_template": "Genera {num_topics} temas sobre {series_description}. Formato JSON: {output_format}",
+        "system_role": "You are an expert creative content creator.",
+        "user_template": "Generate {num_topics} topics about {series_description}. JSON format: {output_format}",
         "output_format": {
             "topics": [
                 {
-                    "title": "Título sugerido",
-                    "description": "Descripción del tema",
-                    "educational_value": "Valor educativo",
+                    "title": "Suggested title",
+                    "description": "Topic description",
+                    "educational_value": "Educational value",
                     "references_episode": null,
-                    "target_emotion": "Curiosidad"
+                    "target_emotion": "Curiosity"
                 }
             ]
         }

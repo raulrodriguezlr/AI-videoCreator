@@ -697,7 +697,8 @@ class LtxProvider(BaseVideoProvider):
         """Get the last frame: try extracting from video, fallback to saved PNG."""
         # Try saved PNG first (faster, more reliable)
         if save_dir and scene_index is not None and scene_index > 0:
-            saved_frame = os.path.join(save_dir, f"last_frame_{scene_index:02d}.png")
+            frames_dir = os.path.join(os.path.dirname(save_dir), "frames")
+            saved_frame = os.path.join(frames_dir, f"last_frame_{scene_index:02d}.png")
             if os.path.exists(saved_frame):
                 print(f"[LTX]    📷 Usando frame guardado: {os.path.basename(saved_frame)}")
                 return saved_frame
@@ -726,6 +727,8 @@ class LtxProvider(BaseVideoProvider):
 
     def _save_last_frame(self, video_path: str, clips_dir: str, scene_index: int):
         """Save the last frame of a clip as PNG for resume safety."""
+        frames_dir = os.path.join(os.path.dirname(clips_dir), "frames")
+        os.makedirs(frames_dir, exist_ok=True)
         try:
             cap = cv2.VideoCapture(video_path)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -736,9 +739,9 @@ class LtxProvider(BaseVideoProvider):
             ret, frame = cap.read()
             cap.release()
             if ret:
-                frame_path = os.path.join(clips_dir, f"last_frame_{scene_index + 1:02d}.png")
+                frame_path = os.path.join(frames_dir, f"last_frame_{scene_index + 1:02d}.png")
                 cv2.imwrite(frame_path, frame)
-                print(f"[LTX]    📷 Último frame guardado: {os.path.basename(frame_path)}")
+                print(f"[LTX]    📷 Último frame guardado en frames/: {os.path.basename(frame_path)}")
         except Exception as e:
             print(f"[LTX] ⚠️  No se pudo guardar último frame: {e}")
 

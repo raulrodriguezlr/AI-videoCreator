@@ -12,6 +12,7 @@ Requires: GOOGLE_API_KEY in .env, google-genai SDK, Google AI Pro/Ultra plan.
 """
 
 import os
+import re
 import json
 import time
 import tempfile
@@ -27,6 +28,7 @@ from src.providers.base_provider import BaseVideoProvider, VideoClip
 from src.providers.elevenlabs_provider import ElevenLabsProvider
 from src.utils.audio_mixer import AudioMixer
 from src.utils.api_key_manager import get_api_key_manager
+from src.utils.scene_context import SceneContextManager
 from src.utils.config_loader import load_json
 from src.utils.progress_manager import is_rate_limit_error, is_content_error
 from src.variables import (
@@ -37,6 +39,7 @@ from src.variables import (
     VEO_POLLING_INTERVAL,
     VEO_TIMEOUT,
     USE_REFERENCE_IMAGES,
+    IMAGEN_MODEL,
 )
 
 class VeoProvider(BaseVideoProvider):
@@ -224,7 +227,8 @@ class VeoProvider(BaseVideoProvider):
 
         # Fallback: try saved PNG frame if video extraction failed
         if last_frame is None and save_dir and scene_index is not None and scene_index > 0:
-            saved_frame_path = os.path.join(save_dir, f"last_frame_{scene_index:02d}.png")
+            frames_dir = os.path.join(os.path.dirname(save_dir), "frames")
+            saved_frame_path = os.path.join(frames_dir, f"last_frame_{scene_index:02d}.png")
             if os.path.exists(saved_frame_path):
                 print(f"[VEO]    📷 Usando frame guardado: {os.path.basename(saved_frame_path)}")
                 image_bytes = open(saved_frame_path, "rb").read()
@@ -256,10 +260,16 @@ class VeoProvider(BaseVideoProvider):
         self, scene: dict, i: int, clips: List[VideoClip], transition: str,
         prompt: str, scene_duration: int, ref_images: List[str],
         negative: Optional[str], narrative_phase: str, clips_dir: str,
+        incoming_transition: str = "cut",
     ) -> VideoClip:
         """
-        Generate a single clip based on the transition type.
-        Centralizes the if/elif/else logic so it's not duplicated in retry blocks.
+        Generate a single clip based on the incoming transition type.
+        
+        Routing logic:
+          - First scene: always fresh (generate_scene)
+          - incoming 'continue': jump_to_scene (last frame seed, seamless)
+          - incoming 'cut': jump_to_scene (last frame seed, new angle same location)
+          - incoming 'scene_change': generate_scene fresh (new location entirely)
         """
         if i == 0 or not clips:
             # First scene — always generate fresh
@@ -269,15 +279,19 @@ class VeoProvider(BaseVideoProvider):
                 negative_prompt=negative, save_dir=clips_dir,
                 scene_index=i, narrative_phase=narrative_phase,
             )
-        elif transition == "continue":
-            # Visual continuity: use last frame as seed
+        elif incoming_transition == "continue":
+            # 'continue' uses last frame as visual seed for a seamless, same-angle continuation
             return self.jump_to_scene(
                 previous_clip=clips[-1], prompt=prompt,
                 reference_images=ref_images, save_dir=clips_dir,
                 scene_index=i, narrative_phase=narrative_phase,
             )
         else:
-            # "cut" or "scene_change" — fresh clip with reference images
+            # "cut" or "scene_change"
+            # We CANNOT use jump_to_scene for "cut" because the image seed becomes the literal first frame.
+            # If the angle changes, forcing the old angle as frame 1 causes Veo to violently 
+            # jump-cut mid-clip to satisfy the text prompt.
+            # Consistency is instead maintained via SceneContextManager (text) + Reference Images.
             return self.generate_scene(
                 prompt=prompt, duration=scene_duration,
                 seed=scene.get("seed"), reference_images=ref_images,
@@ -290,7 +304,7 @@ class VeoProvider(BaseVideoProvider):
         clips: List[VideoClip], transition: str, prompt: str,
         scene_duration: int, ref_images: List[str], negative: Optional[str],
         narrative_phase: str, clips_dir: str, scene_num_str: str,
-        progress_manager=None,
+        progress_manager=None, incoming_transition: str = "cut",
     ) -> dict:
         """
         Handle a scene generation error: retry with rotated key if rate-limited,
@@ -315,6 +329,7 @@ class VeoProvider(BaseVideoProvider):
                         prompt=prompt, scene_duration=scene_duration,
                         ref_images=ref_images, negative=negative,
                         narrative_phase=narrative_phase, clips_dir=clips_dir,
+                        incoming_transition=incoming_transition,
                     )
                     self._apply_dubbing(clip, scene, clips_dir, scene_num_str)
                     self.key_manager.record_success()
@@ -359,7 +374,15 @@ class VeoProvider(BaseVideoProvider):
             return
 
         audio_filename = f"dialogue_{scene_num_str}.wav"
-        audio_path = os.path.join(clips_dir, audio_filename)
+        
+        # Save dialogues to 'audio' folder if inside an episode directory structure
+        parent_dir = os.path.dirname(clips_dir)
+        if os.path.basename(clips_dir) == "clips":
+            audio_dir = os.path.join(parent_dir, "audio")
+            os.makedirs(audio_dir, exist_ok=True)
+            audio_path = os.path.join(audio_dir, audio_filename)
+        else:
+            audio_path = os.path.join(clips_dir, audio_filename)
 
         final_audio_to_mix = None
 
@@ -449,21 +472,38 @@ class VeoProvider(BaseVideoProvider):
             os.makedirs(clips_dir, exist_ok=True)
         else:
             clips_dir = self.assets_dir
-        # Load character reference images from config
-        ref_images = self._get_character_reference_images()
+        # Load character reference images
+        ref_images = []
+        consistency_cfg = self.config.get("consistency", {})
+        if consistency_cfg.get("generate_anchor_images", False) and episode_dir:
+            # Phase 4: Generate dynamic anchor image for the episode
+            anchor_path = self._generate_anchor_image(episode_dir, script, scenes)
+            if anchor_path:
+                ref_images = [anchor_path]
+        
+        # Fallback to static config images if anchor generation disabled or failed
+        if not ref_images:
+            ref_images = self._get_character_reference_images()
         # Collect clips — load previously generated clips if resuming
         clips: List[VideoClip] = []
         if resume_from > 0 and progress_manager:
             completed = progress_manager.get_completed_clips()
             for c in completed:
                 if c.get("clip_path") and os.path.exists(c["clip_path"]):
+                    clip_path = c["clip_path"]
+                    expected_dubbed = clip_path.replace(".mp4", "_dubbed.mp4")
+                    dubbed_path = expected_dubbed if os.path.exists(expected_dubbed) else None
                     clips.append(VideoClip(
-                        file_path=c["clip_path"],
+                        file_path=clip_path,
                         duration=c.get("duration_seconds", VEO_DURATION_SECONDS),
+                        dubbed_path=dubbed_path,
                     ))
             print(f"[VEO]    📂 {len(clips)} clips previos recuperados")
 
         rate_limited = False
+
+        # Scene Context Manager — tracks location, props, character state for consistency
+        context_mgr = SceneContextManager(episode_dir or clips_dir, pod_config=self.config)
 
         for i, scene in enumerate(scenes):
             scene_num = scene.get("scene_number", i + 1)
@@ -473,7 +513,15 @@ class VeoProvider(BaseVideoProvider):
                 continue
 
             narrative_phase = scene.get("narrative_phase", "")
-            prompt = self._build_cinematographic_prompt(scene, narrative_phase)
+            # The transition that LED to this scene (from previous scene's transition_to_next)
+            incoming_transition = scenes[i - 1].get("transition_to_next", "cut") if i > 0 else "scene_change"
+            # Get continuity context from previous scenes
+            continuity_context = context_mgr.get_continuity_context(incoming_transition)
+            prompt = self._build_cinematographic_prompt(
+                scene, narrative_phase,
+                incoming_transition=incoming_transition,
+                continuity_context=continuity_context,
+            )
             negative = scene.get("negative_prompt")
             transition = scene.get("transition_to_next", "cut")
             scene_duration = scene.get("duration_seconds", VEO_DURATION_SECONDS)
@@ -490,6 +538,7 @@ class VeoProvider(BaseVideoProvider):
                     prompt=prompt, scene_duration=scene_duration,
                     ref_images=ref_images, negative=negative,
                     narrative_phase=narrative_phase, clips_dir=clips_dir,
+                    incoming_transition=incoming_transition,
                 )
 
                 self._apply_dubbing(clip, scene, clips_dir, scene_num_str)
@@ -500,6 +549,9 @@ class VeoProvider(BaseVideoProvider):
 
                 # Save last frame for resume safety
                 self._save_last_frame(clip.file_path, clips_dir, i)
+
+                # Update scene context for next clip's consistency
+                context_mgr.update_after_scene(i, scene, transition)
 
                 # Persist progress
                 if progress_manager:
@@ -517,6 +569,7 @@ class VeoProvider(BaseVideoProvider):
                     negative=negative, narrative_phase=narrative_phase,
                     clips_dir=clips_dir, scene_num_str=scene_num_str,
                     progress_manager=progress_manager,
+                    incoming_transition=incoming_transition,
                 )
                 if result.get("clip"):
                     clips.append(result["clip"])
@@ -671,6 +724,8 @@ class VeoProvider(BaseVideoProvider):
 
     def _save_last_frame(self, video_path: str, clips_dir: str, scene_index: int):
         """Save the last frame of a clip as PNG for resume safety."""
+        frames_dir = os.path.join(os.path.dirname(clips_dir), "frames")
+        os.makedirs(frames_dir, exist_ok=True)
         try:
             cap = cv2.VideoCapture(video_path)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -681,9 +736,9 @@ class VeoProvider(BaseVideoProvider):
             ret, frame = cap.read()
             cap.release()
             if ret:
-                frame_path = os.path.join(clips_dir, f"last_frame_{scene_index + 1:02d}.png")
+                frame_path = os.path.join(frames_dir, f"last_frame_{scene_index + 1:02d}.png")
                 cv2.imwrite(frame_path, frame)
-                print(f"[VEO]    📷 Último frame guardado: {os.path.basename(frame_path)}")
+                print(f"[VEO]    📷 Último frame guardado en frames/: {os.path.basename(frame_path)}")
         except Exception as e:
             print(f"[VEO] ⚠️  No se pudo guardar último frame: {e}")
 
@@ -712,6 +767,55 @@ class VeoProvider(BaseVideoProvider):
                     print(f"[VEO] ⚠️  No se pudo cargar ref image {path}: {e}")
         return ref_images
 
+    def _generate_anchor_image(self, episode_dir: str, script: dict, scenes: list) -> Optional[str]:
+        """
+        Phase 4: Generate an episode-specific reference image (Anchor Image) using Imagen 3.
+        This provides Veo with a character reference that already matches the episode's
+        environment and lighting, maximizing consistency.
+        """
+        anchor_path = os.path.join(episode_dir, "anchor_image.png")
+        if os.path.exists(anchor_path):
+            print(f"[VEO]    📸 Usando Anchor Image existente: {anchor_path}")
+            return anchor_path
+            
+        print(f"[VEO]    🎨 Generando Anchor Image del episodio con Imagen 3...")
+        
+        # Build prompt from config and script
+        art_style = self.config.get("consistency", {}).get("art_style", "3D style")
+        char_desc = ""
+        for char in self.config.get("characters", []):
+            if char.get("role") == "protagonist":
+                char_desc = char.get("visual_description", "")
+                break
+                
+        # Extract environment from first scene
+        first_scene = scenes[0].get("visual_prompt", "") if scenes else ""
+        
+        prompt = f"{art_style}. Character: {char_desc}. Environment: {first_scene}. Ensure the character is clearly visible, full body or medium shot, well-lit."
+        
+        try:
+            result = self.client.models.generate_images(
+                model=IMAGEN_MODEL,
+                prompt=prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    output_mime_type="image/png",
+                    aspect_ratio="16:9"
+                )
+            )
+            
+            if result.generated_images:
+                img_bytes = result.generated_images[0].image.image_bytes
+                with open(anchor_path, "wb") as f:
+                    f.write(img_bytes)
+                print(f"[VEO]    ✅ Anchor Image generada y guardada en {anchor_path}")
+                return anchor_path
+                
+        except Exception as e:
+            print(f"[VEO] ⚠️ Error generando Anchor Image: {e}")
+            
+        return None
+
     def _get_character_reference_images(self) -> List[str]:
         """Get reference image paths from pod config characters."""
         ref_images = []
@@ -724,10 +828,54 @@ class VeoProvider(BaseVideoProvider):
                     ref_images.append(full_path)
         return ref_images
 
-    def _build_cinematographic_prompt(self, scene: dict, narrative_phase: str = "") -> str:
+    @staticmethod
+    def _sanitize_visual_prompt(visual_prompt: str) -> str:
+        """
+        Strip dialogue text that Gemini sometimes embeds inside visual_prompt.
+        
+        Patterns removed:
+          - 'The squirrel says "¡Hola, exploradores!"'
+          - 'The character says "text"'
+          - Any 'X says "..."' pattern with quoted Spanish/English text
+          
+        This does NOT affect the audio_text injection (line ~793) which feeds
+        Veo's native lip-sync. Only cleans contamination from script generation.
+        """
+        if not visual_prompt:
+            return visual_prompt
+        
+        # Remove patterns like: The squirrel says "..." or The character says "..."
+        # Handles escaped quotes and Spanish characters
+        cleaned = re.sub(
+            r'The \w+ says\s*"[^"]*"\s*\.?\s*',
+            '',
+            visual_prompt,
+            flags=re.IGNORECASE,
+        )
+        
+        # Also handle escaped quote variants from JSON
+        cleaned = re.sub(
+            r'The \w+ says\s*\\"[^"]*\\"\s*\.?\s*',
+            '',
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+
+        # Clean up any double spaces or trailing dots left behind
+        cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
+        cleaned = re.sub(r'\.\s*\.', '.', cleaned)
+        
+        return cleaned
+
+    def _build_cinematographic_prompt(
+        self, scene: dict, narrative_phase: str = "",
+        incoming_transition: str = "cut", continuity_context: str = None,
+    ) -> str:
         """
         Build a detailed cinematographic prompt from scene metadata.
         Combines visual_prompt with camera, mood, lighting, and audio info.
+        Injects defensive guards based on the incoming transition type.
+        Optionally injects continuity context from SceneContextManager.
         """
         parts = []
 
@@ -752,9 +900,14 @@ class VeoProvider(BaseVideoProvider):
         if lighting:
             parts.append(f"{lighting} lighting")
 
-        # Main visual prompt
+        # Main visual prompt — sanitize dialogue contamination before using
         visual_prompt = scene.get("visual_prompt", "")
+        visual_prompt = self._sanitize_visual_prompt(visual_prompt)
         parts.append(visual_prompt)
+
+        # Continuity context from SceneContextManager (Phase 3)
+        if continuity_context:
+            parts.append(continuity_context)
 
         # Audio/dialogue with voice direction
         character_name = scene.get("character", "")
@@ -780,10 +933,37 @@ class VeoProvider(BaseVideoProvider):
 
             parts.append(f'{display_name} ({final_voice_modifier}) says: "{audio_text}"')
 
+            # Anti-gibberish guard: prevent Veo from generating mumbling/creepy sounds
+            # after the spoken line ends. The clip may be longer than the speech.
+            parts.append("After the character finishes speaking, only natural ambient sounds "
+                         "(wind, birds, rustling leaves, water). Absolutely no mumbling, "
+                         "no babbling, no additional vocalizations after the dialogue line ends")
+
         # Art style from config
         art_style = self.config.get("consistency", {}).get("art_style", "")
         if art_style:
             parts.append(art_style)
+
+        # --- Defensive guards based on incoming transition ---
+        if incoming_transition == "continue":
+            # This scene will be generated via jump_to_scene (image-to-video from last frame).
+            # Veo tends to "morph" from the seed frame to the new prompt if they differ.
+            # We inject a strong continuity instruction to prevent this.
+            parts.append("This shot is a smooth, uninterrupted continuation of the previous shot. "
+                         "Maintain the exact same character position, props, background, lighting, "
+                         "and camera angle. Do not introduce any new objects or change the scene. "
+                         "The action flows seamlessly as if this is one continuous take")
+        elif incoming_transition == "cut":
+            # 'cut' = same location, different camera angle. Last frame used as seed.
+            # We tell Veo to keep the environment but allow camera/action changes.
+            parts.append("This is a new camera angle within the same scene. "
+                         "Maintain the exact same location, environment, props, and lighting. "
+                         "The character's appearance, clothing, and accessories must remain identical. "
+                         "Only the camera angle, framing, or character action changes")
+
+        # Anatomy stabilization — always appended
+        parts.append("Character anatomy must remain stable and consistent throughout the entire clip. "
+                     "Hands, fingers and limbs must not deform, multiply or teleport")
 
         # Anti-subtitle/anti-text guard — always appended
         parts.append("Absolutely no text, no subtitles, no letters, no watermarks, no written words on screen")
@@ -794,21 +974,59 @@ class VeoProvider(BaseVideoProvider):
         """
         Concatenate multiple video clips into one final video.
         Uses ffmpeg via subprocess for reliability.
+        Includes a normalization step to ensure all clips have identical audio streams (AAC 44.1kHz).
         """
         try:
+            print("[VEO] 🔄 Normalizando pistas de audio (inyectando silencio si es necesario) para concatenar...")
+            normalized_paths = []
+            
+            for i, clip in enumerate(clips):
+                if use_dubbed and getattr(clip, 'dubbed_path', None) and os.path.exists(clip.dubbed_path):
+                    p = clip.dubbed_path
+                else:
+                    p = clip.file_path
+                    
+                norm_path = os.path.join(self.assets_dir, f"_norm_{i}_{int(time.time())}.mp4")
+                
+                # Validar si el clip tiene pista de audio
+                from src.utils.audio_mixer import AudioMixer
+                has_audio = AudioMixer._probe_has_audio(p)
+                
+                if has_audio:
+                    # Re-codificamos el audio a aac y copiamos video para estandarizar
+                    cmd = [
+                        "ffmpeg", "-y", "-i", p,
+                        "-c:v", "copy", "-c:a", "aac", "-ac", "2", "-ar", "44100",
+                        norm_path
+                    ]
+                else:
+                    # El clip no tiene audio, inyectamos una pista de silencio AAC
+                    cmd = [
+                        "ffmpeg", "-y",
+                        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                        "-i", p,
+                        "-map", "1:v", "-map", "0:a",
+                        "-c:v", "copy", "-c:a", "aac", "-shortest",
+                        norm_path
+                    ]
+                
+                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                
+                if os.path.exists(norm_path):
+                    normalized_paths.append(norm_path)
+                else:
+                    normalized_paths.append(p) # fallback
+            
             # Create concat file list for ffmpeg
             concat_list_path = os.path.join(self.assets_dir, "_concat_list.txt")
             with open(concat_list_path, "w") as f:
-                for clip in clips:
-                    # ffmpeg requires forward slashes or escaped backslashes
-                    if use_dubbed and getattr(clip, 'dubbed_path', None) and os.path.exists(clip.dubbed_path):
-                        p = clip.dubbed_path
-                    else:
-                        p = clip.file_path
-                    safe_path = p.replace("\\", "/")
+                for p in normalized_paths:
+                    abs_path = os.path.abspath(p)
+                    safe_path = abs_path.replace("\\", "/")
                     f.write(f"file '{safe_path}'\n")
 
             # Run ffmpeg concat
+            print("[VEO] 🔄 Pegando todos los clips normalizados...")
             result = subprocess.run(
                 [
                     "ffmpeg", "-y",
@@ -822,13 +1040,20 @@ class VeoProvider(BaseVideoProvider):
                 text=True,
             )
 
+            # Cleanup temp normalization files
+            for p in normalized_paths:
+                if "_norm_" in p and os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except:
+                        pass
+            if os.path.exists(concat_list_path):
+                os.remove(concat_list_path)
+
             if result.returncode != 0:
-                print(f"[VEO] ⚠️  ffmpeg error: {result.stderr[:200]}")
-                # Fallback: return first clip
+                print(f"[VEO] ⚠️  ffmpeg error al concatenar:\n{result.stderr[-500:]}")
                 return clips[0].file_path
 
-            # Cleanup temp file
-            os.remove(concat_list_path)
             return output_path
 
         except FileNotFoundError:

@@ -12,25 +12,31 @@ python -m src.main --pod kids_story --topic "Tico aprende sobre la paciencia"
 
 ## Arquitectura
 
-```
-cli.py → PipelineOrchestrator (orquestador)
+```text
+cli.py (Menú interactivo / Comandos)
   │
-  ├── TopicEngine → Gemini genera temas
-  ├── ScriptEngine → Gemini genera guion cinematográfico
-  ├── ProgressManager → Persistencia de estado (resume)
-  ├── EpisodeManager → Organización de episodios
-  └── VideoEngine (router)
+  ├── Herramientas CLI (VideoEditor, VideoAnalyzer, VoiceManager, ManualDubber)
+  │
+  └── PipelineOrchestrator (Orquestador central)
         │
-        ├── VeoProvider → Google Veo 3.1 API (producción, cloud)
-        │     ├── Scene Builder: generate → jump_to
-        │     └── Dubbing: Veo audio → ElevenLabs STS → voz de personaje
+        ├── TopicEngine → Gemini genera temas
+        ├── ScriptEngine → Gemini genera guion cinematográfico
+        ├── ReviewerEngine → IA "Director" que audita y mejora el guion (QC)
+        ├── ProgressManager → Persistencia de estado (resume)
+        ├── EpisodeManager → Organización de archivos y carpetas
         │
-        ├── LtxProvider → LTX-2 via ComfyUI (local, GPU)
-        │     └── Genera con audio nativo (Gemma 3)
+        ├── VideoEngine (router)
+        │     │
+        │     ├── VeoProvider → Google Veo 3.1 API (producción, cloud)
+        │     │     ├── Scene Builder: generate (para cortes) o jump_to (para continuaciones)
+        │     │     └── Dubbing: Veo audio nativo → ElevenLabs STS → voz de personaje
+        │     │
+        │     ├── LtxProvider → LTX-2 via ComfyUI (local, GPU)
+        │     │
+        │     ├── LyriaProvider → Música ambiental (ElevenLabs Sound Gen)
+        │     └── AudioMixer → FFmpeg: mezcla, extracción, time-stretch
         │
-        ├── ElevenLabsProvider → Doblaje (STS + TTS fallback)
-        ├── LyriaProvider → Música ambiental (ElevenLabs Sound Gen)
-        └── AudioMixer → FFmpeg: mezcla, extracción, time-stretch
+        └── YoutubeMetadataGenerator → Gemini genera título SEO y descripción
 
   ApiKeyManager → Rotación automática de API keys (failover 429)
 ```
@@ -106,6 +112,16 @@ ELEVENLABS_API_KEY=tu_clave_de_elevenlabs_aqui
 ```
 *(Si no tienes clave, consigue una gratis en [Google AI Studio](https://aistudio.google.com/apikey) y [ElevenLabs](https://elevenlabs.io)).*
 
+### Paso 6: Configurar subida a YouTube (Opcional)
+Si quieres que el menú interactivo pueda subir los vídeos directamente a tu canal de YouTube (Opción 12), necesitas unas credenciales de autorización especiales para ese Pod:
+1. Ve a [Google Cloud Console](https://console.cloud.google.com/).
+2. En el menú superior izquierdo (las tres rayitas), ve a **"APIs y servicios"** > **"Biblioteca"**, busca "YouTube Data API v3" y actívala.
+3. Ve a **"Pantalla de consentimiento de OAuth"** (en "Público" o en el menú de la izquierda). Asegúrate de que el estado es **"Prueba"** y añade tu correo de YouTube en **"Usuarios de prueba"**.
+4. Ve a **"Credenciales"** > **"Crear Credenciales"** > **"ID de cliente de OAuth"**.
+5. Elige "App de escritorio" en el desplegable y dale a crear.
+6. **Descarga el archivo JSON**, renómbralo exactamente a `client_secret.json` y guárdalo dentro de la carpeta de tu Pod (ej: `pods/kids_story/client_secret.json`).
+7. La próxima vez que uses la Opción 12, se abrirá el navegador para que autorices a la aplicación. El token seguro se guardará localmente y no se subirá a GitHub.
+
 ## Configuración
 
 ### `.env` — Secretos (crear si no existe)
@@ -178,6 +194,8 @@ El menú interactivo incluye:
 7. 🎯 Crear vídeo de un tema específico
 8. 🎙️ Doblaje Manual (Aplicar STS a un vídeo nativo)
 9. 🗣️ Gestor de Voces (Cambiar voces con ElevenLabs + Gemini)
+10. 🕵️ Analizador de Vídeo (Debug visual con Gemini Pro)
+11. ✂️ Editor de Vídeos (Unir clips a medida)
 
 ### Retomar un episodio fallido o rate-limited
 
@@ -258,8 +276,12 @@ AI-videoCreator/
 │               ├── script.json
 │               ├── progress.json
 │               ├── metadata.json
-│               ├── clips/        # Clips individuales
-│               └── final.mp4     # Vídeo concatenado
+│               ├── youtube_metadata.json # Título y descripción SEO para YT
+│               ├── clips/        # Clips individuales de vídeo (.mp4)
+│               ├── frames/       # Fotogramas clave para transiciones continuas
+│               ├── audio/        # Pistas de doblaje
+│               ├── ep_XXX_...mp4             # Vídeo concatenado nativo
+│               └── ep_XXX_..._dubbed.mp4     # Vídeo concatenado doblado
 └── README.md
 ```
 
@@ -331,13 +353,21 @@ Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
 - [x] Música ambiental automática (ElevenLabs Sound Generation)
 - [x] Rotación automática de API keys (failover 429)
 - [x] Sistema de resume/progreso (nunca se pierde un clip)
-- [x] Menú interactivo completo (9 opciones)
+- [x] Menú interactivo completo (11 opciones)
 - [x] Doblaje manual post-generación
 - [x] Gestor de voces interactivo
+- [x] Analizador visual de consistencia (Gemini Pro)
+- [x] Editor de vídeos CLI (unión de clips personalizada)
+- [x] Generación de metadatos SEO para YouTube
+- [x] Publicación manual a YouTube con OAuth 2.0 (Opción 12)
+- [ ] Generación automática de miniaturas para YouTube (Thumbnails)
+- [ ] Exportación en formato vertical (9:16) con auto-cropping para Shorts / TikTok
+- [ ] Doblaje multi-idioma automático para canales internacionales
+- [ ] Motor de Efectos de Sonido (SFX) para sincronizar ruidos de ambiente (pisadas, viento, etc.)
+- [ ] Interfaz web (Dashboard local) para gestionar los Pods y la Memoria de Personajes más fácilmente
+- [ ] Integración con Google Opal
 - [ ] Automatización con n8n (local/cloud)
-- [ ] Google Opal integration
 - [ ] Modelos de vídeo adicionales (providers)
 - [ ] LoRA para character consistency local
-- [ ] Publicación automática a YouTube
-- [ ] Migración de `print()` a `logging` (para automatización)
+- [ ] Migración de `print()` a `logging` (para automatización y servidores)
 - [ ] Tests unitarios

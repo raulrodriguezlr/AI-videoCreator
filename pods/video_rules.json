@@ -1,67 +1,109 @@
 {
-  "version": "2.0",
-  "description": "Reglas universales de producción de vídeo con IA generativa. Se inyectan automáticamente en todos los pods.",
+  "version": "2.2",
+  "description": "Universal video production rules for Generative AI. Injected automatically into all pods.",
   "rules": {
     "transitions": {
-      "description": "El director del guión (tú) decide libremente qué transición usar según el ritmo y la narrativa. Piensa como un espectador: ¿qué tendría sentido cinematográficamente? USA LOS TRES TIPOS, no solo uno.",
+      "description": "Choose the most appropriate transition based on pacing and narrative. Use all three types.",
       "types": {
-        "continue": "Continuación fluida. Misma cámara, mismo ángulo, la acción sigue exactamente donde se dejó. Es como una toma larga que continúa. El motor de vídeo usará el último frame como semilla visual para mantener continuidad perfecta.",
-        "cut": "Corte pequeño. Cambio de ángulo o plano DENTRO del mismo escenario. El diálogo o la acción puede continuar donde se cortó, pero desde otro punto de vista (ej: de plano medio a primer plano, o de frente a perfil). Mantiene la coherencia espacial y temporal.",
-        "scene_change": "Corte grande. Cambio total de escenario, localización o acción. Se inicia una situación completamente nueva. El motor de vídeo generará la toma desde cero usando las imágenes de referencia de los personajes para mantener su apariencia visual consistente."
+        "continue": "Fluid static continuation. ONLY use to prolong static dialogue or a slow pan over an empty landscape. The visual_prompt MUST be exactly the same as the previous clip. If there is physical movement, pose change, or new objects, use 'cut'.",
+        "cut": "Small cut. Change of angle/shot within the same scene. Action/dialogue continues but from another viewpoint. Main transition to be used.",
+        "scene_change": "Large cut. Complete change of location or action. A completely new situation begins."
       },
       "when_to_use": {
         "continue": [
-          "El personaje está hablando una frase larga que necesita más de un clip para terminar. El diálogo se parte entre los clips con 'continue'.",
-          "El personaje camina por un camino y queremos que la toma siga fluyendo sin interrupciones.",
-          "Estamos en un momento emocional que necesita respirar más de 8 segundos (ej: reacción, contemplación).",
-          "Cualquier acción continua que se beneficia de no tener corte: una persecución, un baile, una exploración."
+          "Character is COMPLETELY STILL speaking a long phrase.",
+          "Slow pan over an empty landscape."
         ],
         "cut": [
-          "Queremos dar dinamismo cambiando el ángulo (ej: de frente a perfil, de plano medio a close-up).",
-          "El personaje sigue hablando o la acción sigue pero queremos variar el plano para no aburrir.",
-          "Reacción de otro personaje u objeto en la misma escena.",
-          "Cambio de enfoque dentro del mismo espacio (ej: del personaje al objeto que está mirando)."
+          "Any physical movement (walking, running, grabbing).",
+          "Changing angle or shot type (e.g. medium to close-up).",
+          "Character interacts with an object.",
+          "Noticeable pose change."
         ],
         "scene_change": [
-          "Cambio de localización (ej: del bosque a una cueva, de día a noche).",
-          "Salto temporal (ej: 'Al día siguiente...', 'Más tarde...').",
-          "Aparición de un nuevo escenario, estructura o personaje que no estaba en la toma anterior.",
-          "Inicio de una nueva fase narrativa."
+          "Location change (e.g. forest to cave).",
+          "Time skip.",
+          "New character or structure appears."
         ]
       },
-      "forbidden": ["extend"],
-      "golden_rule": "Nunca metas un cambio brusco de escenario, aparición repentina de un nuevo personaje/estructura, o giro dramático DENTRO de un solo clip. Si la trama necesita algo nuevo en pantalla, DIVIDE la acción en 2+ clips con un 'cut' o 'scene_change' entre ellos y cambia el ángulo de cámara. Ejemplo CORRECTO: Clip A = Tico caminando con cara de sorpresa (transition: cut) → Clip B = plano medio de Tico de espaldas viendo la cueva con la sombra. Ejemplo INCORRECTO: un solo clip donde Tico camina y de repente del suelo emerge una cueva."
+      "forbidden": [
+        "extend"
+      ],
+      "golden_rule": "NEVER ask a character to perform more than ONE main physical action per clip/scene. Divide actions using 'cut'. NEVER introduce a sudden scene change or new character WITHIN a single clip.",
+      "anti_morphing_rule": "NEVER use 'continue' for moving actions. 'continue' will cause severe morphing if used during a pose change or camera angle change. When in doubt, ALWAYS use 'cut'."
     },
     "lip_sync": {
-      "description": "Reglas CRÍTICAS para sincronización de labios. Veo 3.1 genera lip sync PERFECTO si le das el diálogo entrecomillado en el visual_prompt.",
+      "description": "Rules for when a character speaks.",
       "rules": [
-        "Si el personaje HABLA, INCLUIR una versión corta (4-10 palabras) del diálogo entre comillas dobles dentro del visual_prompt. Ejemplo: '...the squirrel says \"¡Mirad amigos, qué tengo aquí!\"...' Esto permite al motor de vídeo animar los labios exactamente para esas palabras.",
-        "Cuando el personaje habla, la cámara DEBE ser 'close-up' o 'medium' mostrando su cara. Si la cámara es 'wide' o el personaje está de espaldas, el motor no podrá animar los labios.",
-        "El personaje NO debe hablar en off (voz sin verse su cara) a menos que narrativamente tenga sentido (ej: narración contemplativa sobre un paisaje).",
-        "Las frases entrecomilladas en el visual_prompt DEBEN ser en el MISMO IDIOMA que el audio_text."
+        "ABSOLUTELY FORBIDDEN: Do NOT write 'The squirrel says ...', 'The character says ...' or ANY 'X says \"...\"' pattern inside visual_prompt. This is the MOST IMPORTANT RULE.",
+        "The visual_prompt must contain ONLY physical descriptions: actions, environment, expressions, poses. ZERO dialogue text.",
+        "All spoken dialogue goes EXCLUSIVELY in the audio_text field.",
+        "When a character speaks, prefer 'close-up' or 'medium' shots to show their face.",
+        "No speaking off-camera unless narratively justified."
       ]
     },
     "visual_continuity": {
-      "description": "Reglas para mantener coherencia visual entre clips.",
+      "description": "Rules to maintain visual coherence.",
       "rules": [
-        "Describir SIEMPRE la apariencia física completa del personaje en cada visual_prompt (no solo su nombre). Incluir ropa, colores, accesorios, textura.",
-        "ABSOLUTAMENTE PROHIBIDO incluir texto, subtítulos, letras, marcas de agua, elementos de UI, carteles, letreros o cualquier contenido escrito en el visual_prompt. Añadir siempre al final del visual_prompt: 'absolutely no text, no subtitles, no letters, no watermarks, no written words'.",
-        "El visual_prompt debe estar en INGLÉS y ser una descripción cinematográfica detallada de exactamente lo que se ve en pantalla.",
-        "Incluir siempre el estilo artístico (ej: '3D Disney Pixar style') al principio del visual_prompt."
+        "ALWAYS describe the full physical appearance of characters in every visual_prompt (clothing, colors, accessories).",
+        "ABSOLUTELY PROHIBITED to include text, subtitles, watermarks, or any written content in the visual_prompt. Always append: 'absolutely no text, no subtitles, no letters, no watermarks, no written words'.",
+        "The visual_prompt MUST be in ENGLISH.",
+        "Always prefix the visual_prompt with the art style (e.g., '3D Disney Pixar style').",
+        "DO NOT use contradictory visual concepts for an object (e.g., 'crystal acorn'). Use one clear visual identity."
+      ]
+    },
+    "prop_continuity": {
+      "description": "CRITICAL rules to prevent object morphing and disappearance.",
+      "rules": [
+        "If a character holds an object in consecutive clips, explicitly describe it in BOTH visual_prompts using the EXACT SAME WORDS.",
+        "If an object must disappear, dedicate a short clip showing the character dropping it.",
+        "Objects cannot magically appear. Show the character grabbing it using a 'cut'.",
+        "Use consistent naming for props across all prompts (e.g., always 'small green fabric backpack')."
+      ]
+    },
+    "anatomy_guard": {
+      "description": "Defensive rules against anatomical AI errors.",
+      "rules": [
+        "Avoid complex finger or hand gestures (pointing, counting). Prefer broad actions (open arms, hand on hip).",
+        "During gestures, use medium or wide shots. Close-ups of hands cause artifacts.",
+        "Do not hold more than one object at a time.",
+        "For fluid interactions (water, mud), use wide or medium shots."
       ]
     },
     "pacing": {
-      "description": "Guía de duración por tipo de escena. El director elige libremente dentro de estos rangos.",
+      "description": "Scene duration guidelines.",
       "guidelines": {
-        "4-5 seconds": "Cambios de plano rápidos, reacciones, transiciones visuales.",
-        "6-7 seconds": "Diálogos cortos, acciones simples, momentos de exploración.",
-        "8 seconds": "Escenas de establecimiento, clímax emocional, momentos importantes que necesitan respirar."
-      }
+        "4-5 seconds": "Fast cuts, reactions, visual transitions.",
+        "6-7 seconds": "Short dialogue, simple action, exploration.",
+        "8 seconds": "Establishing scenes, emotional climax, important moments."
+      },
+      "tip": "Clips can have natural silence or ambient sounds. But if a clip is mostly action with very little speech (under 20 characters), consider using 4 seconds to keep the pacing tight."
     },
     "camera": {
-      "shot_types": ["wide", "medium", "close-up", "extreme_close_up", "aerial", "over_the_shoulder"],
-      "movements": ["static", "pan_left", "pan_right", "tracking", "dolly_in", "dolly_out", "crane_up"],
-      "angles": ["eye_level", "low_angle", "high_angle", "bird_eye", "dutch_angle"]
+      "shot_types": [
+        "wide",
+        "medium",
+        "close-up",
+        "extreme_close_up",
+        "aerial",
+        "over_the_shoulder"
+      ],
+      "movements": [
+        "static",
+        "pan_left",
+        "pan_right",
+        "tracking",
+        "dolly_in",
+        "dolly_out",
+        "crane_up"
+      ],
+      "angles": [
+        "eye_level",
+        "low_angle",
+        "high_angle",
+        "bird_eye",
+        "dutch_angle"
+      ]
     }
   }
 }

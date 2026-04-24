@@ -105,9 +105,7 @@ ELEVENLABS_DEFAULT_USE_SPEAKER_BOOST = True
 ELEVENLABS_DEFAULT_SPEED = 1.15
 
 # ==========================
-# LLM — Gemini (Script + Topic Generation)
+# LLM — Gemini (Script + Topic Generation + Images)
 # ==========================
 GEMINI_MODEL_NAME = "gemini-3.1-pro-preview"
-#"gemini-3-pro-preview"
-
-
+IMAGEN_MODEL = "imagen-3.0-generate-002"
