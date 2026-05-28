@@ -1,0 +1,130 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "videocreator"
+version = "3.0.0a0"
+description = "AI Video Creator - backend (Clean Architecture, local-first, cloud-ready)"
+readme = "../README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Raul Rodriguez" }]
+
+dependencies = [
+    # web framework
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    # cli
+    "typer>=0.12.0",
+    # async db
+    "sqlalchemy[asyncio]>=2.0.30",
+    "aiosqlite>=0.20.0",
+    "alembic>=1.13.0",
+    # http + utils
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.0",
+    "structlog>=24.1.0",
+    "rich>=13.7.0",
+    "dependency-injector>=4.41.0",
+    # auth / crypto
+    "argon2-cffi>=23.1.0",
+    "cryptography>=42.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    # existing deps that still apply
+    "google-genai>=1.0.0",
+    "Pillow>=10.0.0",
+    "opencv-python-headless>=4.9.0",
+    "google-api-python-client>=2.0.0",
+    "google-auth-oauthlib>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+local = [
+    # local ML stack (CPU-only, no external services)
+    "faster-whisper>=1.0.0",
+    "faiss-cpu>=1.8.0",
+    "lightgbm>=4.3.0",
+    "sentence-transformers>=2.7.0",
+    "demucs>=4.0.0",
+    "soundfile>=0.13.0",
+    "librosa>=0.10.0",
+]
+server = [
+    # postgres + redis + s3 stack
+    "psycopg[binary,pool]>=3.1.18",
+    "redis>=5.0.0",
+    "arq>=0.26.0",
+    "boto3>=1.34.0",
+    "pgvector>=0.2.5",
+    "slowapi>=0.1.9",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "pytest-mock>=3.12.0",
+    "hypothesis>=6.100.0",
+    "respx>=0.21.0",
+    "freezegun>=1.4.0",
+    "polyfactory>=2.16.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "pre-commit>=3.7.0",
+]
+
+[project.scripts]
+videocreator = "videocreator.interfaces.cli.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/videocreator"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/videocreator" = "videocreator"
+
+# ---------------- Ruff ----------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "UP", "SIM", "RUF", "C90", "PL"]
+ignore = ["PLR0913"]  # too-many-arguments — common in use cases
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-statements = 40
+max-args = 8
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "PLR2004"]
+
+# ---------------- Mypy ----------------
+[tool.mypy]
+python_version = "3.10"
+strict = true
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_decorators = false  # FastAPI/Typer decorators
+
+[[tool.mypy.overrides]]
+module = ["google.*", "cv2.*", "demucs.*", "librosa.*", "soundfile.*", "faster_whisper.*", "faiss.*", "lightgbm.*"]
+ignore_missing_imports = true
+
+# ---------------- Pytest ----------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "live: makes real external API calls (skip by default)",
+    "integration: requires DB/Redis/MinIO",
+    "slow: slow tests",
+]

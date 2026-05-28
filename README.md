@@ -2,6 +2,8 @@
 
 Generador automático de vídeos usando IA. Crea vídeos con guión, narración y audio sincronizado de forma nativa.
 
+> **📐 Hoja de ruta v3.0**: Hay un plan de evolución mayor documentado en [PLAN_MAESTRO.md](PLAN_MAESTRO.md) — backend FastAPI + frontend React, wizards IA para crear pods y personajes, engine de Shorts/TikTok, SEO con learning por bandits contextuales, y nuevos providers (ElevenLabs Studio 3.0, Artlist multi-modelo con Kling 3.0 / Veo 2 / Luma / MiniMax). **El modo local sin Docker sigue siendo first-class** — un solo comando arranca todo con almacenamiento en disco.
+
 ## ¿Qué hace?
 
 Le das un tema → genera un guión → genera un vídeo con audio sincronizado. Todo automático.
@@ -234,6 +236,7 @@ AI-videoCreator/
 ├── .env                          # API keys (secretos)
 ├── requirements.txt              # Dependencias Python
 ├── BITACORA.md                   # Cuaderno de bitácora técnico
+├── PLAN_MAESTRO.md               # Plan de evolución v3.0 (arquitectura + features + QA)
 ├── src/
 │   ├── main.py                   # Punto de entrada
 │   ├── cli.py                    # CLI + Menú interactivo
@@ -357,6 +360,8 @@ Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
 
 ## Roadmap
 
+### v2.x — Estado actual (entregado)
+
 - [x] Sistema de doblaje automático (ElevenLabs STS + TTS fallback)
 - [x] Música ambiental automática (ElevenLabs Sound Generation)
 - [x] Rotación automática de API keys (failover 429)
@@ -368,14 +373,38 @@ Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
 - [x] Editor de vídeos CLI (unión de clips personalizada)
 - [x] Generación de metadatos SEO para YouTube
 - [x] Publicación manual a YouTube con OAuth 2.0 (Opción 12)
-- [ ] Generación automática de miniaturas para YouTube (Thumbnails)
-- [ ] Exportación en formato vertical (9:16) con auto-cropping para Shorts / TikTok
-- [ ] Doblaje multi-idioma automático para canales internacionales
-- [ ] Motor de Efectos de Sonido (SFX) para sincronizar ruidos de ambiente (pisadas, viento, etc.)
-- [ ] Interfaz web (Dashboard local) para gestionar los Pods y la Memoria de Personajes más fácilmente
-- [ ] Integración con Google Opal
-- [ ] Automatización con n8n (local/cloud)
-- [ ] Modelos de vídeo adicionales (providers)
-- [ ] LoRA para character consistency local
-- [ ] Migración de `print()` a `logging` (para automatización y servidores)
-- [ ] Tests unitarios
+
+### v3.0 — En planificación (detalle en [PLAN_MAESTRO.md](PLAN_MAESTRO.md))
+
+**Plataforma**
+- [ ] Backend FastAPI (REST + Swagger UI automático) sobre Clean Architecture / Hexagonal
+- [ ] Frontend React + TypeScript + Vite + shadcn/ui (modo dashboard)
+- [ ] **Modo local zero-docker**: un solo comando, SQLite + FAISS + storage en disco, sin Postgres/Redis/MinIO
+- [ ] Modo server con Docker Compose (Postgres + Redis + MinIO + nginx) — mismo código, distintos adaptadores
+- [ ] Cloud-ready (GCP/AWS) con Terraform skeleton, healthchecks, observabilidad (structlog + Prometheus + OTEL)
+
+**Nuevos providers de video**
+- [ ] `ElevenLabsStudioProvider` — ElevenLabs Studio 3.0 (text→video / image→video con voz+lipsync integrado)
+- [ ] `ArtlistProvider` — hub multi-modelo: **Kling 3.0**, Veo 2, Luma Dream Machine, MiniMax Hailuo, PixVerse — con `ArtlistModelSelector` que elige el motor óptimo por escena
+- [ ] `ProviderRouter` por `style_profile` + `provider_preferences` — multi-provider per-scene y A/B entre modelos
+
+**Generación y edición**
+- [ ] Engine de Shorts / TikTok (pipeline 8 stages: highlight → hook → beat segmentation → captions → b-roll → sound design → render vertical 9:16 → safe-zone)
+- [ ] `EditingTimeline` (NLE-lite componible) que serializa a JSON y rinde con un único comando FFmpeg
+- [ ] Generación automática de miniaturas para YouTube
+- [ ] Doblaje multi-idioma automático
+- [ ] Motor de Efectos de Sonido (SFX) sincronizados
+
+**Inteligencia y aprendizaje**
+- [ ] **AI Pod Wizard** (Gemini) — de una idea vaga a `config.json`+`prompts.json`+`universe_memory.json`+topics+characters en 8 pasos con structured outputs
+- [ ] **Character Wizard** con generación de imágenes de referencia (Imagen 3 / SDXL fallback) y verificación de consistencia (face/style embeddings)
+- [ ] Engine SEO: `HookScorer` + `RetentionCurvePredictor` + `TitleThumbnailOptimizer` + `TrendRadar`
+- [ ] **A/B con contextual bandits** (LinUCB / Thompson Sampling) — variantes del mismo Short compiten y el sistema aprende qué funciona (más barato y eficaz que RL puro)
+- [ ] MLOps lite: registry, shadow mode, kill-switch, budget caps
+
+**Calidad y operación**
+- [ ] Migración completa de `print()` a `structlog` JSON con correlation IDs
+- [ ] Pydantic v2 como source-of-truth de todos los JSON (`schema_version` + upcaster chain)
+- [ ] Suite de tests: unit + integration (testcontainers) + contract (schemathesis) + E2E (Playwright) + LLM-evals (LLM-as-judge)
+- [ ] CI/CD GitHub Actions con gates de calidad (ruff, mypy --strict, eslint, security scans)
+- [ ] CODEOWNERS con pools cruzados (architect / ml / data) — los PRs se supervisan entre roles

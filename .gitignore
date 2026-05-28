@@ -65,3 +65,15 @@ pods/*/output/
 # --- Agents ---
 pods/*/.agent.md
 pods/*/persona.md
+
+# --- v3.0 backend local-mode data ---
+var/
+backend/.venv/
+backend/var/
+*.sqlite
+*.sqlite3
+*.db
+
+# --- Claude Code workspace ---
+.claude/
+Claude.md
