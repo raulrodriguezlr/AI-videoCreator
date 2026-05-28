@@ -136,7 +136,7 @@ class EpisodeManager:
             clips_dir = os.path.join(self.output_dir, episode_id)
 
         for name in sorted(os.listdir(clips_dir)):
-            if name.endswith(".mp4") and name != "final.mp4":
+            if name.endswith(".mp4") and name != f"{episode_id}.mp4" and name != "final.mp4":
                 clip_path = os.path.join(clips_dir, name)
                 clips.append({
                     "name": name,
@@ -228,7 +228,7 @@ class EpisodeManager:
             ])
 
         # Check for final video
-        info["has_final"] = os.path.exists(os.path.join(ep_dir, "final.mp4"))
+        info["has_final"] = os.path.exists(os.path.join(ep_dir, f"{episode_id}.mp4")) or os.path.exists(os.path.join(ep_dir, "final.mp4"))
 
         # Derive status if not from progress
         if info["status"] == "unknown":

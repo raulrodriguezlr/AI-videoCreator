@@ -16,7 +16,7 @@ load_dotenv()
 # PIPELINE — Selección de provider
 # ==========================
 # 'veo' = Google Veo 3.1 API (producción, cloud, genera audio nativo)
-# 'ovi' = ComfyUI local (testing, dev, no gasta tokens)
+# 'ltx' = LTX-2 via ComfyUI local (GPU local, no gasta tokens, genera audio)
 VIDEO_PROVIDER = "veo"
 
 # ==========================
@@ -25,7 +25,6 @@ VIDEO_PROVIDER = "veo"
 # Modelos disponibles:
 #   "veo-3.1-generate-preview"        → Máxima calidad, más lento
 #   "veo-3.1-fast-generate-preview"   → Rápido, buena calidad
-#   "veo-2"                           → Anterior, sin audio nativo
 VEO_MODEL = "veo-3.1-generate-preview"
 
 # Resolución: "720p", "1080p", "4k"
@@ -37,8 +36,6 @@ VEO_ASPECT_RATIO = "16:9"
 # Duración por clip: 4, 6 u 8 segundos
 VEO_DURATION_SECONDS = 8
 
-# Generación de personas: "allow_all" | "allow_adult" | "dont_allow" puede que sea en minusculas
-VEO_PERSON_GENERATION = "allow_adult"
 
 # Polling: cada cuántos segundos comprobar si el vídeo está listo
 VEO_POLLING_INTERVAL = 10
@@ -47,22 +44,36 @@ VEO_POLLING_INTERVAL = 10
 VEO_TIMEOUT = 360
 
 # ==========================
-# OVI — Local Testing (ComfyUI)
+# LTX — LTX-2 via ComfyUI (Local GPU)
 # ==========================
-# URL del servidor ComfyUI local
-OVI_COMFYUI_URL = "http://127.0.0.1:8188"
+# ComfyUI API endpoint
+LTX_COMFYUI_URL = "http://127.0.0.1:8188"
 
-# Cuantización del modelo: "fp4" | "fp8" | "fp16"
-# fp4 → ~10-12GB VRAM (RTX 4070 Ti)
-# fp8 → ~20-24GB VRAM
-# fp16 → ~32GB+ VRAM
-OVI_QUANTIZATION = "fp4"
+# Model checkpoint (in ComfyUI/models/checkpoints/)
+LTX_CHECKPOINT = "ltx-2-19b-dev-fp4.safetensors"
 
-# Resolución para generación local (menor = menos VRAM)
-OVI_RESOLUTION = "512x512"
+# Distilled LoRA (in ComfyUI/models/loras/)
+LTX_LORA = "ltx-2-19b-distilled-lora-384.safetensors"
+LTX_LORA_STRENGTH = 0.6
+
+# Gemma 3 text encoder folder (in ComfyUI/models/text_encoders/)
+# The exact path is resolved at runtime from ComfyUI (OS-agnostic)
+LTX_TEXT_ENCODER = "gemma-3-12b-it-qat-q4_0-unquantized"
+
+# Resolution (must be divisible by 64 — 12GB VRAM safe)
+LTX_WIDTH = 768
+LTX_HEIGHT = 512
+
+# Video params
+LTX_FPS = 24
+
+# Sampling params
+LTX_STEPS = 25
+LTX_CFG = 7.0
+LTX_DENOISE = 1.0
 
 # Timeout de espera para ComfyUI (segundos)
-OVI_TIMEOUT = 300
+LTX_TIMEOUT = 600
 
 # ==========================
 # SCENE BUILDER — Lógica de construcción de vídeo
@@ -73,60 +84,28 @@ USE_REFERENCE_IMAGES = True
 # Máximo de extensiones por clip (Veo soporta hasta 20)
 SCENE_BUILDER_MAX_EXTENDS = 20
 
-# ==========================
-# SMART MODEL SELECTION — Modelo según importancia de escena
-# ==========================
-# Si True, cada escena usa un modelo diferente según narrative_phase.
-# Si False, todas usan VEO_MODEL (el de arriba).
-SMART_MODEL_SELECTION = True
-
-# narrative_phase → tier
-SCENE_TIER_MAP = {
-    # HERO → máxima calidad (escenas clave de la historia)
-    "climax": "hero",
-    "resolution": "hero",
-    "introduction": "hero",
-
-    # STANDARD → rápido pero buena calidad
-    "rising_action": "standard",
-    "falling_action": "standard",
-
-    # FILLER → modelo más económico
-    "transition": "filler",
-    "establishing": "filler",
-
-    # Backward compat (nombres legacy de prompts.json antiguos)
-    "development": "standard",
-    "conclusion": "hero",
-}
-
-# tier → modelo Veo
-TIER_MODEL_MAP = {
-    "hero": "veo-3.1-generate-preview",
-    "standard": "veo-3.1-generate-preview",
-    "filler": "veo-3.1-generate-preview",
-}
 
 # ==========================
-# AUDIO — ElevenLabs Sound Generation
+# AUDIO & VOZ — ElevenLabs
 # ==========================
-# Used for ambient background music generation (replaces Gemini TTS which only does speech)
+# Used for TTS (Text-to-Speech) and STS (Speech-to-Speech) dubbing, and ambient background music.
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 
+# Modelos
+ELEVENLABS_TTS_MODEL = "eleven_multilingual_v2"
+ELEVENLABS_STS_MODEL = "eleven_multilingual_sts_v2"
+ELEVENLABS_OUTPUT_FORMAT = "mp3_44100_128"
+
+# Voice Settings por defecto (si el character no los tiene en config.json)
+ELEVENLABS_DEFAULT_VOICE_ID = "pNInz6obbf5cNed9uQcd"  # Voice genérica (Pippa u otra)
+ELEVENLABS_DEFAULT_STABILITY = 0.5
+ELEVENLABS_DEFAULT_SIMILARITY_BOOST = 0.8  # STS se beneficia de valores >= 0.8
+ELEVENLABS_DEFAULT_STYLE = 0.3
+ELEVENLABS_DEFAULT_USE_SPEAKER_BOOST = True
+ELEVENLABS_DEFAULT_SPEED = 1.15
+
 # ==========================
-# LLM — Gemini (Script + Topic Generation)
+# LLM — Gemini (Script + Topic Generation + Images)
 # ==========================
 GEMINI_MODEL_NAME = "gemini-3.1-pro-preview"
-#"gemini-3-pro-preview"
-
-# ==========================
-# OUTPUT
-# ==========================
-VIDEO_FPS = 24
-
-# ==========================
-# AUTOMATION (futuro)
-# ==========================
-# 'none' | 'n8n_local' | 'opal'
-AUTOMATION_MODE = "none"
-N8N_URL = "http://localhost:5678"
+IMAGEN_MODEL = "imagen-3.0-generate-002"

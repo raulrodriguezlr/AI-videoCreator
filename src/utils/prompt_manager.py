@@ -109,6 +109,109 @@ class PromptManager:
         
         return self.prompts[section]["output_format"]
 
+    @staticmethod
+    def load_video_rules(pods_dir: str) -> str:
+        """
+        Load universal video production rules from pods/video_rules.json
+        and format them as a text block ready to inject into any prompt.
+
+        Args:
+            pods_dir: Path to the pods/ directory
+
+        Returns:
+            Formatted text block with all video rules
+        """
+        rules_path = os.path.join(pods_dir, "video_rules.json")
+        if not os.path.exists(rules_path):
+            print(f"[PromptManager] ⚠️  No se encontró video_rules.json en {pods_dir}")
+            return ""
+
+        with open(rules_path, "r", encoding="utf-8") as f:
+            rules_data = json.load(f)
+
+        rules = rules_data.get("rules", {})
+        sections = []
+
+        # --- Transitions ---
+        tr = rules.get("transitions", {})
+        if tr:
+            lines = ["## REGLAS DE TRANSICIONES ENTRE CLIPS (CRÍTICO)"]
+            lines.append(tr.get("description", ""))
+            for name, desc in tr.get("types", {}).items():
+                lines.append(f'- "{name}" → {desc}')
+            # When to use each transition
+            when = tr.get("when_to_use", {})
+            if when:
+                lines.append("\n### CUÁNDO USAR CADA TRANSICIÓN (EJEMPLOS)")
+                for name, examples in when.items():
+                    lines.append(f'Usa "{name}" cuando:')
+                    for ex in examples:
+                        lines.append(f"  • {ex}")
+            forbidden = tr.get("forbidden", [])
+            if forbidden:
+                lines.append(f"\nPROHIBIDO usar: {', '.join(forbidden)}")
+            golden = tr.get("golden_rule", "")
+            if golden:
+                lines.append(f"\n⚠️ REGLA DE ORO: {golden}")
+            anti_morph = tr.get("anti_morphing_rule", "")
+            if anti_morph:
+                lines.append(f"\n🚫 REGLA ANTI-MORPHING: {anti_morph}")
+            sections.append("\n".join(lines))
+
+        # --- Lip sync ---
+        ls = rules.get("lip_sync", {})
+        if ls:
+            lines = ["## REGLAS DE LIP-SYNC (MOVIMIENTO DE LABIOS)"]
+            for rule in ls.get("rules", []):
+                lines.append(f"- {rule}")
+            sections.append("\n".join(lines))
+
+        # --- Visual continuity ---
+        vc = rules.get("visual_continuity", {})
+        if vc:
+            lines = ["## CONTINUIDAD VISUAL"]
+            for rule in vc.get("rules", []):
+                lines.append(f"- {rule}")
+            sections.append("\n".join(lines))
+
+        # --- Prop continuity ---
+        pc_props = rules.get("prop_continuity", {})
+        if pc_props:
+            lines = ["## CONTINUIDAD DE OBJETOS (PROPS) — CRÍTICO"]
+            for rule in pc_props.get("rules", []):
+                lines.append(f"- {rule}")
+            sections.append("\n".join(lines))
+
+        # --- Anatomy guard ---
+        ag = rules.get("anatomy_guard", {})
+        if ag:
+            lines = ["## PROTECCIÓN ANATÓMICA (EVITAR GLITCHES DE MANOS/CUERPO)"]
+            for rule in ag.get("rules", []):
+                lines.append(f"- {rule}")
+            sections.append("\n".join(lines))
+
+        # --- Pacing ---
+        pc = rules.get("pacing", {})
+        if pc:
+            lines = ["## RITMO Y DURACIÓN POR ESCENA"]
+            for duration, desc in pc.get("guidelines", {}).items():
+                lines.append(f"- {duration}: {desc}")
+            sections.append("\n".join(lines))
+
+        # --- Camera ---
+        cam = rules.get("camera", {})
+        if cam:
+            lines = ["## OPCIONES DE CÁMARA DISPONIBLES"]
+            if "shot_types" in cam:
+                lines.append(f"shot_type: {' | '.join(cam['shot_types'])}")
+            if "movements" in cam:
+                lines.append(f"movement: {' | '.join(cam['movements'])}")
+            if "angles" in cam:
+                lines.append(f"angle: {' | '.join(cam['angles'])}")
+            sections.append("\n".join(lines))
+
+        return "\n\n".join(sections)
+
 
 # Example usage
 if __name__ == "__main__":

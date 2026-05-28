@@ -20,15 +20,17 @@ env/
 .env
 .env.local
 .env.production
+client_secret*.json
+youtube_token*.json
 
-# --- Generated Assets (regenerable) ---
-pods/*/assets/*.png
-pods/*/assets/*.mp3
-pods/*/assets/*.mp4
-pods/*/output/
+# # --- Generated Assets (regenerable) ---
+# pods/*/assets/*.png
+# pods/*/assets/*.mp3
+# pods/*/assets/*.mp4
+# pods/*/output/
 
 # --- Media files (generated, not source) ---
-*.mp4
+# *.mp4
 *.mp3
 *.wav
 
@@ -53,3 +55,13 @@ Desktop.ini
 # .agent
 # .gemini
 # model_capabilities.yaml
+
+# --- Generated Assets (regenerable) ---
+pods/*/assets/*.png
+pods/*/assets/*.mp3
+pods/*/assets/*.mp4
+pods/*/output/
+
+# --- Agents ---
+pods/*/.agent.md
+pods/*/persona.md

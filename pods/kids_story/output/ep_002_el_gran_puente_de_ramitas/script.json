@@ -1,0 +1,331 @@
+{
+  "title": "El Gran Puente de Ramitas",
+  "summary": "Tico la ardilla se encuentra con un arroyo que no puede cruzar. Con la ayuda de los espectadores, aprende a usar ramitas para construir un puente y alcanzar una bellota dorada.",
+  "moral": "Pensar con paciencia y usar la creatividad nos ayuda a superar cualquier obstáculo.",
+  "ambient_audio_prompt": "Cheerful upbeat acoustic guitar and soft magical forest chimes, friendly and adventurous",
+  "scenes": [
+    {
+      "scene_number": 1,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney Pixar style. Close-up of a friendly squirrel with bright orange fur, big expressive eyes, wearing a small green fabric adventurer's backpack. The squirrel raises its arms cheerfully at the camera with a bright, joyful smile. Magical forest setting with vibrant green leaves in the background. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Hola amigos! Soy Tico. ¡Bienvenidos al Bosque Mágico!",
+      "character": "Tico",
+      "voice_direction": "muy alegre y entusiasta",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 2,
+      "narrative_phase": "introduction",
+      "visual_prompt": "3D Disney Pixar style. Medium shot of the friendly squirrel with bright orange fur, big expressive eyes, wearing a small green fabric adventurer's backpack. The squirrel stands tall with hands on hips, looking very proud. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Hoy es mi primer día de aventuras y mi mochila verde está listísima.",
+      "character": "Tico",
+      "voice_direction": "orgulloso y enérgico",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 6,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 3,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. Wide shot over the shoulder of the friendly squirrel with bright orange fur and small green fabric adventurer's backpack. The squirrel looks across a sparkling blue stream. On a small patch of grass on the other side of the water rests a glowing golden acorn. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Mirad allí! Una súper bellota dorada... pero hay un arroyo muy grande en medio.",
+      "character": "Tico",
+      "voice_direction": "asombrado pero un poco preocupado al final",
+      "camera": {
+        "shot_type": "over_the_shoulder",
+        "movement": "pan_right",
+        "angle": "high_angle"
+      },
+      "mood": "exciting",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 4,
+      "narrative_phase": "establishing",
+      "visual_prompt": "3D Disney Pixar style. Close-up of the friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack. The squirrel tilts its head down at the flowing water with a thoughtful and slightly hesitant expression. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "El agua está muy fría y yo no sé nadar muy bien. ¿Cómo podré cruzar?",
+      "character": "Tico",
+      "voice_direction": "pensativo y dudoso",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "calm",
+      "lighting": "soft_diffused",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 5,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Medium shot. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, opens its eyes wide in surprise and looks excitedly at a large pile of long, straight wooden twigs scattered on the grass. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Un momento! Fijaos en todas estas ramitas caídas en el suelo.",
+      "character": "Tico",
+      "voice_direction": "emocionado, descubriendo algo",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "exciting",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 6,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Close-up. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, looks directly at the camera with a bright, questioning expression, tilting its head slightly to one side. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¿Qué creéis que puedo construir con estas ramitas para poder cruzar el arroyo? ¿Un barco o un puente?",
+      "character": "Tico",
+      "voice_direction": "animado, preguntando al público",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": true,
+      "pause_for_answer": 4
+    },
+    {
+      "scene_number": 7,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Medium shot. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, smiles brightly and carefully picks up a long wooden twig from the grass. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Exacto! ¡Un puente! Voy a colocar las ramitas con mucho cuidado.",
+      "character": "Tico",
+      "voice_direction": "alegre y decidido",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "triumphant",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 8,
+      "narrative_phase": "rising_action",
+      "visual_prompt": "3D Disney Pixar style. Wide shot. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, gently places a long wooden twig across the narrow sparkling blue stream, aligning it with other twigs. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Una por aquí... otra por allá... ¡tengo que asegurarme de que estén muy firmes!",
+      "character": "Tico",
+      "voice_direction": "concentrado, trabajando",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "pan_left",
+        "angle": "high_angle"
+      },
+      "mood": "calm",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 9,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Medium shot. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, stands at the edge of the stream. The squirrel cautiously steps onto the newly built flat twig bridge. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "El puente de ramitas está listo. ¡Allá voy, deseadme suerte!",
+      "character": "Tico",
+      "voice_direction": "valiente pero un poco nervioso",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_in",
+        "angle": "eye_level"
+      },
+      "mood": "tense",
+      "lighting": "soft_diffused",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 10,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Wide shot. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, balances perfectly in the middle of the twig bridge over the stream, holding its arms spread wide for balance. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "Uyyy... se mueve un poquito. Pero si voy despacito, seguro que no me caeré.",
+      "character": "Tico",
+      "voice_direction": "hablando despacio, concentrado",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "tracking",
+        "angle": "eye_level"
+      },
+      "mood": "tense",
+      "lighting": "bright_daylight",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 11,
+      "narrative_phase": "climax",
+      "visual_prompt": "3D Disney Pixar style. Medium shot. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, jumps happily onto the soft green grass on the other side of the stream, raising both arms high in victory. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Bieeeen! ¡Lo logré! He cruzado el arroyo sin mojarme ni un pelito.",
+      "character": "Tico",
+      "voice_direction": "muy feliz, celebrando",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "low_angle"
+      },
+      "mood": "triumphant",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 12,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Close-up. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, looks with huge sparkling eyes at a glowing golden acorn resting beautifully on a large green leaf. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Y mirad qué bellota tan brillante he conseguido! Ha merecido la pena el esfuerzo.",
+      "character": "Tico",
+      "voice_direction": "maravillado y suave",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "dolly_in",
+        "angle": "high_angle"
+      },
+      "mood": "warm",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 13,
+      "narrative_phase": "falling_action",
+      "visual_prompt": "3D Disney Pixar style. Medium shot. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, gently places the glowing golden acorn inside the open green backpack. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "La guardaré muy bien en mi mochila para compartirla luego con mis amigos.",
+      "character": "Tico",
+      "voice_direction": "cariñoso y amigable",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 7,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 14,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Close-up. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, turns to the camera with a warm, encouraging smile, nodding slightly. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¿Verdad que es mejor usar la cabeza y pensar en un plan en lugar de rendirse?",
+      "character": "Tico",
+      "voice_direction": "suave, didáctico",
+      "camera": {
+        "shot_type": "close-up",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "warm",
+      "lighting": "golden_hour",
+      "transition_to_next": "cut",
+      "duration_seconds": 8,
+      "is_interactive_question": true,
+      "pause_for_answer": 4
+    },
+    {
+      "scene_number": 15,
+      "narrative_phase": "resolution",
+      "visual_prompt": "3D Disney Pixar style. Medium shot. The friendly squirrel with bright orange fur, wearing the small green fabric adventurer's backpack, raises its arms joyfully at the camera while standing proudly next to the newly built twig bridge. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "¡Gracias por ayudarme a construir el puente! Nos vemos en la próxima aventura, amigos.",
+      "character": "Tico",
+      "voice_direction": "muy alegre y despidiéndose",
+      "camera": {
+        "shot_type": "medium",
+        "movement": "dolly_out",
+        "angle": "eye_level"
+      },
+      "mood": "joyful",
+      "lighting": "golden_hour",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 8,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 16,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Wide shot. A completely still, empty magical forest landscape showing the tranquil sparkling blue stream and the sturdy twig bridge, bathed in warm golden sunset light. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "",
+      "character": "Tico",
+      "voice_direction": "",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "calm",
+      "lighting": "golden_hour",
+      "transition_to_next": "continue",
+      "duration_seconds": 5,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    },
+    {
+      "scene_number": 17,
+      "narrative_phase": "transition",
+      "visual_prompt": "3D Disney Pixar style. Wide shot. A completely still, empty magical forest landscape showing the tranquil sparkling blue stream and the sturdy twig bridge, bathed in warm golden sunset light. absolutely no text, no subtitles, no letters, no watermarks, no written words.",
+      "audio_text": "",
+      "character": "Tico",
+      "voice_direction": "",
+      "camera": {
+        "shot_type": "wide",
+        "movement": "static",
+        "angle": "eye_level"
+      },
+      "mood": "calm",
+      "lighting": "golden_hour",
+      "transition_to_next": "scene_change",
+      "duration_seconds": 5,
+      "is_interactive_question": false,
+      "pause_for_answer": 0
+    }
+  ]
+}

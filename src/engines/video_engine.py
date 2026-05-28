@@ -72,6 +72,10 @@ class VideoEngine:
             progress_manager=progress_manager,
         )
 
+        # --- BACKGROUND AUDIO DISABLED ---
+        # El usuario ha reportado que la música de fondo (cancioncita de ~22s) no aporta y raya.
+        # Se ha deshabilitado la generación y mezcla de audio de fondo.
+        """
         # 2. Generate ambient background music using Lyria
         audio_prompt = script.get("ambient_audio_prompt", "").strip()
         
@@ -86,11 +90,11 @@ class VideoEngine:
             # 3. Mix audio and video together
             if generated_audio_path:
                 mixed_output = final_video_path.replace(".mp4", "_mixed.mp4")
-                mixed_video_path = AudioMixer.mix_audio_to_video(
+                mixed_video_path = AudioMixer.mix_background_audio(
                     video_path=final_video_path,
                     audio_path=generated_audio_path,
                     output_path=mixed_output,
-                    audio_volume=0.3  # Background volume level
+                    bg_volume=0.15  # Background volume level
                 )
                 
                 # Replace the original video output with the mixed one
@@ -100,7 +104,7 @@ class VideoEngine:
                         print(f"[VideoEngine] 🎵 Audio añadido al vídeo final exitosamente.")
                     except OSError as e:
                         print(f"[VideoEngine] ⚠️  No se pudo renombrar vídeo mezclado: {e}")
-
+        """
         return final_video_path
 
     def check_provider(self) -> bool:

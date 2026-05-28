@@ -1,4 +1,4 @@
-# AI-videoCreator v1.0 🎬
+# AI-videoCreator v2.0 🎬
 
 Generador automático de vídeos usando IA. Crea vídeos con guión, narración y audio sincronizado de forma nativa.
 
@@ -12,18 +12,33 @@ python -m src.main --pod kids_story --topic "Tico aprende sobre la paciencia"
 
 ## Arquitectura
 
-```
-main.py (orquestador)
+```text
+cli.py (Menú interactivo / Comandos)
   │
-  ├── TopicEngine → Gemini genera temas
-  ├── ScriptEngine → Gemini genera guion cinematográfico
-  └── VideoEngine (router)
+  ├── Herramientas CLI (VideoEditor, VideoAnalyzer, VoiceManager, ManualDubber)
+  │
+  └── PipelineOrchestrator (Orquestador central)
         │
-        ├── VeoProvider → Google Veo 3.1 API (producción)
-        │     └── Scene Builder: generate → extend → jump_to
+        ├── TopicEngine → Gemini genera temas
+        ├── ScriptEngine → Gemini genera guion cinematográfico
+        ├── ReviewerEngine → IA "Director" que audita y mejora el guion (QC)
+        ├── ProgressManager → Persistencia de estado (resume)
+        ├── EpisodeManager → Organización de archivos y carpetas
         │
-        └── OviProvider → ComfyUI local (testing)
-              └── GPU local, no gasta tokens
+        ├── VideoEngine (router)
+        │     │
+        │     ├── VeoProvider → Google Veo 3.1 API (producción, cloud)
+        │     │     ├── Scene Builder: generate (para cortes) o jump_to (para continuaciones)
+        │     │     └── Dubbing: Veo audio nativo → ElevenLabs STS → voz de personaje
+        │     │
+        │     ├── LtxProvider → LTX-2 via ComfyUI (local, GPU)
+        │     │
+        │     ├── LyriaProvider → Música ambiental (ElevenLabs Sound Gen)
+        │     └── AudioMixer → FFmpeg: mezcla, extracción, time-stretch
+        │
+        └── YoutubeMetadataGenerator → Gemini genera título SEO y descripción
+
+  ApiKeyManager → Rotación automática de API keys (failover 429)
 ```
 
 ## Requisitos
@@ -31,13 +46,13 @@ main.py (orquestador)
 - **Python 3.10+**
 - **Google AI Pro plan** (para Veo 3.1 API)
 - **API Key de Google AI Studio**: [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- **API Key de ElevenLabs**: Para la generación de la música ambiental (Sound Generation API).
+- **API Key de ElevenLabs**: Para la generación de voces de personajes y música ambiental.
+- **FFmpeg**: Sistema de procesamiento de audio/vídeo (necesario para el doblaje automático).
 
 ### Requisitos opcionales (testing local)
 
-- **ComfyUI** corriendo en `http://127.0.0.1:8188` (para OviProvider)
+- **ComfyUI** corriendo en `http://127.0.0.1:8188` (para LtxProvider)
 - **NVIDIA GPU 12GB+** (RTX 4070 Ti o similar)
-- **ffmpeg** instalado (para concatenar clips)
 
 ## Instalación paso a paso 
 
@@ -97,6 +112,16 @@ ELEVENLABS_API_KEY=tu_clave_de_elevenlabs_aqui
 ```
 *(Si no tienes clave, consigue una gratis en [Google AI Studio](https://aistudio.google.com/apikey) y [ElevenLabs](https://elevenlabs.io)).*
 
+### Paso 6: Configurar subida a YouTube (Opcional)
+Si quieres que el menú interactivo pueda subir los vídeos directamente a tu canal de YouTube (Opción 12), necesitas unas credenciales de autorización especiales para ese Pod:
+1. Ve a [Google Cloud Console](https://console.cloud.google.com/).
+2. En el menú superior izquierdo (las tres rayitas), ve a **"APIs y servicios"** > **"Biblioteca"**, busca "YouTube Data API v3" y actívala.
+3. Ve a **"Pantalla de consentimiento de OAuth"** (en "Público" o en el menú de la izquierda). Asegúrate de que el estado es **"Prueba"** y añade tu correo de YouTube en **"Usuarios de prueba"**.
+4. Ve a **"Credenciales"** > **"Crear Credenciales"** > **"ID de cliente de OAuth"**.
+5. Elige "App de escritorio" en el desplegable y dale a crear.
+6. **Descarga el archivo JSON**, renómbralo exactamente a `client_secret.json` y guárdalo dentro de la carpeta de tu Pod (ej: `pods/kids_story/client_secret.json`).
+7. La próxima vez que uses la Opción 12, se abrirá el navegador para que autorices a la aplicación. El token seguro se guardará localmente y no se subirá a GitHub.
+
 ## Configuración
 
 ### `.env` — Secretos (crear si no existe)
@@ -113,14 +138,18 @@ ELEVENLABS_API_KEY=tu_api_key_de_elevenlabs
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `VIDEO_PROVIDER` | `"veo"` | Provider de vídeo: `"veo"` (cloud) o `"ovi"` (local) |
+| `VIDEO_PROVIDER` | `"veo"` | Provider de vídeo: `"veo"` (cloud) o `"ltx"` (local) |
 | `VEO_MODEL` | `"veo-3.1-generate-preview"` | Modelo de Veo a usar |
 | `VEO_RESOLUTION` | `"720p"` | Resolución: `"720p"`, `"1080p"`, `"4k"` |
 | `VEO_ASPECT_RATIO` | `"16:9"` | Ratio: `"16:9"` o `"9:16"` |
 | `VEO_DURATION_SECONDS` | `8` | Segundos por clip: 4, 6 u 8 |
-| `GEMINI_MODEL_NAME` | `"gemini-2.5-flash-preview-05-20"` | Modelo Gemini para scripts |
-| `OVI_COMFYUI_URL` | `"http://127.0.0.1:8188"` | URL de ComfyUI local |
-| `OVI_QUANTIZATION` | `"fp4"` | Cuantización: `"fp4"`, `"fp8"`, `"fp16"` |
+| `VEO_POLLING_INTERVAL` | `10` | Segundos entre cada check de generación |
+| `VEO_TIMEOUT` | `360` | Timeout máximo de espera (6 min) |
+| `GEMINI_MODEL_NAME` | `"gemini-3.1-pro-preview"` | Modelo Gemini para scripts y temas |
+| `LTX_COMFYUI_URL` | `"http://127.0.0.1:8188"` | URL de ComfyUI local |
+| `LTX_CHECKPOINT` | `"ltx-2-19b-dev-fp4.safetensors"` | Checkpoint del modelo LTX-2 |
+| `LTX_WIDTH` / `LTX_HEIGHT` | `768` / `512` | Resolución local (divisible por 64) |
+| `USE_REFERENCE_IMAGES` | `True` | Usar imágenes de referencia para consistencia |
 
 ## Uso
 
@@ -149,11 +178,24 @@ python -m src.main --check-provider
 ```
 ### Lanzar el modo interactivo (Recomendado)
 
-El modo interactivo es un menú que te guía paso a paso para crear vídeos, generar temas, o retomar episodios pausados.
+El modo interactivo es un menú que te guía paso a paso para crear vídeos, generar temas, retomar episodios pausados, aplicar doblaje manual o gestionar voces.
 
 ```bash
 python -m src.main --pod kids_story --interactive
 ```
+
+El menú interactivo incluye:
+1. 📝 Ver temas disponibles
+2. 🆕 Generar nuevos temas con IA
+3. ▶️ Crear vídeo completo (Auto Topic)
+4. 🔄 Continuar episodio incompleto
+5. 📋 Ver episodios generados
+6. ❌ Borrar un tema
+7. 🎯 Crear vídeo de un tema específico
+8. 🎙️ Doblaje Manual (Aplicar STS a un vídeo nativo)
+9. 🗣️ Gestor de Voces (Cambiar voces con ElevenLabs + Gemini)
+10. 🕵️ Analizador de Vídeo (Debug visual con Gemini Pro)
+11. ✂️ Editor de Vídeos (Unir clips a medida)
 
 ### Retomar un episodio fallido o rate-limited
 
@@ -163,11 +205,24 @@ Si se agotan tus tokens de Veo 3.1 o quieres parar, el proceso guarda cada clip 
 python -m src.main --pod kids_story --resume last
 ```
 
-### Cambiar a testing local (Ovi)
+### Otros comandos CLI
+
+```bash
+# Listar temas generados
+python -m src.main --pod kids_story --list-topics
+
+# Listar episodios
+python -m src.main --pod kids_story --list-episodes
+
+# Borrar un tema por ID
+python -m src.main --pod kids_story --delete-topic topic_001
+```
+
+### Cambiar a testing local (LTX)
 
 En `src/variables.py`:
 ```python
-VIDEO_PROVIDER = "ovi"  # Cambia de "veo" a "ovi"
+VIDEO_PROVIDER = "ltx"  # Cambia de "veo" a "ltx"
 ```
 
 Asegúrate de que ComfyUI está corriendo en `http://127.0.0.1:8188`.
@@ -178,28 +233,61 @@ Asegúrate de que ComfyUI está corriendo en `http://127.0.0.1:8188`.
 AI-videoCreator/
 ├── .env                          # API keys (secretos)
 ├── requirements.txt              # Dependencias Python
+├── BITACORA.md                   # Cuaderno de bitácora técnico
 ├── src/
-│   ├── main.py                   # Orquestador principal
+│   ├── main.py                   # Punto de entrada
+│   ├── cli.py                    # CLI + Menú interactivo
 │   ├── variables.py              # TODA la configuración
 │   ├── engines/
+│   │   ├── pipeline_orchestrator.py  # Orquesta Script → Video → Memory
 │   │   ├── script_engine.py      # Gemini → Guión cinematográfico
 │   │   ├── topic_engine.py       # Gemini → Ideas de temas
 │   │   └── video_engine.py       # Router → delega al provider
 │   ├── providers/
 │   │   ├── __init__.py           # Factory (get_provider)
-│   │   ├── base_provider.py      # Clase abstracta
+│   │   ├── base_provider.py      # Clase abstracta (VideoClip, BaseVideoProvider)
 │   │   ├── veo_provider.py       # Google Veo 3.1 (producción)
-│   │   └── ovi_provider.py       # ComfyUI local (testing)
+│   │   ├── ltx_provider.py       # LTX-2 via ComfyUI (testing local)
+│   │   ├── elevenlabs_provider.py # Doblaje: STS + TTS fallback
+│   │   └── lyria_provider.py     # Música ambiental (ElevenLabs Sound Gen)
 │   └── utils/
-│       ├── memory_manager.py     # Memoria episódica
-│       └── prompt_manager.py     # Templates de prompts
+│       ├── api_key_manager.py    # Rotación de API keys (failover 429)
+│       ├── audio_mixer.py        # FFmpeg: mezcla, extracción, sync
+│       ├── audio_separator.py    # Separación de audio con IA (Demucs)
+│       ├── config_loader.py      # Carga de JSON
+│       ├── episode_manager.py    # Gestión de episodios y carpetas
+│       ├── manual_dubbing.py     # Doblaje manual post-generación
+│       ├── memory_manager.py     # Memoria episódica (universe_memory)
+│       ├── progress_manager.py   # Persistencia de progreso (resume)
+│       ├── prompt_manager.py     # Templates de prompts
+│       ├── resume_handler.py     # Lógica de --resume
+│       ├── scene_context.py      # Contexto inter-escenas
+│       ├── topic_manager.py      # CRUD de temas
+│       ├── video_analyzer.py     # Analizador visual con Gemini Pro
+│       ├── video_editor.py       # Ensamblador de clips a medida
+│       ├── voice_manager.py      # Gestión de voces ElevenLabs
+│       ├── youtube_generator.py  # Generador SEO de YT (Títulos/Desc)
+│       └── youtube_uploader.py   # Subida a YouTube OAuth 2.0
 ├── pods/
+│   ├── video_rules.json          # Reglas de producción universales
+│   ├── example_pod/              # Plantilla para nuevos pods
 │   └── kids_story/
 │       ├── config.json           # Configuración del pod
 │       ├── prompts.json          # Templates de prompts
+│       ├── topics.json           # Temas generados
 │       ├── universe_memory.json  # Memoria de episodios
-│       ├── assets/               # Archivos generados (clips, frames)
-│       └── output/               # Vídeos finales
+│       ├── assets/               # Reference images de personajes
+│       └── output/               # Episodios generados
+│           └── ep_001_.../
+│               ├── script.json
+│               ├── progress.json
+│               ├── metadata.json
+│               ├── youtube_metadata.json # Título y descripción SEO para YT
+│               ├── clips/        # Clips individuales de vídeo (.mp4)
+│               ├── frames/       # Fotogramas clave para transiciones continuas
+│               ├── audio/        # Pistas de doblaje
+│               ├── ep_XXX_...mp4             # Vídeo concatenado nativo
+│               └── ep_XXX_..._dubbed.mp4     # Vídeo concatenado doblado
 └── README.md
 ```
 
@@ -209,10 +297,19 @@ El `VeoProvider` replica la lógica de Google Flow Scene Builder:
 
 1. **Escena 1**: Genera vídeo de cero con `generate_scene()` (texto → vídeo)
 2. **Escenas 2..N**: Para cada escena siguiente:
-   - **Extend** (misma escena, más larga): `extend_scene()` — añade +7s al clip anterior
-   - **Jump To** (corte a nueva escena): `jump_to_scene()` — extrae último frame del clip anterior → lo usa como seed visual para el siguiente clip
+   - **Continue** (continuación fluida): `jump_to_scene()` — extrae último frame → lo usa como seed visual para el siguiente clip
+   - **Cut** (cambio de plano en misma escena): `generate_scene()` con reference images
+   - **Scene Change** (nueva localización): `generate_scene()` con reference images
 3. **Character Consistency**: Usa `referenceImages` (hasta 3 imágenes de referencia por personaje)
-4. **Audio**: Veo 3.1 genera audio sincronizado nativamente (narración, diálogos, efectos)
+4. **Audio nativo**: Veo 3.1 genera audio sincronizado nativamente (narración, diálogos, efectos)
+5. **Doblaje Inteligente (Aislamiento con Demucs)**: Cada clip pasa por el pipeline STS de ElevenLabs de forma quirúrgica:
+   - Extrae el audio nativo de Veo (lip-synced y con efectos).
+   - Usa **Demucs (Meta AI)** para separar la "voz/risas" de los "efectos de sonido" (SFX).
+   - Convierte SOLO la voz vía Speech-to-Speech (STS) para evitar que ElevenLabs robotice los efectos.
+   - Remezcla la nueva voz limpia con los SFX originales de Veo.
+   - Si Demucs falla → fallback al método antiguo; si STS falla → fallback a TTS.
+6. **Música ambiental**: LyriaProvider genera música de fondo con ElevenLabs Sound Generation
+7. **Resiliencia**: Cada clip generado se persiste inmediatamente. Si falla, `--resume` retoma donde se quedó
 
 ## Cómo crear un pod nuevo (Onboarding)
 
@@ -260,12 +357,25 @@ Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
 
 ## Roadmap
 
+- [x] Sistema de doblaje automático (ElevenLabs STS + TTS fallback)
+- [x] Música ambiental automática (ElevenLabs Sound Generation)
+- [x] Rotación automática de API keys (failover 429)
+- [x] Sistema de resume/progreso (nunca se pierde un clip)
+- [x] Menú interactivo completo (11 opciones)
+- [x] Doblaje manual post-generación
+- [x] Gestor de voces interactivo
+- [x] Analizador visual de consistencia (Gemini Pro)
+- [x] Editor de vídeos CLI (unión de clips personalizada)
+- [x] Generación de metadatos SEO para YouTube
+- [x] Publicación manual a YouTube con OAuth 2.0 (Opción 12)
+- [ ] Generación automática de miniaturas para YouTube (Thumbnails)
+- [ ] Exportación en formato vertical (9:16) con auto-cropping para Shorts / TikTok
+- [ ] Doblaje multi-idioma automático para canales internacionales
+- [ ] Motor de Efectos de Sonido (SFX) para sincronizar ruidos de ambiente (pisadas, viento, etc.)
+- [ ] Interfaz web (Dashboard local) para gestionar los Pods y la Memoria de Personajes más fácilmente
+- [ ] Integración con Google Opal
 - [ ] Automatización con n8n (local/cloud)
-- [ ] Google Opal integration
 - [ ] Modelos de vídeo adicionales (providers)
 - [ ] LoRA para character consistency local
-- [ ] Publicación automática a YouTube
-## Futuras mejoras
-
-Ahora las escenas se extienden cogiendo el ultimo frame y partiendo de ahi genera el siguiente clip, esto hace que vaya todo de seguido pero 
-no mantiene ni las voces(las imagenes si son iguales pero no las voces). Al hacer esto, no hay cortes entre escenas, no puede haber un corte de escena a otra escena diferente. Supongo que se puede cambiar con promting y no necesariarmente con codigo.
+- [ ] Migración de `print()` a `logging` (para automatización y servidores)
+- [ ] Tests unitarios

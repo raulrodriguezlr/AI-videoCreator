@@ -1,12 +1,49 @@
 {
     "episodes": [
         {
-            "title": "El Gran Tesoro de Bellotas",
-            "summary": "Tico la ardilla encuentra un mapa hacia un gran tesoro. En su camino ayuda a un amigo y al encontrar la enorme bellota, descubre que necesita la ayuda de los demás para abrirla, aprendiendo que el verdadero tesoro es compartir.",
-            "moral": "El verdadero valor de un tesoro se encuentra cuando lo compartes con tus amigos."
+            "title": "El Misterio de las Bellotas Desaparecidas",
+            "summary": "Tico se enfada cuando descubre que faltan sus bellotas recolectadas, pero al investigar encuentra a una nueva familia de pajaritos que no tenía qué comer. Tico decide ayudarlos.",
+            "moral": "Desarrollo emocional: Empatía, la importancia de compartir y el perdón."
+        },
+        {
+            "title": "El Gran Puente de Ramitas",
+            "summary": "Tico la ardilla se encuentra con un arroyo que no puede cruzar. Con la ayuda de los espectadores, aprende a usar ramitas para construir un puente y alcanzar una bellota dorada.",
+            "moral": "Pensar con paciencia y usar la creatividad nos ayuda a superar cualquier obstáculo."
+        },
+        {
+            "title": "El Tesoro de las Moras Dulces",
+            "summary": "Tico busca las legendarias Moras Dulces en el Bosque Mágico. Durante su aventura, pide ayuda para tomar las decisiones correctas y aprende que el mayor tesoro es compartir.",
+            "moral": "Compartir nuestros descubrimientos con los demás hace que las cosas buenas sean aún mejores."
+        },
+        {
+            "title": "El Monstruo de las Sombras Largas",
+            "summary": "Tico se asusta al ver una sombra gigante en el bosque al atardecer, pero descubre que solo es una pequeña ranita. Aprende que las sombras pueden engañarnos y no hay que temer a la oscuridad.",
+            "moral": "Las cosas que parecen aterradoras en la oscuridad a menudo son inofensivas cuando las miramos de cerca."
+        },
+        {
+            "title": "Las Gotitas de Lluvia Bailarinas",
+            "summary": "Tico se siente triste porque la lluvia arruina su día de juegos, pero pronto descubre que saltar en los charcos es una aventura mágica llena de baile.",
+            "moral": "Incluso cuando las cosas no salen como planeamos, podemos encontrar la manera de divertirnos y ver el lado positivo."
+        },
+        {
+            "title": "El Secreto de la Pluma Azul",
+            "summary": "Tico encuentra una brillante pluma azul en el bosque y emprende una pequeña aventura para encontrar a su dueño, aprendiendo el valor de devolver lo que no es nuestro.",
+            "moral": "Devolver lo que encontramos a sus dueños es lo correcto y nos hace sentir felices."
+        },
+        {
+            "title": "El Misterio de la Semilla Dormilona",
+            "summary": "Tico encuentra una extraña semilla que no quiere despertar. Con la ayuda de los niños, aprenderá que para que las cosas crezcan se necesita agua, tierra y mucha paciencia.",
+            "moral": "Las cosas buenas toman su tiempo y requieren paciencia y cuidado para crecer."
+        },
+        {
+            "title": "El Enredo en la Madriguera",
+            "summary": "Tico se despierta y descubre que su madriguera está tan desordenada que se queda atrapado en una enredadera. Con la ayuda de los niños, aprenderá que respirar hondo y hacer las cosas con paciencia es mejor que tirar con fuerza.",
+            "moral": "El orden y la paciencia nos ayudan a resolver los problemas paso a paso."
+        },
+        {
+            "title": "El Enigma de las Cosas que Flotan",
+            "summary": "Tico realiza un experimento en el arroyo del Bosque Mágico para descubrir por qué la madera y las plumas flotan, mientras que las piedras se hunden.",
+            "moral": "Las cosas flotan dependiendo de su material y no de su tamaño, enseñándonos a ser curiosos e investigar cómo funciona el mundo."
         }
-    ],
-    "current_state": {
-        "characters": {}
-    }
+    ]
 }
