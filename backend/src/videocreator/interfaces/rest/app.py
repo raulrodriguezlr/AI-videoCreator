@@ -21,6 +21,7 @@ from videocreator.interfaces.rest.routers import (
     health,
     jobs,
     pods,
+    providers,
     scripts,
     storage,
     topics,
@@ -83,6 +84,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(scripts.router, prefix=API_PREFIX)
     app.include_router(episodes.router, prefix=API_PREFIX)
     app.include_router(jobs.router, prefix=API_PREFIX)
+    app.include_router(providers.router, prefix=API_PREFIX)
     app.include_router(storage.router, prefix=API_PREFIX)
     return app
 

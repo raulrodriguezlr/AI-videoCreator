@@ -131,3 +131,70 @@ class ProviderHealth(BaseModel):
     name: str
     message: str | None = None
     cost_per_second_usd: float | None = None
+
+
+# ============================================================================
+# Multi-provider / multi-model routing (Plan Maestro §B.1)
+# ============================================================================
+class Capability(str, Enum):
+    """A discrete generation capability a video model may support."""
+
+    TEXT_TO_VIDEO = "text_to_video"
+    IMAGE_TO_VIDEO = "image_to_video"
+    EXTEND = "extend"
+    REF_IMAGE = "ref_image"
+    AUDIO_SYNC = "audio_sync"
+    LIPSYNC = "lipsync"
+    CAMERA_CONTROL = "camera_control"
+
+
+ModelFamily = Literal["kling", "veo", "luma", "minimax", "pixverse", "studio", "other"]
+LatencyPriority = Literal["balanced", "fast", "quality"]
+
+
+class ModelHandle(BaseModel):
+    """A concrete generation model exposed by a provider's catalog.
+
+    Used by aggregator providers (e.g. Artlist) whose single API fronts many
+    underlying engines. Selection logic (`ArtlistModelSelector`) reasons purely
+    over these immutable handles, so it stays testable without any network.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: str
+    family: ModelFamily = "other"
+    capabilities: frozenset[Capability] = Field(default_factory=frozenset)
+    max_duration_s: int = 5
+    max_resolution: tuple[int, int] = (1920, 1080)
+    cost_per_second_usd: float = 0.0
+    latency_p95_s: int = 60
+    strengths: tuple[str, ...] = ()
+
+    def supports(self, capability: Capability) -> bool:
+        return capability in self.capabilities
+
+    def fits_budget(self, duration_s: float, budget_usd: float | None) -> bool:
+        if budget_usd is None:
+            return True
+        return self.cost_per_second_usd * duration_s <= budget_usd
+
+
+class ProviderSelection(BaseModel):
+    """The outcome of `ProviderRouter.select` — which provider to try first,
+    the ordered fallback chain, and provider-specific hints/params."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    provider: str
+    fallback_chain: tuple[str, ...] = ()
+    model_hints: tuple[str, ...] = ()
+    params: dict[str, str | int | float | bool] = Field(default_factory=dict)
+
+    @property
+    def chain(self) -> tuple[str, ...]:
+        """Full ordered attempt sequence: primary first, then fallbacks (deduped)."""
+        seen: dict[str, None] = {self.provider: None}
+        for name in self.fallback_chain:
+            seen.setdefault(name, None)
+        return tuple(seen)

@@ -64,6 +64,49 @@ class BudgetExceededError(DomainError):
     error_code = "budget_exceeded"
 
 
+class ProviderQuotaError(ProviderError):
+    """Provider rejected the request because the account quota is exhausted."""
+
+    http_status = 429
+    error_code = "provider_quota_exceeded"
+
+
+class ProviderSafetyError(ProviderError):
+    """Provider refused generation on content-safety grounds."""
+
+    http_status = 422
+    error_code = "provider_safety_rejected"
+
+
+class ProviderTimeoutError(ProviderError):
+    """Provider job did not complete within the allotted polling window."""
+
+    http_status = 504
+    error_code = "provider_timeout"
+
+
+# --- ElevenLabs Studio specific (inherit shared semantics, distinct codes) ---
+class ElevenLabsStudioQuotaError(ProviderQuotaError):
+    error_code = "elevenlabs_studio_quota"
+
+
+class ElevenLabsStudioSafetyError(ProviderSafetyError):
+    error_code = "elevenlabs_studio_safety"
+
+
+class ElevenLabsStudioTimeoutError(ProviderTimeoutError):
+    error_code = "elevenlabs_studio_timeout"
+
+
+# --- Artlist specific ---
+class ArtlistModelUnavailableError(ProviderUnavailableError):
+    error_code = "artlist_model_unavailable"
+
+
+class ArtlistTimeoutError(ProviderTimeoutError):
+    error_code = "artlist_timeout"
+
+
 # Concrete domain errors
 class PodNotFound(NotFoundError):
     error_code = "pod_not_found"

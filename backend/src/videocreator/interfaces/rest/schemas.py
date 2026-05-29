@@ -180,6 +180,42 @@ class JobResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Providers
+# ---------------------------------------------------------------------------
+class ProviderHealthResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(..., examples=["artlist"])
+    available: bool
+    message: str | None = None
+    cost_per_second_usd: float | None = None
+
+
+class ModelHandleResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(..., examples=["kling-3.0"])
+    family: str
+    capabilities: list[str]
+    max_duration_s: int
+    max_resolution: tuple[int, int]
+    cost_per_second_usd: float
+    latency_p95_s: int
+    strengths: list[str]
+
+
+class ProviderSelectionResponse(BaseModel):
+    """What `ProviderRouter` would pick for a given style + preferences."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    fallback_chain: list[str]
+    model_hints: list[str]
+    params: dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
 class HealthResponse(BaseModel):
@@ -196,5 +232,6 @@ __all__ = [
     "GenerateScriptRequest", "SceneResponse", "ScriptResponse",
     "CreateEpisodeRequest", "EpisodeResponse", "EnqueueRenderResponse",
     "JobResponse",
+    "ProviderHealthResponse", "ModelHandleResponse", "ProviderSelectionResponse",
     "HealthResponse",
 ]

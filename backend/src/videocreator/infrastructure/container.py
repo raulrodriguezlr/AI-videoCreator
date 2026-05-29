@@ -51,10 +51,16 @@ from videocreator.domain.ports import (
     StoragePort,
     TopicRepository,
     UserRepository,
+    VideoProviderPort,
 )
+from videocreator.domain.services.provider_router import ProviderRouter
 from videocreator.domain.value_objects import JobKind
 from videocreator.infrastructure.handlers.episode_render import EpisodeRenderHandler
 from videocreator.infrastructure.llm.gemini_llm import GeminiLLM
+from videocreator.infrastructure.providers.artlist_provider import ArtlistProvider
+from videocreator.infrastructure.providers.elevenlabs_studio_provider import (
+    ElevenLabsStudioProvider,
+)
 from videocreator.infrastructure.persistence.database import get_sessionmaker
 from videocreator.infrastructure.queue.inprocess import (
     InMemoryEventBus,
@@ -180,6 +186,25 @@ class Container:
 
     def llm(self) -> LLMPort:
         return self._get("llm", lambda: GeminiLLM(self.settings))
+
+    # ---- video providers --------------------------------------------------
+    #: Provider names this build knows how to construct. veo/ltx remain in the
+    #: legacy engine path for now and are surfaced as "legacy" until ported.
+    KNOWN_VIDEO_PROVIDERS: tuple[str, ...] = ("artlist", "elevenlabs_studio")
+
+    def provider_router(self) -> ProviderRouter:
+        return self._get("provider_router", ProviderRouter)
+
+    def video_provider(self, name: str) -> VideoProviderPort:
+        """Build (and cache) the video provider adapter for `name`."""
+        key = f"video_provider:{name}"
+        if name == "artlist":
+            return self._get(key, lambda: ArtlistProvider(self.settings, self.storage()))
+        if name == "elevenlabs_studio":
+            return self._get(
+                key, lambda: ElevenLabsStudioProvider(self.settings, self.storage())
+            )
+        raise NotImplementedError(f"video provider '{name}' is not wired in this build")
 
     # ---- use cases (freshly built) ---------------------------------------
     def use_cases(self) -> "UseCases":

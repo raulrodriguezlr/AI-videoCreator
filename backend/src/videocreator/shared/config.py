@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str | None = None
     artlist_api_token: str | None = None
     video_provider_default: Literal["veo", "ltx", "artlist", "elevenlabs_studio"] = "veo"
+    # ElevenLabs Studio 3.0 (distinct from classic TTS)
+    elevenlabs_studio_model_id: str = "studio-3.0"
+    elevenlabs_studio_tier: Literal["free", "creator", "pro"] = "creator"
+    # Artlist multi-model hub
+    artlist_base_url: str = "https://api.artlist.io"
+    artlist_catalog_ttl_seconds: int = 24 * 3600
 
     # --- logging ---
     log_level: str = "INFO"
