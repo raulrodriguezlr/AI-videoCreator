@@ -52,6 +52,8 @@ from videocreator.domain.ports import (
     TopicRepository,
     UserRepository,
 )
+from videocreator.domain.value_objects import JobKind
+from videocreator.infrastructure.handlers.episode_render import EpisodeRenderHandler
 from videocreator.infrastructure.llm.gemini_llm import GeminiLLM
 from videocreator.infrastructure.persistence.database import get_sessionmaker
 from videocreator.infrastructure.queue.inprocess import (
@@ -152,11 +154,26 @@ class Container:
 
     def _build_job_queue(self) -> JobQueuePort:
         if self.settings.queue_backend == "inprocess":
-            return InProcessJobQueue(
+            queue = InProcessJobQueue(
                 job_repository=self.job_repo(),
                 event_bus=self.event_bus(),
             )
+            self._register_handlers(queue)
+            return queue
         raise NotImplementedError(f"queue_backend={self.settings.queue_backend} not wired")
+
+    def _register_handlers(self, queue: InProcessJobQueue) -> None:
+        """Wire JobKind → handler bindings for the local queue."""
+        queue.register(
+            JobKind.GENERATE_EPISODE,
+            EpisodeRenderHandler(
+                pod_repo=self.pod_repo(),
+                script_repo=self.script_repo(),
+                episode_repo=self.episode_repo(),
+                storage=self.storage(),
+                settings=self.settings,
+            ),
+        )
 
     def secret_vault(self) -> SecretVaultPort:
         return self._get("secret_vault", lambda: EnvSecretVault(self.settings))

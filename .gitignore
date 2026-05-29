@@ -74,6 +74,14 @@ backend/var/
 *.sqlite3
 *.db
 
+# --- Frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/dev.log
+frontend/dev.err.log
+frontend/*.tsbuildinfo
+
 # --- Claude Code workspace ---
 .claude/
 Claude.md
