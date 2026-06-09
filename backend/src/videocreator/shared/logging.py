@@ -8,11 +8,12 @@ import structlog
 
 from videocreator.shared.config import Settings
 
-
 _SECRET_KEYS = {"api_key", "password", "client_secret", "refresh_token", "access_token", "token"}
 
+_EventDict = dict[str, object]
 
-def _redact_secrets(_logger: object, _name: str, event_dict: dict[str, object]) -> dict[str, object]:
+
+def _redact_secrets(_logger: object, _name: str, event_dict: _EventDict) -> _EventDict:
     """Drop any field whose key looks like a credential."""
     for key in list(event_dict.keys()):
         if key.lower() in _SECRET_KEYS:

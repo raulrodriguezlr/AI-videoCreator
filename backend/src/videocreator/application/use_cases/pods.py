@@ -75,4 +75,4 @@ class DeletePod:
         await self.pod_repo.delete(pod_id)
 
 
-__all__ = ["CreatePod", "ListPods", "GetPod", "UpdatePodConfig", "DeletePod"]
+__all__ = ["CreatePod", "DeletePod", "GetPod", "ListPods", "UpdatePodConfig"]

@@ -1,39 +1,40 @@
 """Job handler that renders an Episode end-to-end.
 
-It bridges the v3.0 domain (Pod/Script/Episode in SQLite) to the existing
-legacy engines in `src/engines/*` which expect a filesystem pod layout with
-`config.json` + `script.json` and produce an mp4 under an `episode_dir`.
+Routing model (Plan Maestro §B.1): the pod's `style_profile` + its
+`ProviderPreferences` are fed to the `ProviderRouter`, which returns an ordered
+attempt chain. The handler walks that chain; the first provider that succeeds
+wins, failures are logged and the next link is tried.
 
-The bridging happens entirely under the local-mode workspace (`var/`) — the
-legacy `pods/` tree is read-only here; we just need its `config.json` to know
-which provider/voice to use. If the pod does not have a legacy directory yet
-(pure-v3.0 pods created via the API), we synthesize a minimal config from the
-PodConfig entity.
-
-Long-running work runs via `asyncio.to_thread` so the FastAPI event loop stays
-responsive.
+**Every** provider — Veo, LTX-Desktop, Artlist, ElevenLabs Studio — renders
+through the one render engine (`infrastructure/engine`, the shared Scene
+Builder), so they all share identical dispatch, dubbing, concat and reference
+handling. Long-running engine work runs via `asyncio.to_thread` so the FastAPI
+event loop stays responsive.
 """
 from __future__ import annotations
 
 import asyncio
+import io
 import json
-import shutil
-import sys
 import traceback
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Any
 
-from videocreator.domain.entities import Episode, Job, Pod, Script
+from videocreator.domain.entities import Character, Episode, Job, Pod, Script
 from videocreator.domain.ports import (
+    CharacterRepository,
     EpisodeRepository,
     PodRepository,
     ScriptRepository,
     StoragePort,
 )
+from videocreator.domain.services.provider_router import ProviderRouter
 from videocreator.domain.value_objects import EpisodeState
 from videocreator.infrastructure.queue.inprocess import JobContext
+from videocreator.infrastructure.video.naming import episode_filename
 from videocreator.shared.config import Settings
-from videocreator.shared.errors import EpisodeNotFound, InvalidScript, PodNotFound
+from videocreator.shared.errors import EpisodeNotFound, InvalidScript, PodNotFound, ProviderError
 from videocreator.shared.ids import EpisodeId, PodId, ScriptId
 from videocreator.shared.logging import get_logger
 
@@ -42,28 +43,111 @@ log = get_logger(__name__)
 STORAGE_BUCKET = "episodes"
 
 
-def _scene_to_legacy(scene) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+class _EngineLogTee(io.StringIO):
+    """Captures the engine's stdout AND streams complete lines to the logger.
+
+    The engine ``print()``s emoji-rich progress; on a cp1252 console writing
+    those straight out crashes, so we keep the raw text in the buffer (for the
+    failure tail) and emit an ascii-safe copy of each line to the structured
+    logger — giving live render traces in the backend terminal.
+    """
+
+    def __init__(self, episode_id: str = "") -> None:
+        super().__init__()
+        self._episode_id = episode_id
+        self._pending = ""
+
+    def write(self, s: str) -> int:
+        self._pending += s
+        while "\n" in self._pending:
+            line, self._pending = self._pending.split("\n", 1)
+            if line.strip():
+                safe = line.encode("ascii", "ignore").decode("ascii").strip()
+                if safe:
+                    log.info("engine", episode_id=self._episode_id, line=safe)
+        return super().write(s)
+
+
+def _scene_to_engine(scene) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    """Map a domain Scene to the exact key names the render engine reads.
+
+    When the original engine-shaped scene was preserved (`scene.raw`), emit it
+    verbatim so dubbing (character/voice_direction) and clip naming behave
+    identically; otherwise build the minimal shape from the domain fields.
+    """
+    if scene.raw:
+        return dict(scene.raw)
     return {
+        "scene_number": scene.index,
         "visual_prompt": scene.visual_prompt,
         "audio_text": scene.audio_text or "",
-        "duration_s": scene.duration_s,
-        "camera_shot": scene.camera_shot,
-        "camera_movement": scene.camera_movement,
-        "camera_angle": scene.camera_angle,
-        "transition": scene.transition,
+        "duration_seconds": scene.duration_s,
+        "transition_to_next": scene.transition,
+        "camera": {
+            "shot_type": scene.camera_shot,
+            "movement": scene.camera_movement,
+            "angle": scene.camera_angle,
+        },
     }
 
 
-def _script_to_legacy_dict(script: Script) -> dict[str, Any]:
+def _script_to_engine_dict(script: Script) -> dict[str, Any]:
     return {
         "title": script.title,
         "summary": script.summary or "",
-        "scenes": [_scene_to_legacy(s) for s in script.scenes],
+        "scenes": [_scene_to_engine(s) for s in script.scenes],
     }
 
 
-def _synthesize_legacy_config(pod: Pod) -> dict[str, Any]:
-    """Build a minimal legacy `config.json` from a v3.0 PodConfig."""
+def _engine_script_dict(episode: Episode, script: Script, settings: Settings) -> dict[str, Any]:
+    """Prefer the original on-disk script.json for a filesystem episode.
+
+    It carries the full engine scene shape (scene_number, character, voice_direction,
+    mood, lighting…) that the engine needs for dubbing and clip naming — the
+    domain Script doesn't model all of it, so reconstructing would degrade the
+    render. New (generated) episodes fall back to the reconstructed dict.
+    """
+    media_pod = episode.extra.get("media_pod")
+    media_dir = episode.extra.get("media_dir")
+    if media_pod and media_dir:
+        original = settings.pods_dir / str(media_pod) / "output" / str(media_dir) / "script.json"
+        if original.is_file():
+            try:
+                data = json.loads(original.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                data = None
+            if isinstance(data, dict) and data.get("scenes"):
+                return data
+    return _script_to_engine_dict(script)
+
+
+def _character_to_engine(char: Character, ref_paths: list[str]) -> dict[str, Any]:
+    """A config character entry: voice + on-disk reference image paths.
+
+    `ref_paths` are paths (relative to the workspace = pod_dir) of the character's
+    reference images, already materialised from the object store. They're what
+    keeps the character visually consistent across scenes — both as ref images in
+    text-to-video and as the visual seed in jump-to-scene. `reference_image`
+    (singular) is kept for backward compatibility with older configs.
+    """
+    return {
+        "name": char.name,
+        "role": char.role,
+        "personality": char.personality or "",
+        "look_description": char.look_description or "",
+        "elevenlabs_voice_id": char.voice.voice_id if char.voice else None,
+        "reference_image": ref_paths[0] if ref_paths else None,
+        "reference_images": ref_paths,
+    }
+
+
+def _synthesize_engine_config(
+    pod: Pod, characters: list[Character], char_refs: dict[str, list[str]],
+) -> dict[str, Any]:
+    """Build a `config.json` from the current pod + characters (voices + refs).
+
+    `char_refs` maps a character name to its materialised reference image paths.
+    """
     cfg = pod.config
     return {
         "series_name": cfg.series_name,
@@ -72,67 +156,155 @@ def _synthesize_legacy_config(pod: Pod) -> dict[str, Any]:
         "video_settings": {"duration_seconds": cfg.duration_seconds},
         "consistency": {"art_style": cfg.art_style or ""},
         "series_context": cfg.series_context or "",
-        "characters": [],
+        "characters": [
+            _character_to_engine(c, char_refs.get(c.name, [])) for c in characters
+        ],
         **(cfg.extra or {}),
     }
 
 
-def _ensure_legacy_workspace(
-    *, pod: Pod, script: Script, episode: Episode, settings: Settings,
+def _ensure_engine_workspace(
+    *, pod: Pod, script_dict: dict[str, Any], episode: Episode, settings: Settings,
+    characters: list[Character], char_refs: dict[str, list[str]],
 ) -> tuple[Path, Path]:
-    """Lay out the directory the legacy engines expect, under `var/`.
+    """Lay out the directory the render engine expects, under `var/`.
 
     Returns `(pod_config_path, episode_dir)`.
     """
     workspace = settings.var_dir / "render" / pod.name
     workspace.mkdir(parents=True, exist_ok=True)
 
-    # If the user already has a legacy pod with the same name, copy its
-    # config.json (it has provider/voice tuning); otherwise synthesize one.
-    legacy_pod_dir = settings.legacy_pods_dir / pod.name
+    # Start from any on-disk config.json (it may carry provider/voice tuning the
+    # new model doesn't track), then overlay the current characters + voices so
+    # a voice the user (re)assigned in the UI actually takes effect.
+    config = _synthesize_engine_config(pod, characters, char_refs)
+    pod_source_dir = settings.pods_dir / pod.name
+    on_disk = pod_source_dir / "config.json"
+    if on_disk.exists():
+        try:
+            base = json.loads(on_disk.read_text(encoding="utf-8"))
+            if isinstance(base, dict):
+                base.update({k: v for k, v in config.items() if k != "characters"})
+                if characters:  # only override the cast when we actually have one
+                    base["characters"] = config["characters"]
+                config = base
+        except json.JSONDecodeError:
+            pass
+
     pod_config_path = workspace / "config.json"
-    if legacy_pod_dir.exists() and (legacy_pod_dir / "config.json").exists():
-        shutil.copy2(legacy_pod_dir / "config.json", pod_config_path)
-    else:
-        pod_config_path.write_text(
-            json.dumps(_synthesize_legacy_config(pod), indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+    pod_config_path.write_text(
+        json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8",
+    )
 
     episode_dir = workspace / "episodes" / episode.id
     episode_dir.mkdir(parents=True, exist_ok=True)
     (episode_dir / "script.json").write_text(
-        json.dumps(_script_to_legacy_dict(script), indent=2, ensure_ascii=False),
-        encoding="utf-8",
+        json.dumps(script_dict, indent=2, ensure_ascii=False), encoding="utf-8",
     )
     return pod_config_path, episode_dir
 
 
-def _run_legacy_engine_sync(
+def _run_engine_sync(
     *, pod_config_path: Path, episode_dir: Path, script_dict: dict[str, Any],
-    output_path: Path, repo_root: Path,
+    output_path: Path, provider_name: str = "veo", model: str | None = None,
 ) -> Path:
-    """Invoke the legacy `VideoEngine.generate(...)` synchronously.
+    """Invoke the render engine's `VideoEngine.generate(...)` synchronously.
 
-    We only import inside this function so the FastAPI app keeps booting even
-    if the legacy module has heavy/optional deps (cv2, providers, etc.).
+    Imported lazily so the FastAPI app keeps booting even if the engine has
+    heavy/optional deps (cv2, providers, …).
     """
-    # The legacy code does `from src.providers ...` etc., so the repo root must
-    # be on sys.path. We rely on the dev install / CWD usually covering it, but
-    # add it defensively.
-    repo_str = str(repo_root)
-    if repo_str not in sys.path:
-        sys.path.insert(0, repo_str)
+    # The engine reads provider/model from module globals — set them so the
+    # user's choice takes effect, then build the engine.
+    from videocreator.infrastructure.engine import variables as engine_vars
+    engine_vars.VIDEO_PROVIDER = provider_name
+    if model:
+        if provider_name == "veo":
+            engine_vars.VEO_MODEL = model
+        elif provider_name in ("ltx", "ltx_desktop"):
+            # The chosen LTX-Desktop pipeline id (e.g. "fast"/"pro").
+            engine_vars.LTX_DESKTOP_MODEL = model
+        elif provider_name == "artlist":
+            engine_vars.ARTLIST_MODEL = model
+        # ltx_comfyui uses a fixed checkpoint (LTX_CHECKPOINT) — no per-render model.
 
-    from src.engines.video_engine import VideoEngine  # noqa: PLC0415 — lazy import
+    from videocreator.infrastructure.engine.engines.video_engine import VideoEngine
 
-    engine = VideoEngine(str(pod_config_path))
-    result = engine.generate(
-        script_dict,
-        output_path=str(output_path),
-        episode_dir=str(episode_dir),
-    )
+    # The render engine print()s emoji-rich progress. On a non-UTF-8 console
+    # (Windows cp1252) that raises UnicodeEncodeError mid-render, so we tee its
+    # stdout/stderr: keep the full text in a buffer (for the failure tail) AND
+    # stream each complete line to the structured logger (ascii-safe) so the
+    # render progress — which scene, which provider — is visible in the backend
+    # terminal in real time.
+    buffer = _EngineLogTee(episode_id=Path(episode_dir).name)
+    try:
+        with redirect_stdout(buffer), redirect_stderr(buffer):
+            engine = VideoEngine(str(pod_config_path))
+            result = engine.generate(
+                script_dict,
+                output_path=str(output_path),
+                episode_dir=str(episode_dir),
+            )
+    except Exception as exc:
+        tail = buffer.getvalue()[-1500:]
+        raise RuntimeError(f"{exc}\n--- render engine output (tail) ---\n{tail}") from exc
     return Path(result)
+
+
+async def _store_render_output(
+    episode: Episode, episode_dir: Path, engine_output: Path, storage: StoragePort,
+) -> tuple[str, str | None]:
+    """Ingest a render's output into storage; return ``(final_key, dub_key)``.
+
+    The render engine leaves per-scene clips (``clips/``), frames, audio, and two
+    final compositions under ``episode_dir``: the native cut ``<id>.mp4`` (voices
+    the video model itself produced) and the dubbed cut ``<id>_dubbed.mp4`` (the
+    TTS voices) — and returns the dubbed one. The media library only reads the
+    object store, so we copy every per-scene artifact to ``episodes/<id>/<rel>``,
+    then store the two finals under the **episode title** (legacy naming):
+
+    * ``<title>.mp4``      → ``final_video_key``   (raw / model voices)
+    * ``<title>_dub.mp4``  → ``dubbed_video_key``  (TTS dub), when present
+    """
+    from videocreator.infrastructure.filesystem.pod_importer import _MEDIA_INGEST_EXTS
+
+    # 1) Per-scene artifacts only (files under a subdirectory: clips/audio/frames).
+    #    Root-level files are the finals, re-keyed by title below.
+    existing = set(await storage.list_keys(STORAGE_BUCKET, prefix=f"{episode.id}/"))
+    copied = 0
+    for path in sorted(episode_dir.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in _MEDIA_INGEST_EXTS:
+            continue
+        rel = path.relative_to(episode_dir)
+        if len(rel.parts) == 1:  # a final at the root — handled below
+            continue
+        key = f"{episode.id}/{rel.as_posix()}"
+        if key in existing:
+            continue
+        await storage.put(STORAGE_BUCKET, key, path.read_bytes())
+        copied += 1
+
+    # 2) The two final compositions, named after the episode title.
+    name = episode_filename(episode.title)
+    if "_dubbed" in engine_output.stem:
+        dubbed_disk: Path | None = engine_output
+        native_disk = engine_output.with_name(engine_output.name.replace("_dubbed", "", 1))
+    else:
+        dubbed_disk, native_disk = None, engine_output
+
+    final_key = f"{episode.id}/{name}.mp4"
+    final_src = native_disk if native_disk.is_file() else engine_output
+    await storage.put(STORAGE_BUCKET, final_key, final_src.read_bytes())
+
+    dub_key: str | None = None
+    if dubbed_disk is not None and dubbed_disk.is_file():
+        dub_key = f"{episode.id}/{name}_dub.mp4"
+        await storage.put(STORAGE_BUCKET, dub_key, dubbed_disk.read_bytes())
+
+    log.info(
+        "episode_render.ingested",
+        episode_id=episode.id, clips=copied, final=final_key, dub=dub_key,
+    )
+    return f"{STORAGE_BUCKET}/{final_key}", (f"{STORAGE_BUCKET}/{dub_key}" if dub_key else None)
 
 
 class EpisodeRenderHandler:
@@ -146,20 +318,73 @@ class EpisodeRenderHandler:
         pod_repo: PodRepository,
         script_repo: ScriptRepository,
         episode_repo: EpisodeRepository,
+        character_repo: CharacterRepository,
         storage: StoragePort,
         settings: Settings,
+        router: ProviderRouter,
     ) -> None:
         self._pods = pod_repo
         self._scripts = script_repo
         self._episodes = episode_repo
+        self._characters = character_repo
         self._storage = storage
         self._settings = settings
+        self._router = router
 
     async def __call__(self, job: Job, ctx: JobContext) -> dict[str, Any]:
+        episode, pod, script = await self._load(job, ctx)
+
+        selection = self._router.select(
+            pod.config.style_profile, pod.config.provider_preferences
+        )
+
+        # Single provider — no fallback chain. The episode's explicit
+        # provider wins; otherwise use the router's primary selection.
+        provider_name = episode.video_provider or selection.provider
+        log.info(
+            "episode_render.route",
+            episode_id=episode.id,
+            style=pod.config.style_profile.value,
+            provider=provider_name,
+        )
+
+        episode.state = EpisodeState.RENDERING
+        await self._episodes.save(episode)
+
+        try:
+            await ctx.progress(0.15, f"rendering via {provider_name}")
+            final_key = await self._render_with_engine(
+                pod, script, episode, ctx, name=provider_name,
+            )
+        except Exception as exc:
+            episode.state = EpisodeState.FAILED
+            await self._episodes.save(episode)
+            log.error(
+                "episode_render.provider_failed",
+                episode_id=episode.id,
+                provider=provider_name,
+                error=str(exc),
+            )
+            raise ProviderError(
+                f"provider '{provider_name}' failed for episode {episode.id}: {exc}"
+            ) from exc
+
+        episode.final_video_key = final_key
+        episode.state = EpisodeState.READY
+        await self._episodes.save(episode)
+        await ctx.progress(1.0, "done")
+        return {
+            "episode_id": episode.id,
+            "final_video_key": final_key,
+            "provider": provider_name,
+            "duration_seconds": pod.config.duration_seconds,
+        }
+
+    # ---- orchestration ----------------------------------------------------
+    async def _load(self, job: Job, ctx: JobContext) -> tuple[Episode, Pod, Script]:
         episode_id = EpisodeId(str(job.payload.get("episode_id", "")))
         if not episode_id:
             raise InvalidScript("job payload missing 'episode_id'")
-
         await ctx.progress(0.05, "loading episode")
         episode = await self._episodes.get(episode_id)
         if episode is None:
@@ -172,48 +397,100 @@ class EpisodeRenderHandler:
         script = await self._scripts.get(ScriptId(episode.script_id))
         if script is None:
             raise InvalidScript(f"script {episode.script_id} not found")
+        return episode, pod, script
 
-        await ctx.progress(0.10, "preparing render workspace")
+    # NOTE: _effective_chain and _render_via_chain removed.
+    # The handler now uses a single provider per render — no fallback chain.
+    # If it fails, the episode fails immediately with the real error.
+
+    async def _render_with_engine(
+        self, pod: Pod, script: Script, episode: Episode, ctx: JobContext, *, name: str,
+    ) -> str:
+        """Fallback path: drive the original `src.engines.video_engine`.
+
+        `name` (veo/ltx) selects the engine provider for this render so the user's
+        choice actually takes effect instead of the module default.
+        """
+        await ctx.progress(0.10, "preparing engine workspace")
+        characters = await self._characters.list_for_pod(PodId(pod.id))
+        workspace = self._settings.var_dir / "render" / pod.name
+        char_refs = await self._materialize_character_refs(characters, workspace)
+        script_dict = _engine_script_dict(episode, script, self._settings)
         pod_config_path, episode_dir = await asyncio.to_thread(
-            _ensure_legacy_workspace,
-            pod=pod, script=script, episode=episode, settings=self._settings,
+            _ensure_engine_workspace,
+            pod=pod, script_dict=script_dict, episode=episode, settings=self._settings,
+            characters=characters, char_refs=char_refs,
         )
-
-        episode.state = EpisodeState.RENDERING
-        await self._episodes.save(episode)
         await ctx.progress(0.15, "starting video engine")
-
-        output_path = episode_dir / f"{episode.id}.mp4"
+        # Name the final compilation after the episode title (not its opaque id),
+        # so the deliverable on disk is human-readable too — storage already
+        # re-keys by title, this keeps the engine's own output consistent.
+        output_path = episode_dir / f"{episode_filename(episode.title)}.mp4"
         try:
             mp4_path = await asyncio.to_thread(
-                _run_legacy_engine_sync,
+                _run_engine_sync,
                 pod_config_path=pod_config_path,
                 episode_dir=episode_dir,
-                script_dict=_script_to_legacy_dict(script),
+                script_dict=script_dict,
                 output_path=output_path,
-                repo_root=self._settings.project_root,
+                provider_name=name,
+                model=episode.video_model,
             )
         except Exception as exc:
-            log.exception("episode_render.failed", episode_id=episode.id)
-            episode.state = EpisodeState.FAILED
-            await self._episodes.save(episode)
-            raise InvalidScript(f"video engine failed: {exc}\n{traceback.format_exc(limit=3)}") from exc
+            raise ProviderError(
+                f"video engine failed: {exc}\n{traceback.format_exc(limit=3)}"
+            ) from exc
 
-        await ctx.progress(0.90, "uploading artifact to storage")
-        storage_key = f"{episode.id}/final.mp4"
-        with mp4_path.open("rb") as fp:
-            await self._storage.put(STORAGE_BUCKET, storage_key, fp.read())
+        await ctx.progress(0.90, "ingesting render output into storage")
+        final_key, dub_key = await _store_render_output(
+            episode, episode_dir, mp4_path, self._storage
+        )
+        if dub_key:
+            episode.dubbed_video_key = dub_key
+        return final_key
 
-        episode.final_video_key = f"{STORAGE_BUCKET}/{storage_key}"
-        episode.state = EpisodeState.READY
-        await self._episodes.save(episode)
-        await ctx.progress(1.0, "done")
+    async def _materialize_character_refs(
+        self, characters: list[Character], workspace: Path,
+    ) -> dict[str, list[str]]:
+        """Copy every character's reference images from storage into the workspace.
 
-        return {
-            "episode_id": episode.id,
-            "final_video_key": episode.final_video_key,
-            "duration_seconds": pod.config.duration_seconds,
-        }
+        The render engine resolves reference images from on-disk paths relative to
+        the pod dir (the workspace). Since the images live in the object store now,
+        we materialise each character's `reference_image_keys` to
+        ``<workspace>/assets/refs/<char>_<n><ext>`` and return, per character name,
+        the workspace-relative paths — what keeps characters visually consistent
+        (refs in text-to-video + the visual seed in jump-to-scene). Characters can
+        have several images; all are materialised.
+        """
+        refs_dir = workspace / "assets" / "refs"
+        refs_dir.mkdir(parents=True, exist_ok=True)
+        out: dict[str, list[str]] = {}
+        for char in characters:
+            paths: list[str] = []
+            slug = episode_filename(char.name).lower()
+            for i, ref_key in enumerate(char.reference_image_keys):
+                bucket, _, key = ref_key.partition("/")
+                if not key:
+                    continue
+                try:
+                    data = await self._storage.get(bucket, key)
+                except (FileNotFoundError, OSError, ValueError) as exc:
+                    log.warning(
+                        "episode_render.ref_image_missing",
+                        character=char.name, key=ref_key, error=str(exc),
+                    )
+                    continue
+                ext = Path(key).suffix or ".png"
+                fname = f"{slug}_{i}{ext}"
+                (refs_dir / fname).write_bytes(data)
+                paths.append((Path("assets") / "refs" / fname).as_posix())
+            if paths:
+                out[char.name] = paths
+                log.info(
+                    "episode_render.refs_materialized",
+                    character=char.name, count=len(paths),
+                )
+        return out
 
 
-__all__ = ["EpisodeRenderHandler", "STORAGE_BUCKET"]
+__all__ = ["STORAGE_BUCKET", "EpisodeRenderHandler"]

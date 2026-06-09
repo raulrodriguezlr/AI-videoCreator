@@ -11,6 +11,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from videocreator.domain.value_objects import (
+    BanditPolicy,
+    CharacterMode,
+    ContentType,
     EpisodeState,
     JobKind,
     JobState,
@@ -27,6 +30,7 @@ from videocreator.shared.ids import (
     PodId,
     SceneId,
     ScriptId,
+    SeoId,
     ShortId,
     TopicId,
     UserId,
@@ -61,9 +65,28 @@ class PodConfig(BaseModel):
     language: str = "es"
     art_style: str | None = None
     style_profile: StyleProfile = StyleProfile.CINEMATIC_3D
+    # What kind of series this pod produces (story/meme/recreation/educational).
+    # Derives the duration + generation + character strategy via content_profile().
+    content_type: ContentType = ContentType.STORY
+    # How characters appear (reference images / none / narrator picture-in-picture
+    # / scene-native for V2V). Chosen in the wizard within the type's allowed set.
+    character_mode: CharacterMode = CharacterMode.REFERENCE
     duration_seconds: int = 120
+    # Maximum length of a single generated clip/scene, in seconds. Drives the
+    # scene-count maths and the pacing instructions in the script prompt. The
+    # default (8s) matches Veo's per-clip ceiling; LTX/other engines may differ,
+    # so it is configurable per pod instead of hardcoded (regression #5).
+    max_clip_seconds: int = 8
+    # How many direct questions to the audience the script should weave into the
+    # dialogue (0 = none). Kids/educational pods set this >0 to address the
+    # viewer ("¿Qué creéis que pasará?"); restores legacy behavior (regression #1).
+    interactive_questions: int = 0
     provider_preferences: ProviderPreferences = Field(default_factory=ProviderPreferences)
     series_context: str | None = None
+    # Accumulated narrative memory — summaries of past episodes injected into
+    # each new script prompt so the LLM maintains continuity across the series.
+    # Appended automatically by GenerateScript; editable via PATCH /pods/{id}.
+    universe_memory: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -107,6 +130,9 @@ class Scene(BaseModel):
     camera_angle: str | None = None
     clip_storage_key: str | None = None
     rendered: bool = False
+    # Original engine-shaped scene data (character, voice_direction, mood,
+    # lighting, narrative_phase…) preserved so a render reproduces it faithfully.
+    raw: dict[str, Any] = Field(default_factory=dict)
 
 
 class Script(BaseModel):
@@ -118,6 +144,11 @@ class Script(BaseModel):
     version: int = 1
     title: str
     summary: str | None = None
+    # Educational lesson of the episode — used in universe_memory and SEO copy.
+    moral: str | None = None
+    # Music/ambient audio prompt for the episode — can be used to generate
+    # background music that matches the episode's mood.
+    ambient_audio_prompt: str | None = None
     scenes: list[Scene] = Field(default_factory=list)
     reviewed: bool = False
     created_at: datetime = Field(default_factory=utcnow)
@@ -136,6 +167,13 @@ class Episode(BaseModel):
     final_video_key: str | None = None
     dubbed_video_key: str | None = None
     youtube_video_id: str | None = None
+    # Per-episode render overrides — when None the pod's provider_preferences win.
+    # The list of selectable values is served by GET /providers.
+    video_provider: str | None = None
+    video_model: str | None = None
+    # Free-form bag for adapter-specific data (e.g. filesystem-pod provenance:
+    # {"media_pod": "kids_story", "media_dir": "ep_001_…"}).
+    extra: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -152,6 +190,30 @@ class Short(BaseModel):
     rendered_video_key: str | None = None
     target_platform: Literal["tiktok", "reels", "shorts"] = "shorts"
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class SeoMetadata(BaseModel):
+    """LLM-generated publishing metadata + the bandit that optimizes its title.
+
+    A video (episode) gets several candidate titles; `policy` is the LinUCB
+    state that learns which one performs best from observed engagement, while
+    `selected_title` caches the latest recommendation for display. Description,
+    tags and hashtags round out the publish payload for the target platform.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: SeoId
+    pod_id: PodId
+    episode_id: EpisodeId
+    description: str = ""
+    tags: list[str] = Field(default_factory=list)
+    hashtags: list[str] = Field(default_factory=list)
+    title_variants: list[str] = Field(default_factory=list)
+    policy: BanditPolicy | None = None
+    selected_title: str | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
 
 class Job(BaseModel):

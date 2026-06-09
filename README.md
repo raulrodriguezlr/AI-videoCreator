@@ -1,410 +1,482 @@
-# AI-videoCreator v2.0 🎬
+# AI-videoCreator
 
-Generador automático de vídeos usando IA. Crea vídeos con guión, narración y audio sincronizado de forma nativa.
+Plataforma local-first de creación automática de vídeos con IA. Un solo comando arranca todo — sin Docker, sin Postgres, sin Redis. SQLite + sistema de ficheros por defecto; swap a Postgres cambiando una variable de entorno.
 
-> **📐 Hoja de ruta v3.0**: Hay un plan de evolución mayor documentado en [PLAN_MAESTRO.md](PLAN_MAESTRO.md) — backend FastAPI + frontend React, wizards IA para crear pods y personajes, engine de Shorts/TikTok, SEO con learning por bandits contextuales, y nuevos providers (ElevenLabs Studio 3.0, Artlist multi-modelo con Kling 3.0 / Veo 2 / Luma / MiniMax). **El modo local sin Docker sigue siendo first-class** — un solo comando arranca todo con almacenamiento en disco.
+El motor de generación (Veo / LTX / ElevenLabs / Artlist — generar, extender, *jump-to-scene*, doblar y montar) vive **dentro del backend** en `infrastructure/engine/`; no hay un proyecto "v2" aparte ni CLI heredada, y toda la media se guarda en el object store (`var/storage`), nunca en `pods/`.
 
-## ¿Qué hace?
+> 🗺️ **Estado y hoja de ruta completa: [PLAN.md](PLAN.md)** — lo hecho y lo pendiente, consolidado.
 
-Le das un tema → genera un guión → genera un vídeo con audio sincronizado. Todo automático.
+---
+
+## Inicio rápido (2 terminales)
+
+### Terminal 1 — Backend (FastAPI · puerto 8000)
+
+```powershell
+cd backend
+
+# Primera vez: instala en modo editable
+pip install -e ".[dev]"
+
+# Arranca (hot-reload activado para desarrollo)
+python -m videocreator.interfaces.cli.main serve --reload
+```
+
+Swagger UI → http://127.0.0.1:8000/docs  
+Redoc      → http://127.0.0.1:8000/redoc
+
+### Terminal 2 — Frontend (Vite · puerto 5173)
+
+```powershell
+cd frontend
+npm install        # primera vez
+npm run dev
+```
+
+Dashboard → http://localhost:5173  
+El proxy de Vite reenvía `/api → http://127.0.0.1:8000` automáticamente.
+
+---
+
+## Docker (modo local)
+
+Construir la imagen (contexto = raíz del repo):
+
+```bash
+docker build -f backend/Dockerfile -t videocreator-backend:local .
+```
+
+Arrancar con docker-compose:
+
+```bash
+docker compose up          # usa docker-compose.yml en la raíz
+```
+
+O directamente:
+
+```bash
+docker run -d \
+  -p 8000:8000 \
+  -v vc_data:/data \
+  -e GOOGLE_API_KEY=tu_key \
+  videocreator-backend:local
+```
+
+El contenedor guarda la BD y los assets en el volumen `/data` (SQLite + LocalFileStorage).  
+Health check: `GET http://localhost:8000/api/v1/health`
+
+---
+
+## Todos los comandos para arrancar
+
+### Backend
+
+| Objetivo | Comando |
+|---|---|
+| Arranque básico | `python -m videocreator.interfaces.cli.main serve` |
+| Con hot-reload (dev) | `python -m videocreator.interfaces.cli.main serve --reload` |
+| Host/puerto custom | `python -m videocreator.interfaces.cli.main serve --host 0.0.0.0 --port 8080` |
+| Logs verbose | `python -m videocreator.interfaces.cli.main --debug serve --reload` |
+| Vía entrypoint instalado | `videocreator serve --reload` |
+| Raw uvicorn (sin CLI) | `uvicorn videocreator.interfaces.rest.app:create_app --factory --reload --port 8000` |
+
+### Frontend
+
+| Objetivo | Comando |
+|---|---|
+| Servidor de desarrollo | `npm run dev` |
+| Build de producción | `npm run build` |
+| Preview del build | `npm run build && npm run preview` |
+| Type-check | `npm run type-check` |
+| Lint | `npm run lint` |
+
+### CLI de gestión
+
+```powershell
+# Muestra la configuración activa (modo, DB, storage, API keys detectadas)
+python -m videocreator.interfaces.cli.main info
+
+# Inicializa la BD y los directorios var/ (idempotente)
+python -m videocreator.interfaces.cli.main init
+
+# Importa los pods de pods/ (config, guiones, personajes) e ingesta su media
+# en el object store var/storage (idempotente, se puede repetir)
+python -m videocreator.interfaces.cli.main pods import
+
+# Importar desde una carpeta específica
+python -m videocreator.interfaces.cli.main pods import --from ../pods
+
+# Listar pods importados
+python -m videocreator.interfaces.cli.main pods list
+```
+
+### Tests
+
+```powershell
+cd backend
+
+# Todos los tests (99 tests, ~1s)
+python -m pytest
+
+# Con cobertura
+python -m pytest --cov=videocreator --cov-report=term-missing
+
+# Solo tests unitarios rápidos
+python -m pytest tests/unit/
+
+# Linting y formato
+python -m ruff check src/ tests/
+```
+
+---
+
+## Arquitectura v3.0
 
 ```
-python -m src.main --pod kids_story --topic "Tico aprende sobre la paciencia"
+AI-videoCreator/
+├── backend/                          # FastAPI · Clean Architecture
+│   └── src/videocreator/
+│       ├── domain/                   # Entidades, puertos, value objects, servicios de dominio
+│       │   ├── entities.py           # Pod, Episode, Character, Topic, Script, Job, User, Short, SeoMetadata
+│       │   ├── ports.py              # Interfaces (Protocol): VideoProviderPort, StoragePort, LLMPort, SecretVaultPort…
+│       │   ├── value_objects.py      # ClipArtifact, ScenePrompt, ModelHandle, ProviderSelection…
+│       │   └── services/
+│       │       ├── provider_router.py        # style_profile → proveedor óptimo
+│       │       ├── artlist_model_selector.py # ranking puro sin I/O
+│       │       └── seo_bandit.py             # LinUCB contextual bandit (title A/B)
+│       ├── application/              # Casos de uso (sin framework)
+│       │   └── use_cases/
+│       │       ├── pods.py / episodes.py / scripts.py / topics.py / characters.py
+│       │       ├── shorts.py         # CreateShort + EnqueueShortRender
+│       │       ├── seo.py            # GenerateSeoMetadata + RecommendTitle + RecordTitleOutcome
+│       │       ├── wizard.py         # DraftPodBlueprint + CreatePodFromBlueprint
+│       │       └── secrets.py        # SetProviderKey + ListProviderKeys + DeleteProviderKey
+│       ├── infrastructure/           # Adaptadores (DB, HTTP, ficheros, proveedores)
+│       │   ├── providers/
+│       │   │   ├── base.py                         # BaseHttpVideoProvider (polling, semáforo)
+│       │   │   ├── artlist_provider.py             # Hub multi-modelo: Kling/Veo/Luma/MiniMax/PixVerse
+│       │   │   └── elevenlabs_studio_provider.py   # Studio 3.0 (text→video + lipsync nativo)
+│       │   ├── persistence/          # SQLAlchemy async (SQLite local / Postgres server)
+│       │   ├── storage/              # LocalFileStorage (file://) / S3 (server)
+│       │   ├── llm/                  # GeminiLLM
+│       │   ├── queue/                # InProcessJobQueue (local) / ARQ+Redis (server)
+│       │   ├── security/
+│       │   │   ├── cipher.py         # SecretCipher (Fernet — encrypt/decrypt, tamper-loud)
+│       │   │   └── secret_vault.py   # EnvSecretVault (local) + DbSecretVault (server)
+│       │   ├── engine/               # Motor de render portado (providers Veo/LTX/
+│       │   │                         # ElevenLabs/Artlist, dub, audio, montaje)
+│       │   ├── filesystem/           # Importador de pods + ingesta de media a storage
+│       │   └── container.py          # DI manual, mode-aware
+│       ├── interfaces/
+│       │   ├── rest/                 # FastAPI: routers, schemas, error handlers, SSE jobs
+│       │   │   └── routers/          # pods, episodes, scripts, topics, characters,
+│       │   │                         # providers, jobs, health, storage,
+│       │   │                         # shorts, seo, wizard, secrets
+│       │   └── cli/main.py           # Typer CLI (serve, init, pods list/import, info)
+│       └── shared/                   # config.py, errors.py, logging.py, ids.py
+├── frontend/                         # Vite 5 · React 18 · TypeScript · TanStack Query
+├── pods/                             # Pods de contenido (serie de vídeos)
+│   ├── kids_story/
+│   └── example_pod/
+├── backend/Dockerfile                # Multi-stage (builder+runtime), non-root, /data volume
+├── docker-compose.yml                # Local mode: SQLite + FS, puerto 8000
+└── .github/workflows/ci.yml          # lint → unit → docker build (fail-fast)
 ```
 
-## Arquitectura
+**Capas y reglas de dependencia:**  
+`domain` ← `application` ← `infrastructure` ← `interfaces`  
+El dominio no importa nada del exterior. Los puertos son `Protocol` de Python — sin herencia obligatoria.
 
-```text
-cli.py (Menú interactivo / Comandos)
-  │
-  ├── Herramientas CLI (VideoEditor, VideoAnalyzer, VoiceManager, ManualDubber)
-  │
-  └── PipelineOrchestrator (Orquestador central)
-        │
-        ├── TopicEngine → Gemini genera temas
-        ├── ScriptEngine → Gemini genera guion cinematográfico
-        ├── ReviewerEngine → IA "Director" que audita y mejora el guion (QC)
-        ├── ProgressManager → Persistencia de estado (resume)
-        ├── EpisodeManager → Organización de archivos y carpetas
-        │
-        ├── VideoEngine (router)
-        │     │
-        │     ├── VeoProvider → Google Veo 3.1 API (producción, cloud)
-        │     │     ├── Scene Builder: generate (para cortes) o jump_to (para continuaciones)
-        │     │     └── Dubbing: Veo audio nativo → ElevenLabs STS → voz de personaje
-        │     │
-        │     ├── LtxProvider → LTX-2 via ComfyUI (local, GPU)
-        │     │
-        │     ├── LyriaProvider → Música ambiental (ElevenLabs Sound Gen)
-        │     └── AudioMixer → FFmpeg: mezcla, extracción, time-stretch
-        │
-        └── YoutubeMetadataGenerator → Gemini genera título SEO y descripción
+---
 
-  ApiKeyManager → Rotación automática de API keys (failover 429)
+## Configuración
+
+### `backend/.env` (ya existe, no hace falta crearlo)
+
+El servidor lo carga automáticamente desde la raíz del backend, independientemente del directorio desde el que lo arranques.
+
+```ini
+# Google AI (Gemini + Veo)
+GOOGLE_API_KEY=tu_key_aqui
+
+# ElevenLabs (TTS + Studio 3.0)
+ELEVENLABS_API_KEY=tu_key_aqui
+
+# Artlist multi-modelo (Kling 3.0 / Veo 2 / Luma / MiniMax / PixVerse)
+ARTLIST_API_TOKEN=tu_token_aqui
+
+# Cifrado de API keys de usuario (BYO keys) — activa DbSecretVault
+# Generar: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# SECRET_ENCRYPTION_KEY=
+
+# Ruta a los pods de contenido (relativa a backend/ o absoluta)
+# (LEGACY_PODS_DIR sigue aceptándose como alias)
+PODS_DIR=../pods
+
+# Opcionales — los defaults ya funcionan en local
+# APP_MODE=local          # local | server | cloud
+# HOST=127.0.0.1
+# PORT=8000
+# LOG_LEVEL=INFO
+# LOG_FORMAT=console      # console | json
 ```
+
+### Variables de entorno clave
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `APP_MODE` | `local` | `local` = SQLite+FS+cola en memoria; `server` = Postgres+Redis+S3 |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./var/app.db` | URL de SQLAlchemy |
+| `STORAGE_URL` | `file://./var/storage` | URL de almacenamiento |
+| `QUEUE_BACKEND` | `inprocess` | `inprocess` o `arq` |
+| `SECRET_ENCRYPTION_KEY` | `None` | Clave Fernet — si está presente activa `DbSecretVault` (BYO keys cifradas) |
+| `PODS_DIR` | `../pods` | Directorio con pods de contenido (alias: `LEGACY_PODS_DIR`) |
+| `VIDEO_PROVIDER_DEFAULT` | `veo` | Provider por defecto para renderizado |
+
+---
+
+## Providers de vídeo
+
+El sistema usa un triple desacoplamiento **estilo → proveedor → modelo** gestionado por `ProviderRouter` y `ArtlistModelSelector`.
+
+### Providers disponibles
+
+| Provider | ID | Modelos | Nota |
+|---|---|---|---|
+| **Artlist hub** | `artlist` | Kling 3.0, Veo 2, Luma Dream Machine, MiniMax Hailuo, PixVerse v3 | Un token, varios motores |
+| **ElevenLabs Studio 3.0** | `elevenlabs_studio` | studio-3.0 | Voice + video lipsync nativo |
+
+### Endpoints de providers
+
+```
+GET  /api/v1/providers                          → lista de providers configurados
+GET  /api/v1/providers/{name}/availability      → salud del provider
+GET  /api/v1/providers/artlist/models           → catálogo de modelos Artlist
+GET  /api/v1/providers/route?style_profile=...  → preview del router (sin renderizar)
+```
+
+Valores de `style_profile`: `cinematic_3d`, `talking_head_avatar`, `anime_2d`, `photoreal_doc`, `kids_3d`, `motion_graphics`
+
+---
+
+## BYO Provider Keys (secrets)
+
+Los usuarios pueden guardar sus propias API keys de proveedor. Las keys **nunca se devuelven** por la API — sólo se puede saber si un proveedor tiene key configurada.
+
+```
+GET    /api/v1/secrets              → lista de nombres de proveedores con key guardada
+PUT    /api/v1/secrets/{provider}   → guardar/reemplazar una key  { "value": "sk-..." }
+DELETE /api/v1/secrets/{provider}   → borrar una key
+```
+
+Proveedores válidos: `google`, `elevenlabs`, `artlist`
+
+**Sin `SECRET_ENCRYPTION_KEY`** (modo local por defecto): las keys se leen del `.env`/entorno del proceso (`EnvSecretVault`).  
+**Con `SECRET_ENCRYPTION_KEY`**: las keys se cifran con Fernet y se guardan en BD por usuario (`DbSecretVault`).
+
+---
+
+## Shorts / Vídeos verticales
+
+```
+POST /api/v1/pods/{id}/shorts               → crear un short a partir de un episodio
+POST /api/v1/shorts/{id}/render             → encolar renderizado 9:16
+GET  /api/v1/shorts/{id}                    → estado + URL del vídeo
+```
+
+Plataformas soportadas: `tiktok`, `reels`, `shorts`  
+El pipeline recorta, añade hook text, reencuadra a 9:16 y re-renderiza.
+
+---
+
+## SEO y optimización de títulos
+
+```
+POST /api/v1/episodes/{id}/seo/generate         → generar metadatos SEO (Gemini)
+GET  /api/v1/episodes/{id}/seo                  → leer metadatos SEO
+POST /api/v1/episodes/{id}/seo/title/recommend  → LinUCB bandit recomienda título óptimo
+POST /api/v1/episodes/{id}/seo/title/outcome    → registrar CTR/resultado para actualizar bandit
+```
+
+---
+
+## AI Pod Wizard
+
+Genera una configuración completa de pod a partir de una idea en lenguaje natural (Gemini structured outputs):
+
+```
+POST /api/v1/wizard/draft       → idea → PodBlueprint (series bible, personajes, topic seeds)
+POST /api/v1/wizard/commit      → PodBlueprint → Pod real en BD + personajes + temas
+```
+
+Ejemplo:
+
+```json
+POST /api/v1/wizard/draft
+{
+  "idea": "Curiosidades del espacio para niños",
+  "language": "es",
+  "character_count": 3,
+  "topic_count": 5
+}
+```
+
+---
+
+## Pods
+
+Un pod es una serie de vídeos: su configuración visual, los personajes, los temas y el historial de episodios.
+
+### Importar pods existentes
+
+```powershell
+# Importa todos los pods de pods/ al sistema v3 (idempotente)
+python -m videocreator.interfaces.cli.main pods import
+```
+
+### Pod incluido: `kids_story`
+
+| Campo | Valor |
+|---|---|
+| Serie | Las Aventuras de Tico |
+| Género | Educación infantil (3-7 años) |
+| Estilo | 3D Disney/Pixar · bosque mágico |
+| Idioma | es-ES |
+| Protagonista | Tico (ardilla · voz ElevenLabs `sSMwBJHeAHHywjjveEzB`) |
+| Narrador | Voz ElevenLabs `P5dwwehjO7NwEIcN2F2N` |
+
+---
+
+## API REST (resumen completo)
+
+Todos los endpoints bajo `/api/v1/`. Swagger completo en http://127.0.0.1:8000/docs.
+
+| Grupo | Endpoints principales |
+|---|---|
+| **Pods** | `GET/POST /pods` · `GET/PUT/DELETE /pods/{id}` |
+| **Characters** | `GET/POST /pods/{id}/characters` |
+| **Topics** | `GET /pods/{id}/topics` · `POST /pods/{id}/topics/generate` |
+| **Scripts** | `POST /pods/{id}/scripts/generate` · `GET /pods/{id}/scripts` |
+| **Episodes** | `POST /pods/{id}/episodes` · `POST /episodes/{id}/render` |
+| **Shorts** | `POST /pods/{id}/shorts` · `POST /shorts/{id}/render` · `GET /shorts/{id}` |
+| **SEO** | `POST /episodes/{id}/seo/generate` · `GET /episodes/{id}/seo` · `POST /episodes/{id}/seo/title/recommend` · `POST /episodes/{id}/seo/title/outcome` |
+| **Wizard** | `POST /wizard/draft` · `POST /wizard/commit` |
+| **Secrets** | `GET /secrets` · `PUT /secrets/{provider}` · `DELETE /secrets/{provider}` |
+| **Jobs** | `GET /jobs/{id}` · `GET /jobs` · `GET /jobs/{id}/stream` (SSE) |
+| **Providers** | `GET /providers` · `GET /providers/{name}/availability` · `GET /providers/artlist/models` · `GET /providers/route` |
+| **Storage** | `GET /storage/{bucket}/{key}` · `DELETE /storage/{bucket}/{key}` |
+| **Health** | `GET /health` |
+
+---
+
+## CI / GitHub Actions
+
+El workflow `.github/workflows/ci.yml` ejecuta tres jobs en secuencia (fail-fast):
+
+| Job | Qué hace |
+|---|---|
+| `lint` | `ruff check` (errores) + `mypy` (advisory, no bloquea) |
+| `unit` | `pytest tests/unit/` con `aiosqlite` + matriz Python 3.12 |
+| `docker` | `docker build` multi-stage para verificar que la imagen compila |
+
+---
 
 ## Requisitos
 
 - **Python 3.10+**
-- **Google AI Pro plan** (para Veo 3.1 API)
-- **API Key de Google AI Studio**: [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- **API Key de ElevenLabs**: Para la generación de voces de personajes y música ambiental.
-- **FFmpeg**: Sistema de procesamiento de audio/vídeo (necesario para el doblaje automático).
+- **Node.js 18+** (para el frontend)
+- **FFmpeg** en el PATH (para mezcla de audio en renderizado)
+  - Windows: `winget install ffmpeg` o `choco install ffmpeg`
+  - macOS: `brew install ffmpeg`
+- API keys opcionales (la app arranca sin ellas en modo local):
+  - **Google AI Studio** → Gemini (guiones) + Veo (vídeo): https://aistudio.google.com/apikey
+  - **ElevenLabs** → voces + Studio 3.0: https://elevenlabs.io
+  - **Artlist** → hub multi-modelo: https://artlist.io
 
-### Requisitos opcionales (testing local)
+---
 
-- **ComfyUI** corriendo en `http://127.0.0.1:8188` (para LtxProvider)
-- **NVIDIA GPU 12GB+** (RTX 4070 Ti o similar)
+## Instalación completa (primera vez)
 
-## Instalación paso a paso 
-
-Sigue estos pasos usando la terminal (Símbolo del sistema o PowerShell en Windows, o la Terminal en Mac/Linux).
-
-### Paso 1: Descargar el código
-Abre tu terminal y escribe:
-```bash
+```powershell
 git clone https://github.com/raulrodriguezlr/AI-videoCreator.git
 cd AI-videoCreator
-```
 
-### Paso 2: Crear el Entorno Virtual (`.venv`)
-Un entorno virtual es como una "caja aislada" para que las librerías de este proyecto no se mezclen con el resto de tu ordenador.
-- Asegúrate de tener Python instalado (escribe `python --version` o `python3 --version` para comprobarlo).
-- Escribe el comando para crear el entorno:
-
-**En Windows, Mac o Linux:**
-```bash
+# Backend
+cd backend
 python -m venv .venv
-```
-*(Si en Mac/Linux dice "command not found", prueba con `python3 -m venv .venv`)*
+.venv\Scripts\Activate.ps1          # Windows PowerShell
+# source .venv/bin/activate          # macOS/Linux
+pip install -e ".[dev]"
 
-### Paso 3: Activar el Entorno Virtual
-Este paso es crucial y **debes hacerlo cada vez que vayas a usar el programa**. Dependiendo de tu sistema operativo y terminal, el comando cambia ligeramente:
+# Inicializar BD y directorios
+python -m videocreator.interfaces.cli.main init
 
-**🖥️ En Windows (PowerShell) - RECOMENDADO:**
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-*(💡 NOTA para Windows: Si te sale un error rojo sobre "ExecutionPolicy" o permisos de scripts, ejecuta primero este comando: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`, dile que Sí (S o Y), y vuelve a intentar activar).*
+# Importar pods existentes
+python -m videocreator.interfaces.cli.main pods import
 
-**🖥️ En Windows (Símbolo del sistema / CMD):**
-```cmd
-.venv\Scripts\activate.bat
-```
+# Arrancar backend
+python -m videocreator.interfaces.cli.main serve --reload
 
-**🍎 En Mac o Linux (Terminal / Bash / Zsh):**
-```bash
-source .venv/bin/activate
-```
-*(Sabrás que funcionó porque tu terminal ahora empezará con `(.venv)` a la izquierda de la línea de comandos).*
-
-### Paso 4: Instalar las dependencias
-Con el `(.venv)` activado, vamos a instalar todo lo que el programa necesita:
-```bash
-pip install -r requirements.txt
+# Frontend (nueva terminal)
+cd ../frontend
+npm install
+npm run dev
 ```
 
-### Paso 5: Configurar tus API Keys
-El programa necesita conectarse a Google y ElevenLabs para funcionar.
-1. Busca un archivo llamado `env_example` o simplemente crea un archivo de texto nuevo y llámalo **exactamente** `.env` (con el punto delante).
-2. Ábrelo con el Bloc de notas o cualquier editor y pega tus claves así:
-```env
-GOOGLE_API_KEY=tu_clave_de_google_ai_studio_aqui
-ELEVENLABS_API_KEY=tu_clave_de_elevenlabs_aqui
-```
-*(Si no tienes clave, consigue una gratis en [Google AI Studio](https://aistudio.google.com/apikey) y [ElevenLabs](https://elevenlabs.io)).*
-
-### Paso 6: Configurar subida a YouTube (Opcional)
-Si quieres que el menú interactivo pueda subir los vídeos directamente a tu canal de YouTube (Opción 12), necesitas unas credenciales de autorización especiales para ese Pod:
-1. Ve a [Google Cloud Console](https://console.cloud.google.com/).
-2. En el menú superior izquierdo (las tres rayitas), ve a **"APIs y servicios"** > **"Biblioteca"**, busca "YouTube Data API v3" y actívala.
-3. Ve a **"Pantalla de consentimiento de OAuth"** (en "Público" o en el menú de la izquierda). Asegúrate de que el estado es **"Prueba"** y añade tu correo de YouTube en **"Usuarios de prueba"**.
-4. Ve a **"Credenciales"** > **"Crear Credenciales"** > **"ID de cliente de OAuth"**.
-5. Elige "App de escritorio" en el desplegable y dale a crear.
-6. **Descarga el archivo JSON**, renómbralo exactamente a `client_secret.json` y guárdalo dentro de la carpeta de tu Pod (ej: `pods/kids_story/client_secret.json`).
-7. La próxima vez que uses la Opción 12, se abrirá el navegador para que autorices a la aplicación. El token seguro se guardará localmente y no se subirá a GitHub.
-
-## Configuración
-
-### `.env` — Secretos (crear si no existe)
-
-```env
-GOOGLE_API_KEY=tu_api_key_de_google_ai_studio
-ELEVENLABS_API_KEY=tu_api_key_de_elevenlabs
-# Opcional (para rotación de keys y no agotar la cuota tan rápido):
-# GOOGLE_API_KEY_1=...
-# GOOGLE_API_KEY_2=...
-```
-
-### `src/variables.py` — Todo lo demás
-
-| Variable | Default | Descripción |
-|---|---|---|
-| `VIDEO_PROVIDER` | `"veo"` | Provider de vídeo: `"veo"` (cloud) o `"ltx"` (local) |
-| `VEO_MODEL` | `"veo-3.1-generate-preview"` | Modelo de Veo a usar |
-| `VEO_RESOLUTION` | `"720p"` | Resolución: `"720p"`, `"1080p"`, `"4k"` |
-| `VEO_ASPECT_RATIO` | `"16:9"` | Ratio: `"16:9"` o `"9:16"` |
-| `VEO_DURATION_SECONDS` | `8` | Segundos por clip: 4, 6 u 8 |
-| `VEO_POLLING_INTERVAL` | `10` | Segundos entre cada check de generación |
-| `VEO_TIMEOUT` | `360` | Timeout máximo de espera (6 min) |
-| `GEMINI_MODEL_NAME` | `"gemini-3.1-pro-preview"` | Modelo Gemini para scripts y temas |
-| `LTX_COMFYUI_URL` | `"http://127.0.0.1:8188"` | URL de ComfyUI local |
-| `LTX_CHECKPOINT` | `"ltx-2-19b-dev-fp4.safetensors"` | Checkpoint del modelo LTX-2 |
-| `LTX_WIDTH` / `LTX_HEIGHT` | `768` / `512` | Resolución local (divisible por 64) |
-| `USE_REFERENCE_IMAGES` | `True` | Usar imágenes de referencia para consistencia |
-
-## Uso
-
-### Crear un vídeo con tema manual
-
-```bash
-python -m src.main --pod kids_story --topic "Tico aprende sobre la paciencia"
-```
-
-### Crear un vídeo con tema automático
-
-```bash
-python -m src.main --pod kids_story --auto-topic
-```
-
-### Generar ideas de temas (sin crear vídeo)
-
-```bash
-python -m src.main --pod kids_story --generate-topics 5
-```
-
-### Verificar que el provider funciona
-
-```bash
-python -m src.main --check-provider
-```
-### Lanzar el modo interactivo (Recomendado)
-
-El modo interactivo es un menú que te guía paso a paso para crear vídeos, generar temas, retomar episodios pausados, aplicar doblaje manual o gestionar voces.
-
-```bash
-python -m src.main --pod kids_story --interactive
-```
-
-El menú interactivo incluye:
-1. 📝 Ver temas disponibles
-2. 🆕 Generar nuevos temas con IA
-3. ▶️ Crear vídeo completo (Auto Topic)
-4. 🔄 Continuar episodio incompleto
-5. 📋 Ver episodios generados
-6. ❌ Borrar un tema
-7. 🎯 Crear vídeo de un tema específico
-8. 🎙️ Doblaje Manual (Aplicar STS a un vídeo nativo)
-9. 🗣️ Gestor de Voces (Cambiar voces con ElevenLabs + Gemini)
-10. 🕵️ Analizador de Vídeo (Debug visual con Gemini Pro)
-11. ✂️ Editor de Vídeos (Unir clips a medida)
-
-### Retomar un episodio fallido o rate-limited
-
-Si se agotan tus tokens de Veo 3.1 o quieres parar, el proceso guarda cada clip generado. Puedes continuarlo sin perder dinero ni tiempo usando el modo `--interactive` (opción 4) o directamente:
-
-```bash
-python -m src.main --pod kids_story --resume last
-```
-
-### Otros comandos CLI
-
-```bash
-# Listar temas generados
-python -m src.main --pod kids_story --list-topics
-
-# Listar episodios
-python -m src.main --pod kids_story --list-episodes
-
-# Borrar un tema por ID
-python -m src.main --pod kids_story --delete-topic topic_001
-```
-
-### Cambiar a testing local (LTX)
-
-En `src/variables.py`:
-```python
-VIDEO_PROVIDER = "ltx"  # Cambia de "veo" a "ltx"
-```
-
-Asegúrate de que ComfyUI está corriendo en `http://127.0.0.1:8188`.
-
-## Estructura del proyecto
-
-```
-AI-videoCreator/
-├── .env                          # API keys (secretos)
-├── requirements.txt              # Dependencias Python
-├── BITACORA.md                   # Cuaderno de bitácora técnico
-├── PLAN_MAESTRO.md               # Plan de evolución v3.0 (arquitectura + features + QA)
-├── src/
-│   ├── main.py                   # Punto de entrada
-│   ├── cli.py                    # CLI + Menú interactivo
-│   ├── variables.py              # TODA la configuración
-│   ├── engines/
-│   │   ├── pipeline_orchestrator.py  # Orquesta Script → Video → Memory
-│   │   ├── script_engine.py      # Gemini → Guión cinematográfico
-│   │   ├── topic_engine.py       # Gemini → Ideas de temas
-│   │   └── video_engine.py       # Router → delega al provider
-│   ├── providers/
-│   │   ├── __init__.py           # Factory (get_provider)
-│   │   ├── base_provider.py      # Clase abstracta (VideoClip, BaseVideoProvider)
-│   │   ├── veo_provider.py       # Google Veo 3.1 (producción)
-│   │   ├── ltx_provider.py       # LTX-2 via ComfyUI (testing local)
-│   │   ├── elevenlabs_provider.py # Doblaje: STS + TTS fallback
-│   │   └── lyria_provider.py     # Música ambiental (ElevenLabs Sound Gen)
-│   └── utils/
-│       ├── api_key_manager.py    # Rotación de API keys (failover 429)
-│       ├── audio_mixer.py        # FFmpeg: mezcla, extracción, sync
-│       ├── audio_separator.py    # Separación de audio con IA (Demucs)
-│       ├── config_loader.py      # Carga de JSON
-│       ├── episode_manager.py    # Gestión de episodios y carpetas
-│       ├── manual_dubbing.py     # Doblaje manual post-generación
-│       ├── memory_manager.py     # Memoria episódica (universe_memory)
-│       ├── progress_manager.py   # Persistencia de progreso (resume)
-│       ├── prompt_manager.py     # Templates de prompts
-│       ├── resume_handler.py     # Lógica de --resume
-│       ├── scene_context.py      # Contexto inter-escenas
-│       ├── topic_manager.py      # CRUD de temas
-│       ├── video_analyzer.py     # Analizador visual con Gemini Pro
-│       ├── video_editor.py       # Ensamblador de clips a medida
-│       ├── voice_manager.py      # Gestión de voces ElevenLabs
-│       ├── youtube_generator.py  # Generador SEO de YT (Títulos/Desc)
-│       └── youtube_uploader.py   # Subida a YouTube OAuth 2.0
-├── pods/
-│   ├── video_rules.json          # Reglas de producción universales
-│   ├── example_pod/              # Plantilla para nuevos pods
-│   └── kids_story/
-│       ├── config.json           # Configuración del pod
-│       ├── prompts.json          # Templates de prompts
-│       ├── topics.json           # Temas generados
-│       ├── universe_memory.json  # Memoria de episodios
-│       ├── assets/               # Reference images de personajes
-│       └── output/               # Episodios generados
-│           └── ep_001_.../
-│               ├── script.json
-│               ├── progress.json
-│               ├── metadata.json
-│               ├── youtube_metadata.json # Título y descripción SEO para YT
-│               ├── clips/        # Clips individuales de vídeo (.mp4)
-│               ├── frames/       # Fotogramas clave para transiciones continuas
-│               ├── audio/        # Pistas de doblaje
-│               ├── ep_XXX_...mp4             # Vídeo concatenado nativo
-│               └── ep_XXX_..._dubbed.mp4     # Vídeo concatenado doblado
-└── README.md
-```
-
-## Cómo funciona el Scene Builder
-
-El `VeoProvider` replica la lógica de Google Flow Scene Builder:
-
-1. **Escena 1**: Genera vídeo de cero con `generate_scene()` (texto → vídeo)
-2. **Escenas 2..N**: Para cada escena siguiente:
-   - **Continue** (continuación fluida): `jump_to_scene()` — extrae último frame → lo usa como seed visual para el siguiente clip
-   - **Cut** (cambio de plano en misma escena): `generate_scene()` con reference images
-   - **Scene Change** (nueva localización): `generate_scene()` con reference images
-3. **Character Consistency**: Usa `referenceImages` (hasta 3 imágenes de referencia por personaje)
-4. **Audio nativo**: Veo 3.1 genera audio sincronizado nativamente (narración, diálogos, efectos)
-5. **Doblaje Inteligente (Aislamiento con Demucs)**: Cada clip pasa por el pipeline STS de ElevenLabs de forma quirúrgica:
-   - Extrae el audio nativo de Veo (lip-synced y con efectos).
-   - Usa **Demucs (Meta AI)** para separar la "voz/risas" de los "efectos de sonido" (SFX).
-   - Convierte SOLO la voz vía Speech-to-Speech (STS) para evitar que ElevenLabs robotice los efectos.
-   - Remezcla la nueva voz limpia con los SFX originales de Veo.
-   - Si Demucs falla → fallback al método antiguo; si STS falla → fallback a TTS.
-6. **Música ambiental**: LyriaProvider genera música de fondo con ElevenLabs Sound Generation
-7. **Resiliencia**: Cada clip generado se persiste inmediatamente. Si falla, `--resume` retoma donde se quedó
-
-## Cómo crear un pod nuevo (Onboarding)
-
-El proyecto incluye la plantilla `pods/example_pod/` pensada para que te sea facilísimo arrancar tu propia serie de vídeos o canal de historia, documentales, etc.
-
-1. **Copia la plantilla `example_pod`:**
-Copia o renombra la carpeta `pods/example_pod` al nombre que quieras (por ejemplo `ods/mi_documental/`).
-
-```text
-pods/mi_documental/
-├── config.json           # Aquí cambias el estilo visual (ej: "Cinematic sci-fi"), la audiencia y las secuencias.
-├── prompts.json          # Aquí modificas tu Prompt Maestro: cómo hablará el narrador, estructura y reglas de generación.
-├── topics.json           # Inicialmente vacío { "topics": [] }
-├── universe_memory.json  # Inicialmente vacío
-```
-
-2. **Ajusta `config.json`:**
-Abre el archivo y modifica parámetros como `target_audience`, `series_context` (de qué va tu canal), y `art_style`. 
-
-3. **Ajusta `prompts.json` (El corazón de tu serie):**
-   - Modifica `script_generation.system_role` para definir la personalidad del director del guión.
-   - En `scenes`, define exactamente quién narra (`character`), qué variables le pides al LLM y qué tipo de transiciones usarás (por defecto usamos `jump` y `cut`, **no uses `extend`**).
-
-4. **¡Arranca el motor!**
-Una vez modificado, usa el modo interactivo para que Gemini proponga ideas basadas en tu configuración:
-```bash
-python -m src.main --pod mi_documental --interactive
-```
+---
 
 ## Troubleshooting
 
-### "GOOGLE_API_KEY no encontrada"
-Verifica que tu `.env` tiene: `GOOGLE_API_KEY=tu_key_aqui`
+**`google_api: missing` en `videocreator info`**  
+→ Verifica que `backend/.env` tiene `GOOGLE_API_KEY=tu_key`. El archivo se carga automáticamente desde la raíz del backend.
 
-### "Provider 'veo' timeout"
-- Veo puede tardar hasta 6 minutos en horas punta
-- Aumenta `VEO_TIMEOUT` en `variables.py`
+**`ARTLIST_API_TOKEN not configured` en `/providers/artlist/availability`**  
+→ Normal si no tienes cuenta Artlist. El catálogo estático (5 modelos) funciona sin token.
 
-### "ComfyUI no disponible" (Ovi)
-- Verifica que ComfyUI está corriendo: `http://127.0.0.1:8188`
-- Instala el modelo Ovi/LTX-2 en ComfyUI
+**`ffmpeg: command not found` al renderizar**  
+→ Instala ffmpeg y asegúrate de que está en el PATH del sistema.
 
-### "ffmpeg no encontrado"
-- Instala ffmpeg: `choco install ffmpeg` (Windows) o `brew install ffmpeg` (macOS)
+**`address already in use` al arrancar el backend**  
+→ Usa `--port 8001` o mata el proceso con `netstat -ano | findstr :8000` (Windows).
+
+**PowerShell: `ExecutionPolicy` al activar `.venv`**  
+→ Ejecuta una vez: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+
+**Container `ERROR: Error loading ASGI app. Could not import module "app"`**  
+→ Esto ocurre cuando uvicorn se arranca con `uvicorn app:app` pero no hay ningún módulo `app` en el `PYTHONPATH`. El backend v3.0 usa la forma correcta con `--factory`:
+```bash
+uvicorn videocreator.interfaces.rest.app:create_app --factory --host 0.0.0.0 --port 8000
+```
+Si es un contenedor legacy (`ai-videocreator-gpu-node`), su CMD/ENTRYPOINT necesita actualizarse o el paquete necesita estar instalado en el contenedor.
+
+---
 
 ## Roadmap
 
-### v2.x — Estado actual (entregado)
+Ver [PLAN_MAESTRO.md](PLAN_MAESTRO.md) para el detalle completo.
 
-- [x] Sistema de doblaje automático (ElevenLabs STS + TTS fallback)
-- [x] Música ambiental automática (ElevenLabs Sound Generation)
-- [x] Rotación automática de API keys (failover 429)
-- [x] Sistema de resume/progreso (nunca se pierde un clip)
-- [x] Menú interactivo completo (11 opciones)
-- [x] Doblaje manual post-generación
-- [x] Gestor de voces interactivo
-- [x] Analizador visual de consistencia (Gemini Pro)
-- [x] Editor de vídeos CLI (unión de clips personalizada)
-- [x] Generación de metadatos SEO para YouTube
-- [x] Publicación manual a YouTube con OAuth 2.0 (Opción 12)
+### Entregado (v3.0)
 
-### v3.0 — En planificación (detalle en [PLAN_MAESTRO.md](PLAN_MAESTRO.md))
+- [x] Backend FastAPI · Clean Architecture · Hexagonal (domain/application/infrastructure/interfaces)
+- [x] Modo local zero-docker: SQLite + LocalFileStorage + InProcessJobQueue
+- [x] Frontend React 18 + TypeScript + Vite 5 + TanStack Query + SSE jobs
+- [x] `ArtlistProvider` — hub multi-modelo con `ArtlistModelSelector` y catálogo TTL
+- [x] `ElevenLabsStudioProvider` — Studio 3.0 (text→video + lipsync)
+- [x] `ProviderRouter` — routing por `style_profile` + `ProviderPreferences`
+- [x] `BaseHttpVideoProvider` — polling exponencial, semáforo de concurrencia
+- [x] REST `/providers/*` — health, catálogo, preview de routing
+- [x] Importador idempotente de pods legacy (v2 → v3)
+- [x] **Fase 6** — Engine de Shorts/vídeos verticales (9:16, hook text, 3 plataformas)
+- [x] **Fase 7** — SEO metadata (Gemini) + LinUCB contextual bandit para A/B de títulos
+- [x] **Fase 8** — AI Pod Wizard (idea → blueprint → pod) con Gemini structured outputs
+- [x] **Fase 9** — CI GitHub Actions (lint→unit→docker) + Dockerfile multi-stage + docker-compose
+- [x] **Fase 10** — BYO provider keys cifradas: `SecretCipher` (Fernet), `DbSecretVault`, endpoints `/secrets/*`
+- [x] Suite de tests: 99 tests unitarios, 0 fallos · ruff clean
 
-**Plataforma**
-- [ ] Backend FastAPI (REST + Swagger UI automático) sobre Clean Architecture / Hexagonal
-- [ ] Frontend React + TypeScript + Vite + shadcn/ui (modo dashboard)
-- [ ] **Modo local zero-docker**: un solo comando, SQLite + FAISS + storage en disco, sin Postgres/Redis/MinIO
-- [ ] Modo server con Docker Compose (Postgres + Redis + MinIO + nginx) — mismo código, distintos adaptadores
-- [ ] Cloud-ready (GCP/AWS) con Terraform skeleton, healthchecks, observabilidad (structlog + Prometheus + OTEL)
+### Siguientes pasos
 
-**Nuevos providers de video**
-- [ ] `ElevenLabsStudioProvider` — ElevenLabs Studio 3.0 (text→video / image→video con voz+lipsync integrado)
-- [ ] `ArtlistProvider` — hub multi-modelo: **Kling 3.0**, Veo 2, Luma Dream Machine, MiniMax Hailuo, PixVerse — con `ArtlistModelSelector` que elige el motor óptimo por escena
-- [ ] `ProviderRouter` por `style_profile` + `provider_preferences` — multi-provider per-scene y A/B entre modelos
-
-**Generación y edición**
-- [ ] Engine de Shorts / TikTok (pipeline 8 stages: highlight → hook → beat segmentation → captions → b-roll → sound design → render vertical 9:16 → safe-zone)
-- [ ] `EditingTimeline` (NLE-lite componible) que serializa a JSON y rinde con un único comando FFmpeg
-- [ ] Generación automática de miniaturas para YouTube
-- [ ] Doblaje multi-idioma automático
-- [ ] Motor de Efectos de Sonido (SFX) sincronizados
-
-**Inteligencia y aprendizaje**
-- [ ] **AI Pod Wizard** (Gemini) — de una idea vaga a `config.json`+`prompts.json`+`universe_memory.json`+topics+characters en 8 pasos con structured outputs
-- [ ] **Character Wizard** con generación de imágenes de referencia (Imagen 3 / SDXL fallback) y verificación de consistencia (face/style embeddings)
-- [ ] Engine SEO: `HookScorer` + `RetentionCurvePredictor` + `TitleThumbnailOptimizer` + `TrendRadar`
-- [ ] **A/B con contextual bandits** (LinUCB / Thompson Sampling) — variantes del mismo Short compiten y el sistema aprende qué funciona (más barato y eficaz que RL puro)
-- [ ] MLOps lite: registry, shadow mode, kill-switch, budget caps
-
-**Calidad y operación**
-- [ ] Migración completa de `print()` a `structlog` JSON con correlation IDs
-- [ ] Pydantic v2 como source-of-truth de todos los JSON (`schema_version` + upcaster chain)
-- [ ] Suite de tests: unit + integration (testcontainers) + contract (schemathesis) + E2E (Playwright) + LLM-evals (LLM-as-judge)
-- [ ] CI/CD GitHub Actions con gates de calidad (ruff, mypy --strict, eslint, security scans)
-- [ ] CODEOWNERS con pools cruzados (architect / ml / data) — los PRs se supervisan entre roles
+- [ ] Server-mode adapters: Postgres, Redis/ARQ, MinIO — actualmente lanzan `NotImplementedError`
+- [ ] JWT auth: `deps.py` `current_user_id()` devuelve 501 en server mode
+- [ ] Providers consuming vault: wiring BYO keys per-user al `VideoProviderPort`
+- [ ] Prometheus metrics + alertas + runbooks (Fase 10 hardening)
+- [ ] RBAC básico (roles: viewer / editor / admin por pod)

@@ -1,12 +1,16 @@
-"""Character endpoints — scoped under a pod."""
+"""Character endpoints — scoped under a pod (incl. reference-image assets)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, File, Query, UploadFile, status
 
-from videocreator.interfaces.rest.deps import UseCasesDep, UserIdDep
+from videocreator.interfaces.rest.deps import ContainerDep, UseCasesDep, UserIdDep
 from videocreator.interfaces.rest.schemas import (
     CharacterResponse,
     CreateCharacterRequest,
+    GenerateReferenceImageRequest,
+    UpdateCharacterRequest,
+    VoiceOptionResponse,
+    VoiceSearchRequest,
 )
 from videocreator.shared.ids import CharacterId, PodId
 
@@ -46,6 +50,20 @@ async def list_characters(
     return [_to_response(c) for c in chars]
 
 
+@router.patch("/{character_id}", response_model=CharacterResponse, summary="Edit a character")
+async def update_character(
+    pod_id: str, character_id: str, body: UpdateCharacterRequest,
+    uc: UseCasesDep, user_id: UserIdDep,
+) -> CharacterResponse:
+    del pod_id
+    character = await uc.characters.update.execute(
+        character_id=CharacterId(character_id), requester_id=user_id,
+        name=body.name, role=body.role, personality=body.personality,
+        look_description=body.look_description, voice=body.voice,
+    )
+    return _to_response(character)
+
+
 @router.delete(
     "/{character_id}", status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a character",
@@ -57,6 +75,70 @@ async def delete_character(
     await uc.characters.delete.execute(
         character_id=CharacterId(character_id), requester_id=user_id,
     )
+
+
+# --------------------------------------------------------------------------
+# Reference images (asset manager)
+# --------------------------------------------------------------------------
+@router.post(
+    "/{character_id}/references", response_model=CharacterResponse,
+    summary="Upload one or more reference images",
+)
+async def upload_references(
+    pod_id: str, character_id: str, uc: UseCasesDep, user_id: UserIdDep,
+    files: list[UploadFile] = File(...),
+) -> CharacterResponse:
+    del pod_id
+    payload = [(await f.read(), f.content_type or "image/png") for f in files]
+    character = await uc.characters.add_refs.execute(
+        character_id=CharacterId(character_id), requester_id=user_id, files=payload,
+    )
+    return _to_response(character)
+
+
+@router.post(
+    "/{character_id}/references/generate", response_model=CharacterResponse,
+    summary="Generate a reference image from a prompt (Imagen)",
+)
+async def generate_reference(
+    pod_id: str, character_id: str, body: GenerateReferenceImageRequest,
+    uc: UseCasesDep, user_id: UserIdDep,
+) -> CharacterResponse:
+    del pod_id
+    character = await uc.characters.generate_ref.execute(
+        character_id=CharacterId(character_id), requester_id=user_id, prompt=body.prompt,
+    )
+    return _to_response(character)
+
+
+@router.delete(
+    "/{character_id}/references", response_model=CharacterResponse,
+    summary="Remove a reference image",
+)
+async def remove_reference(
+    pod_id: str, character_id: str, uc: UseCasesDep, user_id: UserIdDep,
+    ref: str = Query(..., description="The stored reference key (bucket/key)"),
+) -> CharacterResponse:
+    del pod_id
+    character = await uc.characters.remove_ref.execute(
+        character_id=CharacterId(character_id), requester_id=user_id, ref=ref,
+    )
+    return _to_response(character)
+
+
+@router.post(
+    "/{character_id}/voices/search", response_model=list[VoiceOptionResponse],
+    summary="Search ElevenLabs shared voices from a description",
+)
+async def search_voices(
+    pod_id: str, character_id: str, body: VoiceSearchRequest,
+    uc: UseCasesDep, container: ContainerDep, user_id: UserIdDep,
+) -> list[VoiceOptionResponse]:
+    del character_id
+    # Ownership: the requester must own the pod this character lives in.
+    await uc.pods.get.execute(pod_id=PodId(pod_id), requester_id=user_id)
+    options = await container.voice_search().search(query=body.query)
+    return [VoiceOptionResponse(**vars(o)) for o in options]
 
 
 __all__ = ["router"]

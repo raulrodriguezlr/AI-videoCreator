@@ -1,0 +1,35 @@
+# Build context is the repo root; keep it lean and secret-free.
+.git
+.gitignore
+.venv
+**/.venv
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+
+# Runtime state / data — never bake into the image.
+var
+backend/var
+pods
+testing
+
+# Frontend is built into its own image.
+frontend
+
+# Tooling / editor noise.
+.claude
+.idea
+.vscode
+
+# Secrets and local env overrides.
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Docs are not needed at build time, except the README the package reads.
+*.md
+!README.md

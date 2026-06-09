@@ -60,7 +60,7 @@ class GeminiLLM:
                     config=config,
                 )
                 return response.text or ""
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 raise ProviderError(f"gemini call failed: {exc}") from exc
 
         return await asyncio.to_thread(_call)

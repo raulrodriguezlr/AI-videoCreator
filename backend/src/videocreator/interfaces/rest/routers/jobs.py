@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
 from fastapi.responses import StreamingResponse
 
 from videocreator.interfaces.rest.deps import ContainerDep, UseCasesDep, UserIdDep
@@ -17,8 +17,9 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 def _to_response(j) -> JobResponse:  # type: ignore[no-untyped-def]
+    kind = j.kind.value if hasattr(j.kind, "value") else str(j.kind)
     return JobResponse(
-        id=j.id, owner_id=j.owner_id, kind=j.kind.value if hasattr(j.kind, "value") else str(j.kind),
+        id=j.id, owner_id=j.owner_id, kind=kind,
         state=j.state, progress=j.progress, message=j.message,
         payload=j.payload, result=j.result, error=j.error,
         created_at=j.created_at, updated_at=j.updated_at,
@@ -38,6 +39,14 @@ async def list_jobs(
 async def get_job(job_id: str, uc: UseCasesDep, user_id: UserIdDep) -> JobResponse:
     job = await uc.jobs.get.execute(job_id=JobId(job_id), requester_id=user_id)
     return _to_response(job)
+
+
+@router.delete(
+    "/{job_id}", status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a finished job record",
+)
+async def delete_job(job_id: str, uc: UseCasesDep, user_id: UserIdDep) -> None:
+    await uc.jobs.delete.execute(job_id=JobId(job_id), requester_id=user_id)
 
 
 @router.get(

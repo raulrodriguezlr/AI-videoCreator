@@ -124,5 +124,17 @@ class JobNotFound(NotFoundError):
     error_code = "job_not_found"
 
 
+class ScriptNotFound(NotFoundError):
+    error_code = "script_not_found"
+
+
+class ShortNotFound(NotFoundError):
+    error_code = "short_not_found"
+
+
+class SeoMetadataNotFound(NotFoundError):
+    error_code = "seo_metadata_not_found"
+
+
 class InvalidScript(ValidationError):
     error_code = "invalid_script"

@@ -85,3 +85,4 @@ frontend/*.tsbuildinfo
 # --- Claude Code workspace ---
 .claude/
 Claude.md
+graphify-out/

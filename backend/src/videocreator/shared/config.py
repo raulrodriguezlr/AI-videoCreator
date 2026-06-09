@@ -2,28 +2,57 @@
 
 Uses pydantic-settings to load from `.env` + environment variables.
 Mode-based defaults: `local` (zero-docker, SQLite + filesystem) is the default.
+
+`.env` search order (first found wins for each key):
+  1. Environment variables (always highest priority)
+  2. `<backend-root>/.env.local`   — personal overrides, never committed
+  3. `<backend-root>/.env`         — project defaults (committed, no secrets)
+  4. CWD/.env / CWD/.env.local     — fallback when running from a custom dir
+
+`<backend-root>` is resolved relative to this file's location so the app
+finds `backend/.env` regardless of which directory you launch it from.
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppMode = Literal["local", "server", "cloud"]
 LogFormat = Literal["json", "console"]
+
+# Resolve the backend root (…/backend/) from this file's location:
+# config.py → shared/ → videocreator/ → src/ → backend/
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _env_files() -> tuple[str, ...]:
+    """Return candidate .env paths in lowest→highest precedence order.
+
+    pydantic-settings processes the list left-to-right and later files win,
+    so we put the most specific paths last.
+    """
+    candidates = [
+        str(_BACKEND_ROOT / ".env"),
+        str(_BACKEND_ROOT / ".env.local"),
+        ".env",
+        ".env.local",
+    ]
+    # Only include paths that actually exist to avoid noisy warnings.
+    return tuple(p for p in candidates if Path(p).exists()) or (".env",)
 
 
 class Settings(BaseSettings):
     """Runtime configuration.
 
     Defaults are tuned for local-first development — no external services required.
-    Override via environment variables or `.env`.
+    Override via environment variables or `.env` (see module docstring for search order).
     """
 
     model_config = SettingsConfigDict(
-        env_file=(".env", ".env.local"),
+        env_file=_env_files(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -35,13 +64,21 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # --- paths (local-first) ---
-    project_root: Path = Field(default_factory=lambda: Path.cwd())
-    var_dir: Path = Field(default_factory=lambda: Path.cwd() / "var")
-    legacy_pods_dir: Path = Field(default_factory=lambda: Path.cwd() / "pods")
+    # Anchored to the backend root (not the CWD) so the DB, object store and
+    # pods resolve to the *same* place whether you launch from the repo root or
+    # backend/. Override any of these via .env for a custom layout.
+    project_root: Path = Field(default_factory=lambda: _BACKEND_ROOT)
+    var_dir: Path = Field(default_factory=lambda: _BACKEND_ROOT / "var")
+    # Directory holding content pods (config.json, output/, assets/). `LEGACY_PODS_DIR`
+    # stays accepted as an alias so existing .env files keep working.
+    pods_dir: Path = Field(
+        default_factory=lambda: _BACKEND_ROOT.parent / "pods",
+        validation_alias=AliasChoices("pods_dir", "legacy_pods_dir"),
+    )
 
-    # --- persistence ---
-    database_url: str = "sqlite+aiosqlite:///./var/app.db"
-    storage_url: str = "file://./var/storage"
+    # --- persistence (absolute defaults — CWD-independent) ---
+    database_url: str = f"sqlite+aiosqlite:///{(_BACKEND_ROOT / 'var' / 'app.db').as_posix()}"
+    storage_url: str = f"file://{(_BACKEND_ROOT / 'var' / 'storage').as_posix()}"
 
     # --- queue / cache / events ---
     queue_backend: Literal["inprocess", "arq"] = "inprocess"
@@ -54,12 +91,30 @@ class Settings(BaseSettings):
     port: int = 8000
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
+    # --- secrets (BYO provider keys, encrypted at rest) ---
+    # A url-safe base64 32-byte Fernet key. When set, the DB-backed encrypted
+    # vault is used; when unset, local mode reads keys from the env (single user).
+    secret_encryption_key: str | None = None
+
     # --- auth (relaxed in local) ---
     local_require_auth: bool = False
-    jwt_secret: str = "dev-only-change-in-prod"  # noqa: S105 — local default
+    jwt_secret: str = "dev-only-change-in-prod"
     jwt_algorithm: str = "HS256"
     access_token_ttl_seconds: int = 900
     refresh_token_ttl_seconds: int = 7 * 24 * 3600
+
+    # --- LLM (text generation: scripts, topics, wizard, SEO, enhance) ---
+    # `gemini` uses the cloud API (needs google_api_key); `ollama` runs a local
+    # model server — fully offline, ideal for a 12 GB GPU.
+    llm_provider: Literal["gemini", "ollama"] = "gemini"
+    gemini_model: str = "gemini-2.0-flash-exp"
+    # Image generation model. A `gemini-*-image-generation` model uses the
+    # generate_content path (works on standard Gemini API keys); an `imagen-*`
+    # model uses the Imagen predict path (often requires a paid/Vertex tier).
+    image_model: str = "gemini-2.0-flash-preview-image-generation"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:14b-instruct"
+    ollama_timeout_seconds: float = 300.0
 
     # --- providers ---
     google_api_key: str | None = None
@@ -72,6 +127,15 @@ class Settings(BaseSettings):
     # Artlist multi-model hub
     artlist_base_url: str = "https://api.artlist.io"
     artlist_catalog_ttl_seconds: int = 24 * 3600
+    # Local LTX-Video via the LTX-Desktop app. Its bundled FastAPI backend
+    # (ltx2_server.py) listens on port 41954 by default and guards every route
+    # with a per-session bearer token. Both are auto-discovered from the running
+    # process; this URL/token are only fallbacks/overrides.
+    ltx_desktop_url: str = "http://localhost:41954"
+    ltx_desktop_token: str | None = None
+    # Legacy ComfyUI endpoint — kept only so existing .env files don't break while
+    # the generation path is migrated off ComfyUI onto LTX-Desktop.
+    comfyui_url: str = "http://127.0.0.1:8188"
 
     # --- logging ---
     log_level: str = "INFO"

@@ -1,0 +1,49 @@
+# Single-node server stack — Postgres for persistence + local-disk storage.
+#
+#   docker compose -f docker-compose.server.yml up --build
+#   open http://localhost:8000/docs
+#
+# This is the "server" app mode: the same SQL repositories run against Postgres
+# instead of SQLite, while media still lives on a local volume (object storage
+# over s3:// and a distributed Redis/Arq queue are not wired yet). Good for a
+# real single-host deployment without the full cloud footprint.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: videocreator
+      POSTGRES_USER: videocreator
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-prod}
+    volumes:
+      - vc_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U videocreator -d videocreator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: videocreator-backend:local
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      APP_MODE: server
+      DATABASE_URL: postgresql+asyncpg://videocreator:${POSTGRES_PASSWORD:-change-me-in-prod}@db:5432/videocreator
+      STORAGE_URL: file:///data/var/storage
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:8000"]'
+    volumes:
+      - vc_data:/data
+    restart: unless-stopped
+
+volumes:
+  vc_data:
+  vc_pgdata:

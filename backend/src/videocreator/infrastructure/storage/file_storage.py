@@ -78,7 +78,7 @@ class LocalFileStorage:
     def stream(self, bucket: str, key: str) -> BinaryIO:
         """Synchronous open returning a file object (used by FastAPI StreamingResponse)."""
         path = self._resolve(bucket, key)
-        return path.open("rb")  # noqa: SIM115 — caller owns lifecycle
+        return path.open("rb")
 
 
 __all__ = ["LocalFileStorage"]

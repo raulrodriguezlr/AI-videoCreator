@@ -1,0 +1,105 @@
+import os
+import json
+import time
+
+import structlog
+from google import genai
+from google.genai import types
+
+from videocreator.infrastructure.engine.utils.api_key_manager import get_api_key_manager
+from videocreator.infrastructure.engine.variables import GEMINI_MODEL_NAME
+
+log = structlog.get_logger(__name__)
+
+
+class YoutubeMetadataGenerator:
+    """
+    Genera metadatos listos para YouTube (título y descripción) a partir
+    del contexto del episodio.
+    """
+
+    def __init__(self):
+        self.key_manager = get_api_key_manager()
+        self.client = self.key_manager.get_client()
+
+    def generate_metadata(self, title: str, summary: str, moral: str) -> dict:
+        """
+        Llama a Gemini para generar un título SEO y una descripción atractiva para YouTube.
+        Devuelve un diccionario con el resultado.
+        """
+        log.info("youtube_generating_metadata", title=title)
+
+        system_instruction = (
+            "Eres un experto creador de contenido para YouTube, especializado en canales infantiles. "
+            "Tu objetivo es crear títulos súper atractivos y descripciones divertidas, "
+            "usando emojis, llamadas a la acción y resaltando la moraleja de la historia."
+        )
+
+        user_prompt = f"""
+        A partir del siguiente episodio de nuestra serie de cuentos infantiles generados con IA,
+        crea un título para YouTube y una descripción.
+
+        Título original: {title}
+        Resumen: {summary}
+        Moraleja: {moral}
+
+        Sigue estas reglas:
+        - El título DEBE terminar obligatoriamente con el sufijo " | Las Aventuras de Tico en el Bosque Mágico". La primera parte del título la inventas tú para que sea atractiva (ej: ¡Misión: Cruzar el Arroyo! ✨ | Las Aventuras de Tico en el Bosque Mágico).
+        - La descripción debe empezar con un saludo animado.
+        - Cuenta un poco de qué va sin hacer mucho spoiler.
+        - Haz una pregunta a los niños para que dejen comentarios.
+        - Recuerda pedir que se suscriban y le den a Me Gusta.
+        - Añade algunos hashtags relevantes al final. ¡Muy importante! Incluye siempre el hashtag #youtubekids.
+        - Devuelve EXCLUSIVAMENTE un objeto JSON válido con las claves "titulo_youtube" y "descripcion_youtube".
+        """
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=GEMINI_MODEL_NAME,
+                    contents=user_prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        response_mime_type="application/json",
+                    ),
+                )
+
+                data = json.loads(response.text)
+
+                # Garantizar que el sufijo esté presente pase lo que pase
+                suffix = " | Las Aventuras de Tico en el Bosque Mágico"
+                if not data.get("titulo_youtube", "").endswith(suffix):
+                    # Limpiar posibles variaciones que haya metido Gemini al final
+                    base_title = data.get("titulo_youtube", "").split(" | ")[0]
+                    data["titulo_youtube"] = f"{base_title}{suffix}"
+
+                log.info("youtube_metadata_generated", yt_title=data.get("titulo_youtube", "")[:60])
+                return data
+
+            except Exception as e:
+                log.warning("youtube_metadata_attempt_failed", attempt=attempt + 1, max=max_retries, error=str(e))
+                if attempt < max_retries - 1:
+                    time.sleep(2 * (attempt + 1))
+                else:
+                    log.error("youtube_metadata_failed", max_retries=max_retries)
+                    return {}
+
+    def generate_and_save(self, script_data: dict, output_dir: str):
+        """
+        Extrae la información del script, genera los metadatos y los guarda en un JSON.
+        """
+        title = script_data.get("title", "")
+        summary = script_data.get("summary", "")
+        moral = script_data.get("moral", "")
+
+        metadata = self.generate_metadata(title, summary, moral)
+
+        if metadata:
+            output_path = os.path.join(output_dir, "youtube_metadata.json")
+            try:
+                with open(output_path, "w", encoding="utf-8") as f:
+                    json.dump(metadata, f, indent=2, ensure_ascii=False)
+                log.info("youtube_metadata_saved", path=output_path)
+            except OSError as e:
+                log.warning("youtube_metadata_save_failed", error=str(e))

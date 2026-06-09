@@ -7,11 +7,13 @@ field aliases, and other HTTP-shaped concerns.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from videocreator.domain.value_objects import (
+    CharacterMode,
+    ContentType,
     EpisodeState,
     JobState,
     ProviderPreferences,
@@ -32,9 +34,17 @@ class PodConfigPayload(BaseModel):
     language: str = "es"
     art_style: str | None = None
     style_profile: StyleProfile = StyleProfile.CINEMATIC_3D
+    content_type: ContentType = ContentType.STORY
+    character_mode: CharacterMode = CharacterMode.REFERENCE
     duration_seconds: int = 120
+    # Per-clip ceiling (s) — drives scene-count maths + pacing (regression #5).
+    max_clip_seconds: int = 8
+    # Direct-to-audience questions to weave into dialogue, 0 = none (regression #1).
+    interactive_questions: int = 0
     provider_preferences: ProviderPreferences = Field(default_factory=ProviderPreferences)
     series_context: str | None = None
+    # Auto-maintained narrative memory — summaries of past episodes. Editable.
+    universe_memory: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -84,12 +94,61 @@ class CharacterResponse(BaseModel):
     created_at: datetime
 
 
+class UpdateCharacterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(None, min_length=1, max_length=80)
+    role: str | None = None
+    personality: str | None = None
+    look_description: str | None = None
+    voice: VoiceSettings | None = None
+
+
+class GenerateReferenceImageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    prompt: str = Field(..., min_length=3, max_length=1000,
+                        examples=["Tico the squirrel, Pixar style, full body, neutral pose"])
+
+
+class VoiceSearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(..., min_length=2, max_length=300,
+                       examples=["una niña dulce y energética"])
+
+
+class VoiceOptionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    voice_id: str
+    name: str
+    preview_url: str | None = None
+    description: str | None = None
+    gender: str | None = None
+    age: str | None = None
+    accent: str | None = None
+    language: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Topics
 # ---------------------------------------------------------------------------
 class GenerateTopicsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     count: int = Field(5, ge=1, le=20)
+    use_trends: bool = Field(
+        False, description="Ground ideas in current web trends for the pod's locale",
+    )
+
+
+class UpdateTopicRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = None
+    educational_value: str | None = None
+    status: TopicStatus | None = None
 
 
 class TopicResponse(BaseModel):
@@ -129,6 +188,8 @@ class ScriptResponse(BaseModel):
     version: int
     title: str
     summary: str | None
+    moral: str | None = None
+    ambient_audio_prompt: str | None = None
     scenes: list[SceneResponse]
     reviewed: bool
     created_at: datetime
@@ -154,12 +215,191 @@ class EpisodeResponse(BaseModel):
     final_video_key: str | None
     dubbed_video_key: str | None
     youtube_video_id: str | None
+    video_provider: str | None = None
+    video_model: str | None = None
+    source: str = "native"  # "filesystem" | "native" — origin of the episode
     created_at: datetime
     updated_at: datetime
 
 
 class EnqueueRenderResponse(BaseModel):
     job_id: str
+
+
+class UpdateEpisodeRequest(BaseModel):
+    """Patch editable episode fields. Omitted fields stay unchanged; sending
+    `video_provider: null` clears the per-episode override (pod default wins)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(None, min_length=1, max_length=200)
+    state: EpisodeState | None = None
+    video_provider: str | None = None
+    video_model: str | None = None
+
+
+class MediaAssetResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["video", "image", "audio", "subtitle", "data"]
+    name: str
+    url: str
+    group: str | None = None
+    content_type: str | None = None
+    size_bytes: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# Shorts
+# ---------------------------------------------------------------------------
+class CreateShortRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_episode_id: str
+    duration_s: float = Field(30.0, gt=0.0, le=600.0)
+    target_platform: Literal["tiktok", "reels", "shorts"] = "shorts"
+    hook_text: str | None = None
+
+
+class ShortResponse(BaseModel):
+    id: str
+    pod_id: str
+    source_episode_id: str | None
+    aspect: str
+    duration_s: float
+    hook_text: str | None
+    rendered_video_key: str | None
+    target_platform: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# SEO + title optimization
+# ---------------------------------------------------------------------------
+class GenerateSeoRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    variant_count: int = Field(4, ge=1, le=10)
+
+
+class SeoMetadataResponse(BaseModel):
+    id: str
+    pod_id: str
+    episode_id: str
+    description: str
+    tags: list[str]
+    hashtags: list[str]
+    title_variants: list[str]
+    selected_title: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RecommendTitleResponse(BaseModel):
+    """The bandit's pick plus every variant's score, for auditability."""
+
+    title: str
+    score: float
+    scores: dict[str, float]
+
+
+class RecordTitleOutcomeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(..., min_length=1)
+    reward: float = Field(..., ge=0.0, le=1.0, examples=[0.12])
+
+
+# ---------------------------------------------------------------------------
+# AI Pod Wizard
+# ---------------------------------------------------------------------------
+class EnhanceIdeaRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    idea: str = Field(..., min_length=3, max_length=2000)
+    language: str = "es"
+
+
+class EnhanceIdeaResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enhanced: str
+
+
+class DraftPodBlueprintRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    idea: str = Field(
+        ..., min_length=3, max_length=2000,
+        examples=["Curiosidades del espacio para niños"],
+    )
+    language: str = "es"
+    character_count: int = Field(3, ge=1, le=5)
+    topic_count: int = Field(5, ge=1, le=20)
+    content_type: ContentType = ContentType.STORY
+    # Optional override; when None the content type's default mode is used.
+    character_mode: CharacterMode | None = None
+
+
+class SeriesBiblePayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    genre: str
+    audience: str = "general"
+    tone: str | None = None
+    narrative_arc: str | None = None
+    format: str | None = None
+    language: str = "es"
+
+
+class CharacterBlueprintPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    role: str = "supporting"
+    personality: str | None = None
+    look_description: str | None = None
+
+
+class PodBlueprintPayload(BaseModel):
+    """The wizard's draft — returned for editing, then sent back to commit."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    series_name: str
+    bible: SeriesBiblePayload
+    style_profile: StyleProfile = StyleProfile.CINEMATIC_3D
+    art_style: str | None = None
+    characters: list[CharacterBlueprintPayload] = Field(default_factory=list)
+    topic_seeds: list[str] = Field(default_factory=list)
+    content_type: ContentType = ContentType.STORY
+    character_mode: CharacterMode = CharacterMode.REFERENCE
+    duration_seconds: int = 120
+    max_clip_seconds: int = 8
+    interactive_questions: int = 0
+
+
+class CreatePodFromBlueprintRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(..., min_length=1, max_length=80)
+    blueprint: PodBlueprintPayload
+
+
+# ---------------------------------------------------------------------------
+# Secrets (BYO provider keys)
+# ---------------------------------------------------------------------------
+class SetProviderKeyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: str = Field(..., min_length=1, examples=["sk-your-provider-key"])
+
+
+class ProviderKeysResponse(BaseModel):
+    """Provider names with a stored key — never the key values themselves."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    providers: list[str] = Field(default_factory=list, examples=[["google", "artlist"]])
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +431,19 @@ class ProviderHealthResponse(BaseModel):
     cost_per_second_usd: float | None = None
 
 
+class ProviderCatalogEntry(BaseModel):
+    """A video provider plus the models the UI can offer for it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    available: bool
+    message: str | None = None
+    models: list[str] = Field(default_factory=list)
+    #: Human-friendly display name for the dropdown (defaults to `name`).
+    label: str | None = None
+
+
 class ModelHandleResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -215,6 +468,138 @@ class ProviderSelectionResponse(BaseModel):
     params: dict[str, Any]
 
 
+class EpisodeDetailResponse(BaseModel):
+    """One-shot payload for the episode workspace screen — episode + script +
+    SEO + every viewable media artifact."""
+
+    episode: EpisodeResponse
+    script: ScriptResponse | None = None
+    seo: SeoMetadataResponse | None = None
+    media: list[MediaAssetResponse] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# System / LLM runtime control
+# ---------------------------------------------------------------------------
+class OllamaStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    running: bool
+    base_url: str
+    models: list[str] = Field(default_factory=list)
+    current_model_installed: bool = False
+    error: str | None = None
+
+
+class LlmConfigResponse(BaseModel):
+    """Effective LLM selection + live Ollama status for the settings screen."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["gemini", "ollama"]
+    gemini_model: str
+    ollama_model: str
+    gemini_key_present: bool
+    ollama: OllamaStatusResponse
+
+
+class SetLlmConfigRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["gemini", "ollama"] | None = None
+    gemini_model: str | None = Field(None, min_length=1)
+    ollama_model: str | None = Field(None, min_length=1)
+
+
+class OllamaPullRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model: str = Field(..., min_length=1, examples=["qwen2.5:14b-instruct"])
+
+
+class OllamaModelOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    label: str
+    params: str
+    min_vram_gb: float
+    notes: str
+    fits: bool
+    installed: bool
+
+
+class RecommendedModelsResponse(BaseModel):
+    """GPU-aware shortlist of strong models for the local LLM dropdown."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    vram_gb: float | None = None
+    models: list[OllamaModelOption] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Raw pod JSON files (config.json / prompts.json / video_rules.json)
+# ---------------------------------------------------------------------------
+class PodFileListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    files: list[str] = Field(default_factory=list)
+
+
+class PodFileContentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    content: str
+
+
+class WritePodFileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    content: str = Field(..., description="Raw JSON text; must parse as valid JSON")
+
+
+# ---------------------------------------------------------------------------
+# Auth (server mode)
+# ---------------------------------------------------------------------------
+class RegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(..., min_length=3, max_length=255, examples=["you@studio.com"])
+    password: str = Field(..., min_length=8, max_length=200)
+
+
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=1, max_length=200)
+
+
+class RefreshRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    refresh_token: str = Field(..., min_length=1)
+
+
+class TokenResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class MeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    email: str
+    role: str
+
+
 # ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
@@ -226,12 +611,61 @@ class HealthResponse(BaseModel):
 
 
 __all__ = [
-    "PodConfigPayload", "CreatePodRequest", "UpdatePodConfigRequest", "PodResponse",
-    "CreateCharacterRequest", "CharacterResponse",
-    "GenerateTopicsRequest", "TopicResponse",
-    "GenerateScriptRequest", "SceneResponse", "ScriptResponse",
-    "CreateEpisodeRequest", "EpisodeResponse", "EnqueueRenderResponse",
-    "JobResponse",
-    "ProviderHealthResponse", "ModelHandleResponse", "ProviderSelectionResponse",
+    "CharacterBlueprintPayload",
+    "CharacterResponse",
+    "CreateCharacterRequest",
+    "CreateEpisodeRequest",
+    "CreatePodFromBlueprintRequest",
+    "CreatePodRequest",
+    "CreateShortRequest",
+    "DraftPodBlueprintRequest",
+    "EnhanceIdeaRequest",
+    "EnhanceIdeaResponse",
+    "EnqueueRenderResponse",
+    "EpisodeDetailResponse",
+    "EpisodeResponse",
+    "GenerateReferenceImageRequest",
+    "GenerateScriptRequest",
+    "GenerateSeoRequest",
+    "GenerateTopicsRequest",
     "HealthResponse",
+    "JobResponse",
+    "LlmConfigResponse",
+    "LoginRequest",
+    "MeResponse",
+    "MediaAssetResponse",
+    "ModelHandleResponse",
+    "OllamaModelOption",
+    "OllamaPullRequest",
+    "OllamaStatusResponse",
+    "PodBlueprintPayload",
+    "PodConfigPayload",
+    "PodFileContentResponse",
+    "PodFileListResponse",
+    "PodResponse",
+    "ProviderCatalogEntry",
+    "ProviderHealthResponse",
+    "ProviderKeysResponse",
+    "ProviderSelectionResponse",
+    "RecommendTitleResponse",
+    "RecommendedModelsResponse",
+    "RecordTitleOutcomeRequest",
+    "RefreshRequest",
+    "RegisterRequest",
+    "SceneResponse",
+    "ScriptResponse",
+    "SeoMetadataResponse",
+    "SeriesBiblePayload",
+    "SetLlmConfigRequest",
+    "SetProviderKeyRequest",
+    "ShortResponse",
+    "TokenResponse",
+    "TopicResponse",
+    "UpdateCharacterRequest",
+    "UpdateEpisodeRequest",
+    "UpdatePodConfigRequest",
+    "UpdateTopicRequest",
+    "VoiceOptionResponse",
+    "VoiceSearchRequest",
+    "WritePodFileRequest",
 ]

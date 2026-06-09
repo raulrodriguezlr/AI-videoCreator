@@ -116,9 +116,11 @@ class BaseHttpVideoProvider:
         seed: int | None,
         has_audio: bool = True,
     ) -> ClipArtifact:
+        # `put` already returns a fully-qualified `bucket/key`, so we use it
+        # verbatim — prefixing CLIP_BUCKET again would double the bucket segment.
         storage_key = await self._storage.put(CLIP_BUCKET, key, data)
         return ClipArtifact(
-            storage_key=f"{CLIP_BUCKET}/{storage_key}",
+            storage_key=storage_key,
             duration_s=duration_s,
             width=width,
             height=height,

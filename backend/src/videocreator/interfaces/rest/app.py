@@ -16,15 +16,22 @@ from videocreator.infrastructure.container import get_container
 from videocreator.infrastructure.persistence.database import dispose_db, init_db
 from videocreator.interfaces.rest.errors import install_error_handlers
 from videocreator.interfaces.rest.routers import (
+    auth,
     characters,
     episodes,
     health,
     jobs,
+    pod_files,
     pods,
     providers,
     scripts,
+    secrets,
+    seo,
+    shorts,
     storage,
+    system,
     topics,
+    wizard,
 )
 from videocreator.shared.config import Settings, get_settings
 from videocreator.shared.logging import configure_logging, get_logger
@@ -41,7 +48,15 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await init_db(settings)
     log.info("app.startup", mode=settings.app_mode, db=settings.database_url)
     # Eagerly warm the container so DB connectivity issues surface at startup.
-    get_container()
+    container = get_container()
+    # Reconcile jobs orphaned by a previous run: the in-process queue dies with
+    # the app, so anything still 'running'/'queued' isn't actually executing.
+    try:
+        reconciled = await container.job_repo().reconcile_interrupted()
+        if reconciled:
+            log.info("app.startup.jobs_reconciled", count=reconciled)
+    except Exception:
+        log.warning("app.startup.jobs_reconcile_failed", exc_info=True)
     try:
         yield
     finally:
@@ -78,15 +93,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
 
     app.include_router(health.router, prefix=API_PREFIX)
+    app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(pods.router, prefix=API_PREFIX)
     app.include_router(characters.router, prefix=API_PREFIX)
     app.include_router(topics.router, prefix=API_PREFIX)
     app.include_router(scripts.router, prefix=API_PREFIX)
     app.include_router(episodes.router, prefix=API_PREFIX)
+    app.include_router(seo.router, prefix=API_PREFIX)
+    app.include_router(shorts.router, prefix=API_PREFIX)
     app.include_router(jobs.router, prefix=API_PREFIX)
+    app.include_router(secrets.router, prefix=API_PREFIX)
     app.include_router(providers.router, prefix=API_PREFIX)
     app.include_router(storage.router, prefix=API_PREFIX)
+    app.include_router(system.router, prefix=API_PREFIX)
+    app.include_router(pod_files.router, prefix=API_PREFIX)
+    app.include_router(wizard.router, prefix=API_PREFIX)
     return app
 
 
-__all__ = ["create_app", "API_PREFIX"]
+__all__ = ["API_PREFIX", "create_app"]

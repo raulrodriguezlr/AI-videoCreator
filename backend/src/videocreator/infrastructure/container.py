@@ -4,9 +4,11 @@ This is the only place where adapter implementations are picked. The rest of
 the codebase depends on `videocreator.domain.ports` Protocols, so swapping a
 backend is a one-line change here.
 
-Currently only `local` mode adapters are wired. `server` and `cloud` modes
-raise on resolution so misconfiguration fails loudly rather than silently
-falling back to local.
+Persistence + filesystem storage + the in-process queue are mode-agnostic, so
+`local` and single-node `server` mode (Postgres + local disk) both work by just
+pointing `database_url` / `storage_url` at the right backend. Only object
+storage (s3://) and a distributed queue (Redis/Arq) remain unimplemented and
+raise loudly on resolution rather than silently degrading.
 """
 from __future__ import annotations
 
@@ -16,19 +18,32 @@ from typing import Any, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from videocreator.application.use_cases.auth import (
+    CurrentUser,
+    LoginUser,
+    RefreshSession,
+    RegisterUser,
+)
 from videocreator.application.use_cases.characters import (
+    AddCharacterReferences,
     CreateCharacter,
     DeleteCharacter,
+    GenerateCharacterReference,
     ListCharacters,
+    RemoveCharacterReference,
+    UpdateCharacter,
 )
 from videocreator.application.use_cases.episodes import (
     CreateEpisodeFromScript,
+    DeleteEpisode,
     EnqueueEpisodeRender,
     GetEpisode,
+    GetEpisodeDetail,
     ListEpisodes,
+    UpdateEpisode,
 )
-from videocreator.application.use_cases.import_legacy import ImportLegacyPods
-from videocreator.application.use_cases.jobs import GetJob, ListRecentJobs
+from videocreator.application.use_cases.import_pods import ImportPods
+from videocreator.application.use_cases.jobs import DeleteJob, GetJob, ListRecentJobs
 from videocreator.application.use_cases.pods import (
     CreatePod,
     DeletePod,
@@ -36,32 +51,75 @@ from videocreator.application.use_cases.pods import (
     ListPods,
     UpdatePodConfig,
 )
-from videocreator.application.use_cases.scripts import GenerateScript, ListScripts
-from videocreator.application.use_cases.topics import GenerateTopics, ListTopics
+from videocreator.application.use_cases.scripts import GenerateScript, ListScripts, ReviewScript
+from videocreator.application.use_cases.secrets import (
+    DeleteProviderKey,
+    ListProviderKeys,
+    SetProviderKey,
+)
+from videocreator.application.use_cases.seo import (
+    GenerateSeoMetadata,
+    GetSeoMetadata,
+    RecommendTitle,
+    RecordTitleOutcome,
+)
+from videocreator.application.use_cases.shorts import (
+    CreateShortFromEpisode,
+    EnqueueShortRender,
+    GetShort,
+    ListShorts,
+)
+from videocreator.application.use_cases.shorts_planning import SelectShortHighlights
+from videocreator.application.use_cases.topics import (
+    DeleteTopic,
+    GenerateTopics,
+    ListTopics,
+    UpdateTopic,
+)
+from videocreator.application.use_cases.wizard import (
+    CreatePodFromBlueprint,
+    DraftPodBlueprint,
+    EnhanceIdea,
+)
 from videocreator.domain.ports import (
     CharacterRepository,
     EpisodeRepository,
     EventBusPort,
+    ImageGenerationPort,
     JobQueuePort,
     JobRepository,
     LLMPort,
+    MediaLibraryPort,
     PodRepository,
     ScriptRepository,
     SecretVaultPort,
+    SeoRepository,
+    ShortComposerPort,
+    ShortRepository,
     StoragePort,
     TopicRepository,
+    TrendSourcePort,
     UserRepository,
+    VideoAssemblerPort,
     VideoProviderPort,
 )
+from videocreator.domain.services.linucb import LinUcbBandit
 from videocreator.domain.services.provider_router import ProviderRouter
-from videocreator.domain.value_objects import JobKind
+from videocreator.domain.services.short_planner import ShortPlanner
+from videocreator.domain.value_objects import JobKind, ShortsRules
+from videocreator.infrastructure.filesystem.file_store import PodFileStore
 from videocreator.infrastructure.handlers.episode_render import EpisodeRenderHandler
+from videocreator.infrastructure.handlers.short_render import ShortRenderHandler
 from videocreator.infrastructure.llm.gemini_llm import GeminiLLM
+from videocreator.infrastructure.llm.ollama_llm import OllamaLLM
+from videocreator.infrastructure.media.library import LocalMediaLibrary
+from videocreator.infrastructure.persistence.database import get_sessionmaker
 from videocreator.infrastructure.providers.artlist_provider import ArtlistProvider
 from videocreator.infrastructure.providers.elevenlabs_studio_provider import (
     ElevenLabsStudioProvider,
 )
-from videocreator.infrastructure.persistence.database import get_sessionmaker
+from videocreator.infrastructure.providers.elevenlabs_voices import ElevenLabsVoiceSearch
+from videocreator.infrastructure.providers.gemini_image import GeminiImageProvider
 from videocreator.infrastructure.queue.inprocess import (
     InMemoryEventBus,
     InProcessJobQueue,
@@ -72,11 +130,22 @@ from videocreator.infrastructure.repositories.sql_repos import (
     SqlJobRepository,
     SqlPodRepository,
     SqlScriptRepository,
+    SqlSeoRepository,
+    SqlShortRepository,
     SqlTopicRepository,
     SqlUserRepository,
 )
-from videocreator.infrastructure.security.secret_vault import EnvSecretVault
+from videocreator.infrastructure.security.cipher import SecretCipher
+from videocreator.infrastructure.security.passwords import Argon2PasswordHasher
+from videocreator.infrastructure.security.secret_vault import DbSecretVault, EnvSecretVault
+from videocreator.infrastructure.security.tokens import JwtTokenService
 from videocreator.infrastructure.storage.file_storage import LocalFileStorage
+from videocreator.infrastructure.system.ollama_admin import OllamaAdmin
+from videocreator.infrastructure.system.runtime_config import JsonRuntimeConfig
+from videocreator.infrastructure.trends.google_trends import GoogleTrendsRss
+from videocreator.infrastructure.video.ffmpeg_assembler import FfmpegVideoAssembler
+from videocreator.infrastructure.video.short_composer import FfmpegShortComposer
+from videocreator.infrastructure.video.shorts_rules import default_shorts_rules
 from videocreator.shared.config import Settings, get_settings
 from videocreator.shared.logging import get_logger
 
@@ -106,57 +175,57 @@ class Container:
     def _sessionmaker(self) -> async_sessionmaker[AsyncSession]:
         return self._get("sessionmaker", lambda: get_sessionmaker(self.settings))
 
-    # ---- adapters (mode-aware) -------------------------------------------
-    # Repos are cached as singletons because they own only a session_factory
-    # (no per-request state) — the factory builds fresh sessions per call.
+    # ---- persistence (DB-backed; works for SQLite *and* Postgres) ---------
+    # The SQL repos are storage-agnostic — the concrete database is decided by
+    # `database_url` (sqlite+aiosqlite / postgresql+asyncpg), so the same
+    # adapters serve local *and* server mode. They're cached as singletons
+    # because they own only a session_factory (no per-request state).
     def pod_repo(self) -> PodRepository:
-        if self.settings.is_local:
-            return self._get("pod_repo", lambda: SqlPodRepository(self._sessionmaker()))
-        raise NotImplementedError(f"pod_repo not wired for mode={self.settings.app_mode}")
+        return self._get("pod_repo", lambda: SqlPodRepository(self._sessionmaker()))
 
     def character_repo(self) -> CharacterRepository:
-        if self.settings.is_local:
-            return self._get("character_repo", lambda: SqlCharacterRepository(self._sessionmaker()))
-        raise NotImplementedError(f"character_repo not wired for mode={self.settings.app_mode}")
+        return self._get("character_repo", lambda: SqlCharacterRepository(self._sessionmaker()))
 
     def topic_repo(self) -> TopicRepository:
-        if self.settings.is_local:
-            return self._get("topic_repo", lambda: SqlTopicRepository(self._sessionmaker()))
-        raise NotImplementedError(f"topic_repo not wired for mode={self.settings.app_mode}")
+        return self._get("topic_repo", lambda: SqlTopicRepository(self._sessionmaker()))
 
     def script_repo(self) -> ScriptRepository:
-        if self.settings.is_local:
-            return self._get("script_repo", lambda: SqlScriptRepository(self._sessionmaker()))
-        raise NotImplementedError(f"script_repo not wired for mode={self.settings.app_mode}")
+        return self._get("script_repo", lambda: SqlScriptRepository(self._sessionmaker()))
 
     def episode_repo(self) -> EpisodeRepository:
-        if self.settings.is_local:
-            return self._get("episode_repo", lambda: SqlEpisodeRepository(self._sessionmaker()))
-        raise NotImplementedError(f"episode_repo not wired for mode={self.settings.app_mode}")
+        return self._get("episode_repo", lambda: SqlEpisodeRepository(self._sessionmaker()))
+
+    def short_repo(self) -> ShortRepository:
+        return self._get("short_repo", lambda: SqlShortRepository(self._sessionmaker()))
+
+    def seo_repo(self) -> SeoRepository:
+        return self._get("seo_repo", lambda: SqlSeoRepository(self._sessionmaker()))
 
     def job_repo(self) -> JobRepository:
-        if self.settings.is_local:
-            return self._get("job_repo", lambda: SqlJobRepository(self._sessionmaker()))
-        raise NotImplementedError(f"job_repo not wired for mode={self.settings.app_mode}")
+        return self._get("job_repo", lambda: SqlJobRepository(self._sessionmaker()))
 
     def user_repo(self) -> UserRepository:
-        if self.settings.is_local:
-            return self._get("user_repo", lambda: SqlUserRepository(self._sessionmaker()))
-        raise NotImplementedError(f"user_repo not wired for mode={self.settings.app_mode}")
+        return self._get("user_repo", lambda: SqlUserRepository(self._sessionmaker()))
 
     def storage(self) -> StoragePort:
-        return self._get("storage", lambda: self._build_storage())
+        return self._get("storage", self._build_storage)
 
     def _build_storage(self) -> StoragePort:
-        if self.settings.is_local:
+        # Keyed off the URL scheme, not the app mode: a single-node server can
+        # run Postgres + local-disk storage. Object storage (s3://) is the only
+        # unimplemented backend.
+        if self.settings.storage_url.startswith("file://"):
             return LocalFileStorage(self.settings.storage_path)
-        raise NotImplementedError(f"storage not wired for mode={self.settings.app_mode}")
+        raise NotImplementedError(
+            f"storage backend not wired for url={self.settings.storage_url!r} "
+            "(only file:// is implemented; s3:// is pending)"
+        )
 
     def event_bus(self) -> EventBusPort:
         return self._get("event_bus", InMemoryEventBus)
 
     def job_queue(self) -> JobQueuePort:
-        return self._get("job_queue", lambda: self._build_job_queue())
+        return self._get("job_queue", self._build_job_queue)
 
     def _build_job_queue(self) -> JobQueuePort:
         if self.settings.queue_backend == "inprocess":
@@ -176,20 +245,96 @@ class Container:
                 pod_repo=self.pod_repo(),
                 script_repo=self.script_repo(),
                 episode_repo=self.episode_repo(),
+                character_repo=self.character_repo(),
                 storage=self.storage(),
                 settings=self.settings,
+                router=self.provider_router(),
+            ),
+        )
+        queue.register(
+            JobKind.GENERATE_SHORT,
+            ShortRenderHandler(
+                pod_repo=self.pod_repo(),
+                short_repo=self.short_repo(),
+                episode_repo=self.episode_repo(),
+                script_repo=self.script_repo(),
+                storage=self.storage(),
+                composer=self.short_composer(),
+                planner=self.short_planner(),
+                rules=self.shorts_rules(),
+                settings=self.settings,
+                assembler=self.video_assembler(),
+                highlight_selector=self.short_highlight_selector(),
             ),
         )
 
+    def password_hasher(self) -> Argon2PasswordHasher:
+        return self._get("password_hasher", Argon2PasswordHasher)
+
+    def token_service(self) -> JwtTokenService:
+        return self._get("token_service", lambda: JwtTokenService(self.settings))
+
     def secret_vault(self) -> SecretVaultPort:
-        return self._get("secret_vault", lambda: EnvSecretVault(self.settings))
+        return self._get("secret_vault", self._build_secret_vault)
+
+    def _build_secret_vault(self) -> SecretVaultPort:
+        """Pick the encrypted DB vault when a key is configured, else env vault.
+
+        This keeps the zero-config local experience (keys via env) while letting
+        any mode opt into encrypted, per-user BYO keys just by setting
+        `secret_encryption_key`.
+        """
+        key = self.settings.secret_encryption_key
+        if key:
+            return DbSecretVault(self._sessionmaker(), SecretCipher(key))
+        return EnvSecretVault(self.settings)
+
+    def runtime_config(self) -> JsonRuntimeConfig:
+        return self._get(
+            "runtime_config", lambda: JsonRuntimeConfig(self.settings.var_dir / "runtime.json"),
+        )
+
+    def ollama_admin(self) -> OllamaAdmin:
+        return self._get(
+            "ollama_admin", lambda: OllamaAdmin(self.settings, self.runtime_config()),
+        )
+
+    def llm_config(self) -> dict[str, str]:
+        """Effective LLM config = settings baseline overridden by runtime.json."""
+        rc = self.runtime_config().get()
+        return {
+            "provider": str(rc.get("llm_provider", self.settings.llm_provider)),
+            "gemini_model": str(rc.get("gemini_model", self.settings.gemini_model)),
+            "ollama_model": str(rc.get("ollama_model", self.settings.ollama_model)),
+        }
+
+    def set_llm_config(
+        self, *, provider: str | None = None, ollama_model: str | None = None,
+        gemini_model: str | None = None,
+    ) -> dict[str, str]:
+        """Persist runtime LLM overrides and drop the cached adapter so the next
+        request rebuilds against the new selection — no restart needed."""
+        self.runtime_config().set(
+            llm_provider=provider, ollama_model=ollama_model, gemini_model=gemini_model,
+        )
+        self._singletons.pop("llm", None)
+        return self.llm_config()
 
     def llm(self) -> LLMPort:
-        return self._get("llm", lambda: GeminiLLM(self.settings))
+        return self._get("llm", self._build_llm)
+
+    def _build_llm(self) -> LLMPort:
+        cfg = self.llm_config()
+        if cfg["provider"] == "ollama":
+            return OllamaLLM(
+                self.settings, default_model=cfg["ollama_model"],
+                ensure_running=self.ollama_admin().serve,
+            )
+        return GeminiLLM(self.settings, default_model=cfg["gemini_model"])
 
     # ---- video providers --------------------------------------------------
     #: Provider names this build knows how to construct. veo/ltx remain in the
-    #: legacy engine path for now and are surfaced as "legacy" until ported.
+    #: engine path for now and are surfaced as pending until ported.
     KNOWN_VIDEO_PROVIDERS: tuple[str, ...] = ("artlist", "elevenlabs_studio")
 
     def provider_router(self) -> ProviderRouter:
@@ -206,8 +351,49 @@ class Container:
             )
         raise NotImplementedError(f"video provider '{name}' is not wired in this build")
 
+    def video_assembler(self) -> VideoAssemblerPort:
+        return self._get("video_assembler", FfmpegVideoAssembler)
+
+    # ---- shorts engine ----------------------------------------------------
+    def short_composer(self) -> ShortComposerPort:
+        return self._get("short_composer", FfmpegShortComposer)
+
+    def short_planner(self) -> ShortPlanner:
+        return self._get("short_planner", ShortPlanner)
+
+    def short_highlight_selector(self) -> SelectShortHighlights:
+        return self._get(
+            "short_highlight_selector",
+            lambda: SelectShortHighlights(llm=self.llm()),
+        )
+
+    def shorts_rules(self) -> ShortsRules:
+        return self._get("shorts_rules", default_shorts_rules)
+
+    # ---- media library ----------------------------------------------------
+    def media_library(self) -> MediaLibraryPort:
+        return self._get("media_library", lambda: LocalMediaLibrary(self.storage()))
+
+    def image_provider(self) -> ImageGenerationPort:
+        return self._get("image_provider", lambda: GeminiImageProvider(self.settings))
+
+    def trend_source(self) -> TrendSourcePort:
+        return self._get("trend_source", GoogleTrendsRss)
+
+    def voice_search(self) -> ElevenLabsVoiceSearch:
+        return self._get("voice_search", lambda: ElevenLabsVoiceSearch(self.settings, self.llm()))
+
+    def pod_file_store(self) -> PodFileStore:
+        return self._get(
+            "pod_file_store", lambda: PodFileStore(self.settings.pods_dir),
+        )
+
+    # ---- SEO / optimization ----------------------------------------------
+    def bandit(self) -> LinUcbBandit:
+        return self._get("bandit", LinUcbBandit)
+
     # ---- use cases (freshly built) ---------------------------------------
-    def use_cases(self) -> "UseCases":
+    def use_cases(self) -> UseCases:
         return UseCases(self)
 
 
@@ -226,8 +412,22 @@ class UseCases:
         self.topics = _TopicUseCases(c)
         self.scripts = _ScriptUseCases(c)
         self.episodes = _EpisodeUseCases(c)
+        self.shorts = _ShortsUseCases(c)
+        self.seo = _SeoUseCases(c)
+        self.wizard = _WizardUseCases(c)
+        self.secrets = _SecretUseCases(c)
+        self.auth = _AuthUseCases(c)
         self.jobs = _JobUseCases(c)
-        self.legacy = _LegacyUseCases(c)
+        self.pod_sources = _PodSourceUseCases(c)
+
+
+class _AuthUseCases:
+    def __init__(self, c: Container) -> None:
+        users, hasher, tokens = c.user_repo(), c.password_hasher(), c.token_service()
+        self.register = RegisterUser(users, hasher, tokens)
+        self.login = LoginUser(users, hasher, tokens)
+        self.refresh = RefreshSession(users, tokens)
+        self.current = CurrentUser(users)
 
 
 class _PodUseCases:
@@ -243,21 +443,30 @@ class _CharacterUseCases:
     def __init__(self, c: Container) -> None:
         self.create = CreateCharacter(c.pod_repo(), c.character_repo())
         self.list = ListCharacters(c.pod_repo(), c.character_repo())
+        self.update = UpdateCharacter(c.pod_repo(), c.character_repo())
         self.delete = DeleteCharacter(c.pod_repo(), c.character_repo())
+        self.add_refs = AddCharacterReferences(c.pod_repo(), c.character_repo(), c.storage())
+        self.generate_ref = GenerateCharacterReference(
+            c.pod_repo(), c.character_repo(), c.storage(), c.image_provider(),
+        )
+        self.remove_ref = RemoveCharacterReference(c.pod_repo(), c.character_repo(), c.storage())
 
 
 class _TopicUseCases:
     def __init__(self, c: Container) -> None:
-        self.generate = GenerateTopics(c.pod_repo(), c.topic_repo(), c.llm())
+        self.generate = GenerateTopics(c.pod_repo(), c.topic_repo(), c.llm(), c.trend_source())
         self.list = ListTopics(c.pod_repo(), c.topic_repo())
+        self.update = UpdateTopic(c.pod_repo(), c.topic_repo())
+        self.delete = DeleteTopic(c.pod_repo(), c.topic_repo())
 
 
 class _ScriptUseCases:
     def __init__(self, c: Container) -> None:
         self.generate = GenerateScript(
-            c.pod_repo(), c.topic_repo(), c.script_repo(), c.llm(),
+            c.pod_repo(), c.topic_repo(), c.script_repo(), c.character_repo(), c.llm(),
         )
         self.list = ListScripts(c.pod_repo(), c.script_repo())
+        self.review = ReviewScript(c.pod_repo(), c.script_repo(), c.llm())
 
 
 class _EpisodeUseCases:
@@ -270,18 +479,65 @@ class _EpisodeUseCases:
         )
         self.list = ListEpisodes(c.pod_repo(), c.episode_repo())
         self.get = GetEpisode(c.pod_repo(), c.episode_repo())
+        self.detail = GetEpisodeDetail(
+            c.pod_repo(), c.episode_repo(), c.script_repo(), c.seo_repo(),
+            c.media_library(),
+        )
+        self.update = UpdateEpisode(c.pod_repo(), c.episode_repo())
+        self.delete = DeleteEpisode(c.pod_repo(), c.episode_repo())
+
+
+class _ShortsUseCases:
+    def __init__(self, c: Container) -> None:
+        self.create_from_episode = CreateShortFromEpisode(
+            c.pod_repo(), c.episode_repo(), c.short_repo(),
+        )
+        self.enqueue_render = EnqueueShortRender(
+            c.pod_repo(), c.short_repo(), c.job_queue(),
+        )
+        self.list = ListShorts(c.pod_repo(), c.short_repo())
+        self.get = GetShort(c.pod_repo(), c.short_repo())
+
+
+class _SeoUseCases:
+    def __init__(self, c: Container) -> None:
+        self.generate = GenerateSeoMetadata(
+            c.pod_repo(), c.episode_repo(), c.seo_repo(), c.llm(), c.bandit(),
+        )
+        self.get = GetSeoMetadata(c.pod_repo(), c.seo_repo())
+        self.recommend = RecommendTitle(c.pod_repo(), c.seo_repo(), c.bandit())
+        self.record_outcome = RecordTitleOutcome(c.pod_repo(), c.seo_repo(), c.bandit())
+
+
+class _WizardUseCases:
+    def __init__(self, c: Container) -> None:
+        self.enhance = EnhanceIdea(c.llm())
+        self.draft = DraftPodBlueprint(c.llm())
+        self.create_pod = CreatePodFromBlueprint(
+            c.pod_repo(), c.character_repo(), c.topic_repo(),
+        )
+
+
+class _SecretUseCases:
+    def __init__(self, c: Container) -> None:
+        vault = c.secret_vault()
+        self.set = SetProviderKey(vault)
+        self.list = ListProviderKeys(vault)
+        self.delete = DeleteProviderKey(vault)
 
 
 class _JobUseCases:
     def __init__(self, c: Container) -> None:
         self.get = GetJob(c.job_repo())
         self.list_recent = ListRecentJobs(c.job_repo())
+        self.delete = DeleteJob(c.job_repo())
 
 
-class _LegacyUseCases:
+class _PodSourceUseCases:
     def __init__(self, c: Container) -> None:
-        self.import_pods = ImportLegacyPods(
+        self.import_pods = ImportPods(
             c.pod_repo(), c.character_repo(), c.topic_repo(),
+            c.episode_repo(), c.seo_repo(), c.script_repo(), c.storage(),
         )
 
 

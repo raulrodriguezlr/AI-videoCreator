@@ -12,10 +12,33 @@ from dataclasses import dataclass
 from typing import Any
 
 from videocreator.domain.entities import Topic
-from videocreator.domain.ports import LLMPort, PodRepository, TopicRepository
+from videocreator.domain.ports import (
+    LLMPort,
+    PodRepository,
+    TopicRepository,
+    TrendSourcePort,
+)
 from videocreator.domain.value_objects import TopicStatus
-from videocreator.shared.errors import ForbiddenError, PodNotFound, ProviderError
-from videocreator.shared.ids import PodId, UserId, new_topic_id
+from videocreator.shared.errors import (
+    ForbiddenError,
+    NotFoundError,
+    PodNotFound,
+    ProviderError,
+)
+from videocreator.shared.ids import PodId, TopicId, UserId, new_topic_id
+
+
+async def _owned_topic(
+    topic_repo: TopicRepository, pod_repo: PodRepository,
+    topic_id: TopicId, requester_id: UserId,
+) -> Topic:
+    topic = await topic_repo.get(topic_id)
+    if topic is None:
+        raise NotFoundError(f"topic {topic_id} not found")
+    pod = await pod_repo.get(topic.pod_id)
+    if pod is None or not pod.is_owned_by(requester_id):
+        raise ForbiddenError("topic belongs to a pod owned by a different user")
+    return topic
 
 _TOPIC_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -39,13 +62,21 @@ _TOPIC_SCHEMA: dict[str, Any] = {
 
 def _render_topic_prompt(
     *, series_name: str, target_audience: str, language: str,
-    series_context: str | None, count: int,
+    series_context: str | None, count: int, trends: list[str] | None = None,
 ) -> str:
     ctx = series_context.strip() if series_context else "(no extra context)"
+    trend_block = ""
+    if trends:
+        joined = ", ".join(trends)
+        trend_block = (
+            f"\nCurrent trending search terms to take inspiration from where they "
+            f"fit the series (adapt, don't copy verbatim): {joined}.\n"
+        )
     return (
         f"You are a curriculum designer for the educational video series '{series_name}'.\n"
         f"Audience: {target_audience}. Language: {language}.\n"
-        f"Series context: {ctx}\n\n"
+        f"Series context: {ctx}\n"
+        f"{trend_block}\n"
         f"Propose {count} fresh topic ideas. Each topic must be specific, "
         f"educationally valuable, and suitable for a short (~2-3 minute) video.\n"
         f"Return strict JSON matching the supplied schema."
@@ -57,9 +88,11 @@ class GenerateTopics:
     pod_repo: PodRepository
     topic_repo: TopicRepository
     llm: LLMPort
+    trends: TrendSourcePort | None = None
 
     async def execute(
         self, *, pod_id: PodId, requester_id: UserId, count: int = 5,
+        use_trends: bool = False,
     ) -> list[Topic]:
         pod = await self.pod_repo.get(pod_id)
         if pod is None:
@@ -67,12 +100,17 @@ class GenerateTopics:
         if not pod.is_owned_by(requester_id):
             raise ForbiddenError("pod is owned by a different user")
 
+        trend_terms: list[str] = []
+        if use_trends and self.trends is not None:
+            trend_terms = await self.trends.fetch(language=pod.config.language, limit=15)
+
         prompt = _render_topic_prompt(
             series_name=pod.config.series_name,
             target_audience=pod.config.target_audience,
             language=pod.config.language,
             series_context=pod.config.series_context,
             count=count,
+            trends=trend_terms,
         )
         raw = await self.llm.complete(prompt, response_schema=_TOPIC_SCHEMA, temperature=0.9)
         try:
@@ -110,4 +148,36 @@ class ListTopics:
         return await self.topic_repo.list_for_pod(pod_id)
 
 
-__all__ = ["GenerateTopics", "ListTopics"]
+@dataclass(frozen=True, slots=True)
+class UpdateTopic:
+    pod_repo: PodRepository
+    topic_repo: TopicRepository
+
+    async def execute(
+        self, *, topic_id: TopicId, requester_id: UserId,
+        title: str | None = None, description: str | None = None,
+        educational_value: str | None = None, status: TopicStatus | None = None,
+    ) -> Topic:
+        topic = await _owned_topic(self.topic_repo, self.pod_repo, topic_id, requester_id)
+        updated = topic.model_copy(update={
+            k: v for k, v in {
+                "title": title.strip() if title else None,
+                "description": description,
+                "educational_value": educational_value,
+                "status": status,
+            }.items() if v is not None
+        })
+        return await self.topic_repo.save(updated)
+
+
+@dataclass(frozen=True, slots=True)
+class DeleteTopic:
+    pod_repo: PodRepository
+    topic_repo: TopicRepository
+
+    async def execute(self, *, topic_id: TopicId, requester_id: UserId) -> None:
+        await _owned_topic(self.topic_repo, self.pod_repo, topic_id, requester_id)
+        await self.topic_repo.delete(topic_id)
+
+
+__all__ = ["DeleteTopic", "GenerateTopics", "ListTopics", "UpdateTopic"]

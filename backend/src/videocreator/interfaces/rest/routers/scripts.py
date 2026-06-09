@@ -9,7 +9,7 @@ from videocreator.interfaces.rest.schemas import (
     SceneResponse,
     ScriptResponse,
 )
-from videocreator.shared.ids import PodId, TopicId
+from videocreator.shared.ids import PodId, ScriptId, TopicId
 
 router = APIRouter(prefix="/pods/{pod_id}/scripts", tags=["scripts"])
 
@@ -18,6 +18,7 @@ def _to_response(s) -> ScriptResponse:  # type: ignore[no-untyped-def]
     return ScriptResponse(
         id=s.id, pod_id=s.pod_id, topic_id=s.topic_id, version=s.version,
         title=s.title, summary=s.summary,
+        moral=s.moral, ambient_audio_prompt=s.ambient_audio_prompt,
         scenes=[
             SceneResponse(
                 id=sc.id, index=sc.index, visual_prompt=sc.visual_prompt,
@@ -47,6 +48,19 @@ async def generate_script(
 ) -> ScriptResponse:
     script = await uc.scripts.generate.execute(
         pod_id=PodId(pod_id), topic_id=TopicId(body.topic_id), requester_id=user_id,
+    )
+    return _to_response(script)
+
+
+@router.post(
+    "/{script_id}/review", response_model=ScriptResponse,
+    summary="Review and correct a script via the LLM (Animation Director pass)",
+)
+async def review_script(
+    pod_id: str, script_id: str, uc: UseCasesDep, user_id: UserIdDep,
+) -> ScriptResponse:
+    script = await uc.scripts.review.execute(
+        pod_id=PodId(pod_id), script_id=ScriptId(script_id), requester_id=user_id,
     )
     return _to_response(script)
 

@@ -94,6 +94,17 @@ class ShortRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class SeoRow(Base):
+    __tablename__ = "seo_metadata"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    pod_id: Mapped[str] = mapped_column(String(64), ForeignKey("pods.id"), index=True)
+    episode_id: Mapped[str] = mapped_column(String(64), index=True)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class JobRow(Base):
     __tablename__ = "jobs"
 

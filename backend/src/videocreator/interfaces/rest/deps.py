@@ -6,7 +6,6 @@ touching every endpoint.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
@@ -14,6 +13,7 @@ from fastapi import Depends, Header, HTTPException, status
 from videocreator.domain.entities import LOCAL_USER_ID
 from videocreator.infrastructure.container import Container, UseCases, get_container
 from videocreator.shared.config import Settings, get_settings
+from videocreator.shared.errors import DomainError
 from videocreator.shared.ids import UserId
 
 
@@ -31,26 +31,36 @@ def use_cases_dep(container: Annotated[Container, Depends(container_dep)]) -> Us
 
 def current_user_id(
     settings: Annotated[Settings, Depends(settings_dep)],
+    container: Annotated[Container, Depends(container_dep)],
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
 ) -> UserId:
     """Resolve the request principal.
 
-    In local mode (`local_require_auth=False`), we short-circuit to
-    `LOCAL_USER_ID` so the CLI/dev workflow needs no token. In server/cloud,
-    this will become a JWT decode — for now we just reject if auth is required
-    and missing, to surface misconfiguration loudly.
+    A valid `Authorization: Bearer <jwt>` always wins (so authenticated calls
+    work in any mode). Without a token: local mode short-circuits to
+    `LOCAL_USER_ID` for the zero-auth dev/CLI workflow; server/cloud mode (or
+    `local_require_auth=true`) rejects the request.
     """
+    if authorization:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header must be 'Bearer <token>'",
+            )
+        try:
+            claims = container.token_service().decode(token, expected="access")
+        except DomainError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=exc.message,
+            ) from exc
+        return claims.user_id
+
     if not settings.local_require_auth:
         return LOCAL_USER_ID
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="missing Authorization header",
-        )
-    # Server/cloud JWT validation lands in a later phase; for now refuse.
     raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="JWT auth not yet implemented; run with local_require_auth=false",
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="authentication required",
     )
 
 
@@ -61,12 +71,12 @@ UserIdDep = Annotated[UserId, Depends(current_user_id)]
 
 
 __all__ = [
-    "SettingsDep",
     "ContainerDep",
+    "SettingsDep",
     "UseCasesDep",
     "UserIdDep",
-    "settings_dep",
     "container_dep",
-    "use_cases_dep",
     "current_user_id",
+    "settings_dep",
+    "use_cases_dep",
 ]
