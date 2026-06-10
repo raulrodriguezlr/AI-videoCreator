@@ -1,0 +1,22 @@
+﻿id: ltx-desktop
+name: LTX Desktop (local)
+version: "1.0.0"
+description: Local LTX video generation via the LTX-Desktop app (zero marginal cost).
+capabilities:
+  - text_to_video
+  - image_to_video
+models:
+  - id: ltx-fast
+    family: ltx
+    capabilities: [text_to_video, image_to_video]
+    max_duration_s: 20
+    max_resolution: [1920, 1080]
+    cost: { per_second_usd: 0.0, per_request_usd: 0.0, currency: USD }
+    latency: { p50_s: 120.0, p95_s: 600.0, timeout_s: 1800.0 }
+    strengths: [local, free, batch volume, drafts]
+cost: { per_second_usd: 0.0, per_request_usd: 0.0, currency: USD }
+latency: { p50_s: 120.0, p95_s: 600.0, timeout_s: 1800.0 }
+adapter:
+  type: python
+  entrypoint: adapter.py
+tags: [local, video, free, migrated]

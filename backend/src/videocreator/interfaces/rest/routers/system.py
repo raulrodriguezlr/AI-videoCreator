@@ -147,4 +147,27 @@ async def write_root_file(
     return PodFileContentResponse(name=name, content=store.read_root_file(name))
 
 
+@router.get("/providers/sdk", summary="Provider SDK catalog (providers.d manifests)")
+async def list_sdk_providers(container: ContainerDep) -> list[dict]:
+    registry = container.provider_registry()
+    return [
+        {
+            "id": lp.manifest.id,
+            "name": lp.manifest.name,
+            "version": lp.manifest.version,
+            "capabilities": list(lp.manifest.capabilities),
+            "tags": list(lp.manifest.tags),
+            "adapter_type": lp.manifest.adapter.type,
+            "cost_per_second_usd": lp.manifest.cost.per_second_usd,
+        }
+        for lp in registry.providers.values()
+    ]
+
+
+@router.post("/providers/reload", summary="Hot-reload providers.d (no redeploy)")
+async def reload_sdk_providers(container: ContainerDep) -> dict:
+    count = container.provider_registry().reload()
+    return {"loaded": count, "providers": container.provider_registry().provider_ids}
+
+
 __all__ = ["router"]

@@ -33,3 +33,8 @@ export const IcFile = (p: P) => (<svg {...base(p)}><path d="M14 3H7a2 2 0 0 0-2 
 export const IcUsers = (p: P) => (<svg {...base(p)}><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0M16 5.2a3.2 3.2 0 0 1 0 5.6M21 20a6 6 0 0 0-4-5.6"/></svg>);
 export const IcList = (p: P) => (<svg {...base(p)}><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>);
 export const IcRocket = (p: P) => (<svg {...base(p)}><path d="M5 15c-1.5 1.3-2 5-2 5s3.7-.5 5-2M9 11a5 5 0 0 1 5-5c4 0 6 3 6 3s-1 2-5 6a5 5 0 0 1-5 5M14 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>);
+export const IcLayout = (p: P) => (<svg {...base(p)}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>);
+export const IcMessageCircle = (p: P) => (<svg {...base(p)}><path d="M21 12a8 8 0 1 1-3.5-6.6L21 4l-1 4.2A8 8 0 0 1 21 12z"/></svg>);
+export const IcArrowRight = (p: P) => (<svg {...base(p)}><path d="M5 12h14M13 5l7 7-7 7"/></svg>);
+export const IcGitBranch = (p: P) => (<svg {...base(p)}><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M6 8.5v7M8.5 6H14a4 4 0 0 1 4 4v.5"/></svg>);
+export const IcSend = (p: P) => (<svg {...base(p)}><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>);

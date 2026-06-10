@@ -400,6 +400,24 @@ class Container:
     def bandit(self) -> LinUcbBandit:
         return self._get("bandit", LinUcbBandit)
 
+    # ---- provider SDK (§9.1) -----------------------------------------------
+    def provider_registry(self) -> "ProviderRegistry":
+        return self._get("provider_registry", self._build_provider_registry)
+
+    def _build_provider_registry(self) -> "ProviderRegistry":
+        from pathlib import Path
+
+        from videocreator.infrastructure.providers.sdk.registry import (
+            ProviderRegistry,
+        )
+        providers_dir = Path(__file__).resolve().parents[3] / "providers.d"
+        registry = ProviderRegistry(providers_dir, vault=self.secret_vault())
+        try:
+            registry.discover()
+        except ImportError as e:  # pyyaml missing — SDK off, core unaffected
+            log.warning("provider_registry.disabled", error=str(e))
+        return registry
+
     # ---- recipes (§16.15) --------------------------------------------------
     def run_registry(self) -> RunRegistry:
         return self._get("run_registry", RunRegistry)

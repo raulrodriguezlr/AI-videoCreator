@@ -12,6 +12,9 @@ import { EpisodePage } from "./pages/EpisodePage";
 import { CreatePodPage } from "./pages/CreatePodPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { JobsPage } from "./pages/JobsPage";
+import { TemplatesPage } from "./pages/TemplatesPage";
+import { DirectorPage } from "./pages/DirectorPage";
+import { RunPage } from "./pages/RunPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +38,9 @@ createRoot(rootEl).render(
               <Route path="/pods/:podId/episodes/:episodeId" element={<EpisodePage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/jobs" element={<JobsPage />} />
+              <Route path="/templates" element={<TemplatesPage />} />
+              <Route path="/director" element={<DirectorPage />} />
+              <Route path="/runs/:runId" element={<RunPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

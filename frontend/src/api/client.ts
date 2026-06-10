@@ -354,6 +354,90 @@ export function subscribeToJob(
 }
 
 // ---------------------------------------------------------------------------
+// Templates / Director / Runs (DAG recipes)
+// ---------------------------------------------------------------------------
+export interface DagNodeDto {
+  id: string;
+  capability: string;
+  params: Record<string, unknown>;
+  depends_on: string[];
+  max_retries: number;
+}
+
+export interface DagSpecDto {
+  nodes: DagNodeDto[];
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  description: string;
+  tags: string[];
+  preview: string | null;
+  dag: DagSpecDto;
+}
+
+export interface JsonPatchOp {
+  op: string;
+  path: string;
+  value?: unknown;
+  from?: string;
+}
+
+export interface DirectorChatResponse {
+  patch: JsonPatchOp[];
+  explanation: string;
+  spec: DagSpecDto;
+}
+
+export type RunNodeState = "pending" | "running" | "done" | "failed" | "cancelled";
+
+export interface RunNodeStatus {
+  state: RunNodeState;
+  error: string | null;
+  retries_left: number;
+}
+
+export interface RunSnapshot {
+  run_id: string;
+  is_complete: boolean;
+  has_failures: boolean;
+  nodes: Record<string, RunNodeStatus>;
+}
+
+export const getTemplates = () => api.get<Template[]>("/templates");
+export const getTemplate = (id: string) => api.get<Template>(`/templates/${id}`);
+export const directorChat = (spec: DagSpecDto, message: string) =>
+  api.post<DirectorChatResponse>("/director/chat", { spec, message });
+export const getRun = (runId: string) => api.get<RunSnapshot>(`/runs/${runId}`);
+
+// ---------------------------------------------------------------------------
+// SSE — live run progress
+// ---------------------------------------------------------------------------
+export interface RunEvent {
+  event: "node_running" | "node_done" | "node_retry" | "node_failed" | "node_cancelled" | "run_complete";
+  node?: string;
+  error?: string;
+  failed?: boolean;
+}
+
+export function subscribeToRun(
+  runId: string,
+  handlers: { onEvent: (e: RunEvent) => void; onError?: (e: Event) => void },
+): () => void {
+  const src = new EventSource(`${BASE_URL}/runs/${runId}/events`);
+  src.onmessage = (msg) => {
+    try {
+      handlers.onEvent(JSON.parse(msg.data) as RunEvent);
+    } catch {
+      /* skip malformed event */
+    }
+  };
+  if (handlers.onError) src.onerror = handlers.onError;
+  return () => src.close();
+}
+
+// ---------------------------------------------------------------------------
 // Streaming NDJSON (Ollama model pull progress)
 // ---------------------------------------------------------------------------
 export async function streamOllamaPull(

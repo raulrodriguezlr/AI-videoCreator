@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from videocreator.infrastructure.providers.sdk.adapter_base import AdapterBase
+from videocreator.infrastructure.providers.sdk.adapter_comfyui import ComfyUiAdapter
+from videocreator.infrastructure.providers.sdk.adapter_openapi import OpenApiAdapter
+from videocreator.infrastructure.providers.sdk.adapter_webhook import WebhookAdapter
 from videocreator.infrastructure.providers.sdk.manifest import ProviderManifest
 from videocreator.shared.logging import get_logger
 
@@ -81,10 +84,16 @@ class ProviderRegistry:
         match manifest.adapter.type:
             case "python":
                 return self._load_python_adapter(manifest, base_dir)
+            case "http_webhook":
+                return WebhookAdapter(manifest=manifest, base_dir=base_dir, vault=self._vault)
+            case "openapi":
+                return OpenApiAdapter(manifest=manifest, base_dir=base_dir, vault=self._vault)
+            case "comfyui_workflow":
+                return ComfyUiAdapter(manifest=manifest, base_dir=base_dir, vault=self._vault)
             case _:
                 raise NotImplementedError(
                     f"Adapter type '{manifest.adapter.type}' not yet implemented. "
-                    f"Available: python. Coming soon: openapi, comfyui_workflow, http_webhook."
+                    f"Available: python, http_webhook, openapi, comfyui_workflow."
                 )
 
     def _load_python_adapter(self, manifest: ProviderManifest, base_dir: Path) -> AdapterBase:

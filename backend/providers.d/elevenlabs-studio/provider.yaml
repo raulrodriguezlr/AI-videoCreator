@@ -1,0 +1,23 @@
+﻿id: elevenlabs-studio
+name: ElevenLabs Studio 3.0
+version: "1.0.0"
+description: ElevenLabs Studio video generation with native voice.
+capabilities:
+  - text_to_video
+models:
+  - id: eleven-studio-v3
+    family: elevenlabs
+    capabilities: [text_to_video]
+    max_duration_s: 60
+    max_resolution: [1920, 1080]
+    cost: { per_second_usd: 0.08, per_request_usd: 0.0, currency: USD }
+    latency: { p50_s: 90.0, p95_s: 300.0, timeout_s: 600.0 }
+    strengths: [narrated video, voice quality]
+cost: { per_second_usd: 0.08, per_request_usd: 0.0, currency: USD }
+latency: { p50_s: 90.0, p95_s: 300.0, timeout_s: 600.0 }
+auth:
+  vault_key: elevenlabs_api_key
+adapter:
+  type: python
+  entrypoint: adapter.py
+tags: [cloud, video, voice, migrated]

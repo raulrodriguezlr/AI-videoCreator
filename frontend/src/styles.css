@@ -438,3 +438,101 @@ p { margin: 0 0 12px; }
 .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-2); }
 .check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 .check:hover { color: var(--text); }
+
+/* =========================================================================
+   DAG pipeline — mini visualization (templates gallery, director recipe)
+   ========================================================================= */
+.dag-pipeline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dag-pipeline-step { display: flex; align-items: center; gap: 8px; }
+.dag-pipeline-col { display: flex; flex-direction: column; gap: 6px; }
+.dag-pipeline-arrow { width: 14px; height: 14px; color: var(--text-3); flex: none; }
+.dag-chip {
+  display: inline-flex; flex-direction: column; gap: 1px;
+  padding: 5px 10px; border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 11px; line-height: 1.35; max-width: 132px;
+}
+.dag-chip-cap {
+  font-family: var(--font-mono); font-weight: 600; color: var(--accent-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dag-chip-id { color: var(--text-3); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-pipeline.compact .dag-chip { padding: 4px 8px; max-width: 110px; }
+.dag-pipeline.compact .dag-chip-cap { font-size: 10.5px; }
+.dag-pipeline.compact .dag-pipeline-arrow { width: 12px; height: 12px; }
+
+/* =========================================================================
+   Templates gallery
+   ========================================================================= */
+.template-card { display: flex; flex-direction: column; gap: 14px; }
+.template-card .dag-pipeline { overflow-x: auto; padding-bottom: 2px; }
+.template-card-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* =========================================================================
+   Run timeline
+   ========================================================================= */
+.run-summary { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.run-progress-wrap { flex: 1; min-width: 180px; }
+.run-progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); margin-bottom: 6px; }
+.run-node-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface); transition: border-color 0.15s ease;
+}
+.run-node-row.is-running { border-color: var(--accent-line); }
+.run-node-row.is-failed { border-color: rgba(255, 93, 108, 0.4); }
+.run-node-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.run-node-id { font-weight: 600; font-family: var(--font-mono); font-size: 13px; }
+.run-node-error { color: var(--red); font-size: 12.5px; font-family: var(--font-mono); white-space: pre-wrap; word-break: break-word; }
+.run-node-meta { display: flex; align-items: center; gap: 8px; flex: none; }
+
+/* =========================================================================
+   Director chat — recipe editor
+   ========================================================================= */
+.director-layout { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.4fr); gap: 22px; align-items: start; }
+@media (max-width: 1020px) { .director-layout { grid-template-columns: 1fr; } }
+
+.recipe-list { display: flex; flex-direction: column; gap: 10px; }
+.recipe-node {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.recipe-node-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.recipe-node-id { font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
+.recipe-node-deps { font-size: 11.5px; color: var(--text-3); font-family: var(--font-mono); }
+
+.chat-panel { display: flex; flex-direction: column; height: min(72vh, 760px); }
+.chat-history { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+.chat-msg { display: flex; flex-direction: column; gap: 6px; max-width: 88%; }
+.chat-msg.user { align-self: flex-end; align-items: flex-end; }
+.chat-msg.assistant { align-self: flex-start; align-items: flex-start; }
+.chat-bubble {
+  padding: 10px 14px; border-radius: var(--r-md); font-size: 13.5px; line-height: 1.55;
+  border: 1px solid var(--border); background: var(--surface-2); white-space: pre-wrap; word-break: break-word;
+}
+.chat-msg.user .chat-bubble { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent-ink); }
+.chat-msg .chat-role { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+
+.chat-input-row { display: flex; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border); }
+.chat-input-row textarea { flex: 1; resize: none; min-height: 46px; max-height: 160px; }
+
+.patch-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 4px; }
+.patch-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 12px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--bg);
+  font-size: 12.5px;
+}
+.patch-op {
+  flex: none; font-family: var(--font-mono); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.04em; padding: 2px 8px; border-radius: var(--r-pill); text-transform: uppercase;
+}
+.patch-op.add { color: var(--mint); background: var(--mint-soft); }
+.patch-op.replace { color: var(--accent-ink); background: var(--accent-soft); }
+.patch-op.remove { color: var(--red); background: var(--red-soft); }
+.patch-op.move, .patch-op.copy, .patch-op.test { color: var(--violet); background: var(--violet-soft); }
+.patch-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.patch-path { font-family: var(--font-mono); color: var(--text); }
+.patch-value { font-family: var(--font-mono); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.patch-actions { display: flex; gap: 10px; margin-top: 10px; }
