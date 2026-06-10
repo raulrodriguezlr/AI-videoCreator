@@ -400,6 +400,16 @@ class Container:
     def bandit(self) -> LinUcbBandit:
         return self._get("bandit", LinUcbBandit)
 
+    # ---- publishing (§16.14) -----------------------------------------------
+    def youtube_oauth(self) -> "YouTubeOAuthService":
+        return self._get("youtube_oauth", self._build_youtube_oauth)
+
+    def _build_youtube_oauth(self) -> "YouTubeOAuthService":
+        from videocreator.infrastructure.publish.youtube_oauth import (
+            YouTubeOAuthService,
+        )
+        return YouTubeOAuthService(self.secret_vault())
+
     # ---- provider SDK (§9.1) -----------------------------------------------
     def provider_registry(self) -> "ProviderRegistry":
         return self._get("provider_registry", self._build_provider_registry)

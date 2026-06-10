@@ -758,6 +758,22 @@ class RunSnapshotResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Publishing — YouTube OAuth (§16.14)
+# ---------------------------------------------------------------------------
+class ConnectYouTubeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_id: str = Field(..., min_length=1)
+    client_secret: str = Field(..., min_length=1)
+
+
+class YouTubeStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connected: bool
+
+
+# ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
 class HealthResponse(BaseModel):
@@ -841,4 +857,6 @@ __all__ = [
     "TemplateResponse",
     "RunNodeStateResponse",
     "RunSnapshotResponse",
+    "ConnectYouTubeRequest",
+    "YouTubeStatusResponse",
 ]
