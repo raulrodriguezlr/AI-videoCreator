@@ -53,6 +53,7 @@ from videocreator.application.use_cases.pods import (
 )
 from videocreator.application.use_cases.analyze_video import AnalyzeVideoUseCase
 from videocreator.application.use_cases.hook_rewrite import HookRewriteUseCase
+from videocreator.application.use_cases.multiply import GenerateCarouselSlidesUseCase
 from videocreator.application.use_cases.native_short import GenerateNativeShortUseCase
 from videocreator.application.use_cases.scripts import GenerateScript, ListScripts, ReviewScript
 from videocreator.application.use_cases.secrets import (
@@ -542,6 +543,7 @@ class _JobUseCases:
 class _BrainUseCases:
     def __init__(self, c: Container) -> None:
         self.analyze_video = AnalyzeVideoUseCase(c.llm())
+        self.carousel_slides = GenerateCarouselSlidesUseCase(c.llm())
 
 
 class _PodSourceUseCases:
