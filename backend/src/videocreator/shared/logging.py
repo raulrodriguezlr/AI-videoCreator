@@ -56,3 +56,18 @@ def configure_logging(settings: Settings) -> None:
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     return structlog.get_logger(name) if name else structlog.get_logger()
+
+
+def bind_trace(trace_id: str, **extra: object) -> None:
+    """Attach a trace id (e.g. a DAG run_id) to every log line in this context.
+
+    `merge_contextvars` is already in the processor chain, so any value bound
+    here shows up on all loggers until `clear_trace()` — per-render tracing
+    per §11.3 without threading ids through every call.
+    """
+    structlog.contextvars.bind_contextvars(trace_id=trace_id, **extra)
+
+
+def clear_trace() -> None:
+    """Drop the contextvars bound by `bind_trace`."""
+    structlog.contextvars.clear_contextvars()

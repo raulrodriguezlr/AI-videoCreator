@@ -52,6 +52,7 @@ from videocreator.application.use_cases.pods import (
     UpdatePodConfig,
 )
 from videocreator.application.use_cases.analyze_video import AnalyzeVideoUseCase
+from videocreator.application.use_cases.concept_visualizer import ConceptVisualizerUseCase
 from videocreator.application.use_cases.director_chat import DirectorChatUseCase
 from videocreator.application.use_cases.hook_rewrite import HookRewriteUseCase
 from videocreator.application.use_cases.multiply import GenerateCarouselSlidesUseCase
@@ -555,6 +556,7 @@ class _BrainUseCases:
         self.analyze_video = AnalyzeVideoUseCase(c.llm())
         self.carousel_slides = GenerateCarouselSlidesUseCase(c.llm())
         self.director_chat = DirectorChatUseCase(c.llm())
+        self.concept_visualizer = ConceptVisualizerUseCase(c.llm())
 
 
 class _PodSourceUseCases:
