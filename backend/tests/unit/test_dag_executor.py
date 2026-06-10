@@ -176,3 +176,89 @@ class TestDagExecutor:
         executor = DagExecutor(_ok_executor)
         result = await executor.run(run)
         assert result.is_complete
+
+
+# ---- Event hook + RunRegistry (§16.15) --------------------------------------
+class TestExecutorEvents:
+    @pytest.mark.asyncio
+    async def test_emits_lifecycle_events(self) -> None:
+        events: list[dict[str, Any]] = []
+
+        async def on_event(run_id: str, event: dict[str, Any]) -> None:
+            events.append(event)
+
+        async def ok(node: DagNode, upstream: dict[str, Any]) -> str:
+            return "ok"
+
+        spec = DagSpec(nodes=(
+            DagNode(id="a", capability="x"),
+            DagNode(id="b", capability="x", depends_on=("a",)),
+        ))
+        executor = DagExecutor(ok, on_event=on_event)
+        await executor.run(DagRun(run_id="r1", spec=spec))
+
+        kinds = [e["event"] for e in events]
+        assert kinds.count("node_running") == 2
+        assert kinds.count("node_done") == 2
+        assert kinds[-1] == "run_complete"
+        assert events[-1]["failed"] is False
+
+    @pytest.mark.asyncio
+    async def test_emits_failure_and_cancel_events(self) -> None:
+        events: list[dict[str, Any]] = []
+
+        async def on_event(run_id: str, event: dict[str, Any]) -> None:
+            events.append(event)
+
+        async def boom(node: DagNode, upstream: dict[str, Any]) -> str:
+            if node.id == "a":
+                raise RuntimeError("kaput")
+            return "ok"
+
+        spec = DagSpec(nodes=(
+            DagNode(id="a", capability="x", max_retries=0),
+            DagNode(id="b", capability="x", depends_on=("a",)),
+        ))
+        executor = DagExecutor(boom, on_event=on_event)
+        run = await executor.run(DagRun(run_id="r2", spec=spec))
+
+        kinds = [e["event"] for e in events]
+        assert "node_failed" in kinds
+        assert "node_cancelled" in kinds
+        assert run.has_failures
+
+    @pytest.mark.asyncio
+    async def test_event_hook_exception_does_not_break_run(self) -> None:
+        async def bad_hook(run_id: str, event: dict[str, Any]) -> None:
+            raise RuntimeError("hook broken")
+
+        async def ok(node: DagNode, upstream: dict[str, Any]) -> str:
+            return "ok"
+
+        spec = DagSpec(nodes=(DagNode(id="a", capability="x"),))
+        executor = DagExecutor(ok, on_event=bad_hook)
+        run = await executor.run(DagRun(run_id="r3", spec=spec))
+        assert run.is_complete and not run.has_failures
+
+
+class TestRunRegistry:
+    def test_register_and_snapshot(self) -> None:
+        from videocreator.infrastructure.queue.dag_executor import RunRegistry
+
+        spec = DagSpec(nodes=(DagNode(id="a", capability="x"),))
+        run = DagRun(run_id="r1", spec=spec)
+        registry = RunRegistry()
+        registry.register(run)
+
+        snap = registry.snapshot("r1")
+        assert snap is not None
+        assert snap["run_id"] == "r1"
+        assert snap["nodes"]["a"]["state"] == "pending"
+        assert registry.get("r1") is run
+
+    def test_unknown_run_is_none(self) -> None:
+        from videocreator.infrastructure.queue.dag_executor import RunRegistry
+
+        registry = RunRegistry()
+        assert registry.get("nope") is None
+        assert registry.snapshot("nope") is None

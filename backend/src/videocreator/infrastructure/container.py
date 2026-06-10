@@ -52,6 +52,7 @@ from videocreator.application.use_cases.pods import (
     UpdatePodConfig,
 )
 from videocreator.application.use_cases.analyze_video import AnalyzeVideoUseCase
+from videocreator.application.use_cases.director_chat import DirectorChatUseCase
 from videocreator.application.use_cases.hook_rewrite import HookRewriteUseCase
 from videocreator.application.use_cases.multiply import GenerateCarouselSlidesUseCase
 from videocreator.application.use_cases.native_short import GenerateNativeShortUseCase
@@ -124,6 +125,7 @@ from videocreator.infrastructure.providers.elevenlabs_studio_provider import (
 )
 from videocreator.infrastructure.providers.elevenlabs_voices import ElevenLabsVoiceSearch
 from videocreator.infrastructure.providers.gemini_image import GeminiImageProvider
+from videocreator.infrastructure.queue.dag_executor import RunRegistry
 from videocreator.infrastructure.queue.inprocess import (
     InMemoryEventBus,
     InProcessJobQueue,
@@ -145,6 +147,7 @@ from videocreator.infrastructure.security.secret_vault import DbSecretVault, Env
 from videocreator.infrastructure.security.tokens import JwtTokenService
 from videocreator.infrastructure.storage.file_storage import LocalFileStorage
 from videocreator.infrastructure.system.ollama_admin import OllamaAdmin
+from videocreator.infrastructure.templates.template_gallery import TemplateGallery
 from videocreator.infrastructure.system.runtime_config import JsonRuntimeConfig
 from videocreator.infrastructure.trends.google_trends import GoogleTrendsRss
 from videocreator.infrastructure.video.ffmpeg_assembler import FfmpegVideoAssembler
@@ -396,6 +399,13 @@ class Container:
     def bandit(self) -> LinUcbBandit:
         return self._get("bandit", LinUcbBandit)
 
+    # ---- recipes (§16.15) --------------------------------------------------
+    def run_registry(self) -> RunRegistry:
+        return self._get("run_registry", RunRegistry)
+
+    def template_gallery(self) -> TemplateGallery:
+        return self._get("template_gallery", TemplateGallery)
+
     # ---- use cases (freshly built) ---------------------------------------
     def use_cases(self) -> UseCases:
         return UseCases(self)
@@ -544,6 +554,7 @@ class _BrainUseCases:
     def __init__(self, c: Container) -> None:
         self.analyze_video = AnalyzeVideoUseCase(c.llm())
         self.carousel_slides = GenerateCarouselSlidesUseCase(c.llm())
+        self.director_chat = DirectorChatUseCase(c.llm())
 
 
 class _PodSourceUseCases:

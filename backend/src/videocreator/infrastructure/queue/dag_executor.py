@@ -36,6 +36,9 @@ class NodeResult:
 
 NodeExecutor = Callable[[DagNode, dict[str, Any]], Awaitable[Any]]
 
+#: Async progress hook: (run_id, event_dict). Feeds the SSE stream (§16.15).
+EventCallback = Callable[[str, dict[str, Any]], Awaitable[None]]
+
 
 class DagDeadlockError(Exception):
     """Raised when no nodes are ready but work remains."""
@@ -76,8 +79,22 @@ class DagRun:
 class DagExecutor:
     """Execute a DagSpec by running ready nodes in parallel waves."""
 
-    def __init__(self, node_executor: NodeExecutor) -> None:
+    def __init__(
+        self,
+        node_executor: NodeExecutor,
+        *,
+        on_event: EventCallback | None = None,
+    ) -> None:
         self._execute_node = node_executor
+        self._on_event = on_event
+
+    async def _emit(self, run: DagRun, event: str, **data: Any) -> None:
+        if self._on_event is None:
+            return
+        try:
+            await self._on_event(run.run_id, {"event": event, **data})
+        except Exception:
+            log.warning("dag.event_hook_failed", run_id=run.run_id, kind=event)
 
     async def run(self, run: DagRun) -> DagRun:
         by_id = {n.id: n for n in run.spec.nodes}
@@ -107,6 +124,7 @@ class DagExecutor:
             for nid in cancelled:
                 run.node_states[nid].state = NodeState.CANCELLED
                 log.info("dag.node.cancelled", run_id=run.run_id, node=nid)
+                await self._emit(run, "node_cancelled", node=nid)
 
             if not ready and not cancelled:
                 still_running = [
@@ -124,12 +142,14 @@ class DagExecutor:
                 results = await self._run_wave(run, ready)
                 for node, result in results:
                     if isinstance(result, Exception):
-                        self._handle_failure(run, node, result)
+                        await self._handle_failure(run, node, result)
                     else:
                         run.node_states[node.id].state = NodeState.DONE
                         run.node_states[node.id].result = result
                         log.info("dag.node.done", run_id=run.run_id, node=node.id)
+                        await self._emit(run, "node_done", node=node.id)
 
+        await self._emit(run, "run_complete", failed=run.has_failures)
         return run
 
     async def _run_wave(
@@ -137,6 +157,7 @@ class DagExecutor:
     ) -> list[tuple[DagNode, Any]]:
         for node in nodes:
             run.node_states[node.id].state = NodeState.RUNNING
+            await self._emit(run, "node_running", node=node.id)
 
         upstream_results = {
             nid: ns.result
@@ -159,7 +180,7 @@ class DagExecutor:
         except Exception as e:
             return e
 
-    def _handle_failure(self, run: DagRun, node: DagNode, error: Exception) -> None:
+    async def _handle_failure(self, run: DagRun, node: DagNode, error: Exception) -> None:
         ns = run.node_states[node.id]
         if ns.retries_left > 0:
             ns.retries_left -= 1
@@ -171,6 +192,8 @@ class DagExecutor:
                 retries_left=ns.retries_left,
                 error=str(error),
             )
+            await self._emit(run, "node_retry", node=node.id,
+                             retries_left=ns.retries_left)
         else:
             ns.state = NodeState.FAILED
             ns.error = str(error)
@@ -180,13 +203,52 @@ class DagExecutor:
                 node=node.id,
                 error=str(error),
             )
+            await self._emit(run, "node_failed", node=node.id, error=str(error))
+
+
+class RunRegistry:
+    """In-memory registry of DAG runs — read-side for `/runs/{id}` (§16.15).
+
+    Local-first: process-scoped. Server mode can swap this for a DB-backed
+    registry behind the same three methods.
+    """
+
+    def __init__(self) -> None:
+        self._runs: dict[str, DagRun] = {}
+
+    def register(self, run: DagRun) -> None:
+        self._runs[run.run_id] = run
+
+    def get(self, run_id: str) -> DagRun | None:
+        return self._runs.get(run_id)
+
+    def snapshot(self, run_id: str) -> dict[str, Any] | None:
+        """JSON-safe view of a run's node states for the timeline UI."""
+        run = self._runs.get(run_id)
+        if run is None:
+            return None
+        return {
+            "run_id": run.run_id,
+            "is_complete": run.is_complete,
+            "has_failures": run.has_failures,
+            "nodes": {
+                nid: {
+                    "state": ns.state.value,
+                    "error": ns.error,
+                    "retries_left": ns.retries_left,
+                }
+                for nid, ns in run.node_states.items()
+            },
+        }
 
 
 __all__ = [
     "DagDeadlockError",
     "DagExecutor",
     "DagRun",
+    "EventCallback",
     "NodeExecutor",
     "NodeResult",
     "NodeState",
+    "RunRegistry",
 ]

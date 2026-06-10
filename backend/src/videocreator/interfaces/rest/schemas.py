@@ -695,6 +695,69 @@ class HookVariantResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Render recipes (DagSpec) — Director's Chat + templates + runs (§16.15)
+# ---------------------------------------------------------------------------
+class DagNodeSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    capability: str
+    params: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    depends_on: list[str] = Field(default_factory=list)
+    max_retries: int = 2
+
+
+class DagSpecSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nodes: list[DagNodeSchema]
+
+
+class DirectorChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    spec: DagSpecSchema
+    message: str = Field(..., min_length=1, max_length=2000,
+                         examples=["make the short 20 seconds and add captions"])
+
+
+class DirectorChatResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    patch: list[dict]
+    explanation: str
+    spec: DagSpecSchema
+
+
+class TemplateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str
+    description: str
+    tags: list[str]
+    preview: str | None = None
+    dag: DagSpecSchema
+
+
+class RunNodeStateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: str
+    error: str | None = None
+    retries_left: int
+
+
+class RunSnapshotResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    is_complete: bool
+    has_failures: bool
+    nodes: dict[str, RunNodeStateResponse]
+
+
+# ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
 class HealthResponse(BaseModel):
@@ -771,4 +834,11 @@ __all__ = [
     "GenomeHookResponse",
     "GenomeBeatResponse",
     "ViralGenomeResponse",
+    "DagNodeSchema",
+    "DagSpecSchema",
+    "DirectorChatRequest",
+    "DirectorChatResponse",
+    "TemplateResponse",
+    "RunNodeStateResponse",
+    "RunSnapshotResponse",
 ]

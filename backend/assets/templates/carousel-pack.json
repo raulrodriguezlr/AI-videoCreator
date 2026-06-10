@@ -1,0 +1,13 @@
+{
+  "id": "carousel-pack",
+  "name": "Carousel pack",
+  "description": "Script to 8-slide Instagram/LinkedIn carousel (1080x1350 PNGs).",
+  "tags": ["carousel", "image"],
+  "preview": null,
+  "dag": {
+    "nodes": [
+      {"id": "slides", "capability": "llm_text", "params": {"task": "carousel_slides", "n_slides": 8}},
+      {"id": "render", "capability": "carousel_render", "params": {"brand": ""}, "depends_on": ["slides"]}
+    ]
+  }
+}
