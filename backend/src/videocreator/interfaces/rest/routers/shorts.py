@@ -7,7 +7,10 @@ from videocreator.interfaces.rest.deps import UseCasesDep, UserIdDep
 from videocreator.interfaces.rest.schemas import (
     CreateShortRequest,
     EnqueueRenderResponse,
+    GenerateNativeShortRequest,
+    NativeShortStructureResponse,
     ShortResponse,
+    ShortSegmentResponse,
 )
 from videocreator.shared.ids import EpisodeId, PodId, ShortId
 
@@ -73,6 +76,41 @@ async def enqueue_render(
         short_id=ShortId(short_id), requester_id=user_id,
     )
     return EnqueueRenderResponse(job_id=job_id)
+
+
+@router.post(
+    "/native",
+    response_model=NativeShortStructureResponse,
+    summary="Generate native short-form structure from concept via LLM",
+)
+async def generate_native_short(
+    pod_id: str,
+    body: GenerateNativeShortRequest,
+    uc: UseCasesDep,
+    user_id: UserIdDep,
+) -> NativeShortStructureResponse:
+    del pod_id, user_id
+    structure = await uc.shorts.generate_native.execute(
+        concept=body.concept,
+        content_type=body.content_type,
+        duration_s=body.duration_s,
+    )
+    return NativeShortStructureResponse(
+        total_duration_s=structure.total_duration_s,
+        segments=[
+            ShortSegmentResponse(
+                role=seg.role,
+                duration_s=seg.duration_s,
+                visual_prompt=seg.visual_prompt,
+                audio_text=seg.audio_text,
+                sfx_vibe=seg.sfx_vibe,
+                cut_style=seg.cut_style,
+            )
+            for seg in structure.segments
+        ],
+        music_vibe=structure.music_vibe,
+        caption_keywords=list(structure.caption_keywords),
+    )
 
 
 __all__ = ["router"]

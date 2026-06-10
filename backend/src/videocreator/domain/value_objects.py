@@ -599,3 +599,167 @@ class PodBlueprint(BaseModel):
     duration_seconds: int = 120
     max_clip_seconds: int = 8
     interactive_questions: int = 0
+
+
+# ============================================================================
+# Native short-form generation (COMPETITIVE_ANALYSIS §16.5)
+# ============================================================================
+class ShortSegment(BaseModel):
+    """One segment of a natively-generated short — hook, body, payoff, etc."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    role: Literal["hook", "body", "rehook", "example", "payoff", "conclusion"]
+    duration_s: float = Field(..., gt=0.0, le=15.0)
+    visual_prompt: str
+    audio_text: str | None = None
+    sfx_vibe: Literal[
+        "impact", "whoosh", "rimshot", "sad_trombone",
+        "bass_drop", "transition", "reveal", "click", "none",
+    ] | None = None
+    cut_style: Literal["hard", "xfade", "zoom_punch"] = "hard"
+
+
+class ShortStructure(BaseModel):
+    """LLM-generated structure for a native short-form video."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    total_duration_s: float = Field(..., ge=5.0, le=60.0)
+    segments: tuple[ShortSegment, ...]
+    music_vibe: str = "energetic"
+    caption_keywords: tuple[str, ...] = ()
+
+
+# ============================================================================
+# DAG Orchestrator (COMPETITIVE_ANALYSIS §16.10)
+# ============================================================================
+class DagNode(BaseModel):
+    """A single node in a render DAG — one capability invocation."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: str
+    capability: str
+    params: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    depends_on: tuple[str, ...] = ()
+    max_retries: int = 2
+
+
+class DagSpec(BaseModel):
+    """Declarative render pipeline as a DAG of capability nodes.
+
+    Validated at construction: unique IDs and acyclic.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    nodes: tuple[DagNode, ...]
+
+    @model_validator(mode="after")
+    def _validate_dag(self) -> "DagSpec":
+        ids = {n.id for n in self.nodes}
+        if len(ids) != len(self.nodes):
+            raise ValueError("Duplicate node IDs in DagSpec")
+        for n in self.nodes:
+            for dep in n.depends_on:
+                if dep not in ids:
+                    raise ValueError(f"Node '{n.id}' depends on unknown node '{dep}'")
+        if _has_cycle(self.nodes):
+            raise ValueError("DagSpec contains a cycle")
+        return self
+
+    def topo_order(self) -> list[DagNode]:
+        """Return nodes in topological order."""
+        by_id = {n.id: n for n in self.nodes}
+        in_degree = {n.id: len(n.depends_on) for n in self.nodes}
+        queue = [nid for nid, d in in_degree.items() if d == 0]
+        order: list[DagNode] = []
+        while queue:
+            nid = queue.pop(0)
+            order.append(by_id[nid])
+            for n in self.nodes:
+                if nid in n.depends_on:
+                    in_degree[n.id] -= 1
+                    if in_degree[n.id] == 0:
+                        queue.append(n.id)
+        return order
+
+
+# ============================================================================
+# Video Analyst — Viral Genome (COMPETITIVE_ANALYSIS §12.4)
+# ============================================================================
+class GenomeHook(BaseModel):
+    """The hook segment of a viral video genome."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    type: str
+    duration_s: float = 1.5
+    text_overlay: str | None = None
+
+
+class GenomeBeat(BaseModel):
+    """One structural beat in a viral video genome."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    beat: str
+    duration_s: float
+    audio: str | None = None
+    camera: str | None = None
+    sfx: str | None = None
+    cut_style: str | None = None
+    visual_description: str | None = None
+
+
+class GenomeCaptions(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    style: str = "word_by_word"
+    highlight: str = "yellow_bold_keyword"
+
+
+class GenomeSound(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: str | None = None
+    trending: bool = False
+    commercial_safe: bool = True
+
+
+class ViralGenome(BaseModel):
+    """Structured analysis of a viral video — its DNA for recreation."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    format_id: str = ""
+    hook: GenomeHook
+    structure: tuple[GenomeBeat, ...]
+    captions: GenomeCaptions = Field(default_factory=GenomeCaptions)
+    sound: GenomeSound = Field(default_factory=GenomeSound)
+    why_it_works: str = ""
+    remixability: float = Field(0.5, ge=0.0, le=1.0)
+    decay_estimate: str = ""
+
+
+def _has_cycle(nodes: tuple[DagNode, ...]) -> bool:
+    """Detect cycle via DFS."""
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color = {n.id: WHITE for n in nodes}
+    adj: dict[str, list[str]] = {n.id: [] for n in nodes}
+    for n in nodes:
+        for dep in n.depends_on:
+            adj[dep].append(n.id)
+
+    def dfs(nid: str) -> bool:
+        color[nid] = GRAY
+        for child in adj[nid]:
+            if color[child] == GRAY:
+                return True
+            if color[child] == WHITE and dfs(child):
+                return True
+        color[nid] = BLACK
+        return False
+
+    return any(color[n.id] == WHITE and dfs(n.id) for n in nodes)

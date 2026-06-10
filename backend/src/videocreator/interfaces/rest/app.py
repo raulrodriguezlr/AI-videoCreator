@@ -17,6 +17,7 @@ from videocreator.infrastructure.persistence.database import dispose_db, init_db
 from videocreator.interfaces.rest.errors import install_error_handlers
 from videocreator.interfaces.rest.routers import (
     auth,
+    brain,
     characters,
     episodes,
     health,
@@ -108,6 +109,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(system.router, prefix=API_PREFIX)
     app.include_router(pod_files.router, prefix=API_PREFIX)
     app.include_router(wizard.router, prefix=API_PREFIX)
+    app.include_router(brain.router, prefix=API_PREFIX)
     return app
 
 

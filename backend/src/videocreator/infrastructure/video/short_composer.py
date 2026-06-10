@@ -25,6 +25,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from videocreator.domain.services.beat_grid import BeatGrid
 from videocreator.domain.value_objects import EditingTimeline
 from videocreator.shared.errors import ProviderError
 from videocreator.shared.logging import get_logger
@@ -47,7 +48,12 @@ class FfmpegShortComposer:
         self._bin = ffmpeg_bin
 
     async def compose(
-        self, source_path: Path, timeline: EditingTimeline, output_path: Path
+        self,
+        source_path: Path,
+        timeline: EditingTimeline,
+        output_path: Path,
+        *,
+        beat_grid: BeatGrid | None = None,
     ) -> Path:
         if timeline.is_empty:
             raise ProviderError("short-composer: timeline has no segments")
@@ -55,6 +61,9 @@ class FfmpegShortComposer:
             raise ProviderError(
                 f"short-composer: '{self._bin}' not found on PATH — install FFmpeg"
             )
+
+        if beat_grid and beat_grid.is_reliable:
+            timeline = _snap_timeline_to_beats(timeline, beat_grid)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         caption_files = self._write_caption_files(timeline, output_path.parent)
@@ -251,6 +260,28 @@ def _wrap_caption(text: str) -> str:
     if len(lines) >= _CAPTION_MAX_LINES:
         lines[-1] = lines[-1].rstrip(" .,") + "…"
     return "\n".join(lines)
+
+
+def _snap_timeline_to_beats(
+    timeline: EditingTimeline, grid: BeatGrid
+) -> EditingTimeline:
+    """Snap segment boundaries to the nearest beat, preserving total coverage.
+
+    Captions are recalculated AFTER snapping (order from §6 regression table).
+    """
+    from videocreator.domain.value_objects import TimelineSegment  # noqa: PLC0415
+
+    snapped: list[TimelineSegment] = []
+    for i, seg in enumerate(timeline.segments):
+        start = grid.snap(seg.source_start_s)
+        end = grid.snap(seg.source_end_s)
+        if end <= start:
+            end = start + seg.duration_s
+        snapped.append(seg.model_copy(update={
+            "source_start_s": start,
+            "duration_s": round(end - start, 3),
+        }))
+    return timeline.model_copy(update={"segments": tuple(snapped)})
 
 
 __all__ = ["FfmpegShortComposer"]

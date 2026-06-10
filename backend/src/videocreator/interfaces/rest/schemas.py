@@ -601,6 +601,100 @@ class MeResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Brain / Video Analyst
+# ---------------------------------------------------------------------------
+class AnalyzeVideoRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: str | None = Field(None, examples=["https://tiktok.com/@user/video/123"])
+    context: str = Field("", min_length=0, max_length=5000,
+                         description="Video transcript, description, or context for analysis")
+
+
+class GenomeHookResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: str
+    duration_s: float
+    text_overlay: str | None = None
+
+
+class GenomeBeatResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    beat: str
+    duration_s: float
+    audio: str | None = None
+    camera: str | None = None
+    sfx: str | None = None
+    cut_style: str | None = None
+    visual_description: str | None = None
+
+
+class ViralGenomeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    format_id: str
+    hook: GenomeHookResponse
+    structure: list[GenomeBeatResponse]
+    why_it_works: str
+    remixability: float
+    decay_estimate: str
+
+
+# ---------------------------------------------------------------------------
+# Native shorts
+# ---------------------------------------------------------------------------
+class GenerateNativeShortRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    concept: str = Field(..., min_length=3, max_length=1000,
+                         examples=["Why cats always land on their feet"])
+    content_type: str = Field("other", examples=["meme", "story", "educational", "other"])
+    duration_s: int | None = Field(None, ge=5, le=60,
+                                   description="Override default duration for content type")
+
+
+class ShortSegmentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: str
+    duration_s: float
+    visual_prompt: str
+    audio_text: str | None = None
+    sfx_vibe: str | None = None
+    cut_style: str = "hard"
+
+
+class NativeShortStructureResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    total_duration_s: float
+    segments: list[ShortSegmentResponse]
+    music_vibe: str
+    caption_keywords: list[str]
+
+
+# ---------------------------------------------------------------------------
+# Hook rewrite
+# ---------------------------------------------------------------------------
+class RewriteHookRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    n_variants: int = Field(5, ge=1, le=5)
+    language: str = "es"
+
+
+class HookVariantResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    angle: str
+    text: str
+    est_duration_s: float
+    rationale: str
+
+
+# ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
 class HealthResponse(BaseModel):
@@ -629,6 +723,7 @@ __all__ = [
     "GenerateSeoRequest",
     "GenerateTopicsRequest",
     "HealthResponse",
+    "HookVariantResponse",
     "JobResponse",
     "LlmConfigResponse",
     "LoginRequest",
@@ -651,6 +746,7 @@ __all__ = [
     "RecommendedModelsResponse",
     "RecordTitleOutcomeRequest",
     "RefreshRequest",
+    "RewriteHookRequest",
     "RegisterRequest",
     "SceneResponse",
     "ScriptResponse",
@@ -668,4 +764,11 @@ __all__ = [
     "VoiceOptionResponse",
     "VoiceSearchRequest",
     "WritePodFileRequest",
+    "GenerateNativeShortRequest",
+    "ShortSegmentResponse",
+    "NativeShortStructureResponse",
+    "AnalyzeVideoRequest",
+    "GenomeHookResponse",
+    "GenomeBeatResponse",
+    "ViralGenomeResponse",
 ]

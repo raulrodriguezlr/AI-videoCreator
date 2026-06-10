@@ -6,6 +6,8 @@ from fastapi import APIRouter
 from videocreator.interfaces.rest.deps import UseCasesDep, UserIdDep
 from videocreator.interfaces.rest.schemas import (
     GenerateScriptRequest,
+    HookVariantResponse,
+    RewriteHookRequest,
     SceneResponse,
     ScriptResponse,
 )
@@ -63,6 +65,34 @@ async def review_script(
         pod_id=PodId(pod_id), script_id=ScriptId(script_id), requester_id=user_id,
     )
     return _to_response(script)
+
+
+@router.post(
+    "/{script_id}/rewrite-hook",
+    response_model=list[HookVariantResponse],
+    summary="Generate hook variants for the opening scene",
+)
+async def rewrite_hook(
+    pod_id: str,
+    script_id: str,
+    body: RewriteHookRequest,
+    uc: UseCasesDep,
+    user_id: UserIdDep,
+) -> list[HookVariantResponse]:
+    variants = await uc.scripts.rewrite_hook.execute(
+        script_id=ScriptId(script_id),
+        n_variants=body.n_variants,
+        language=body.language,
+    )
+    return [
+        HookVariantResponse(
+            angle=v.angle,
+            text=v.text,
+            est_duration_s=v.est_duration_s,
+            rationale=v.rationale,
+        )
+        for v in variants
+    ]
 
 
 __all__ = ["router"]

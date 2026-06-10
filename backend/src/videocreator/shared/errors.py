@@ -78,6 +78,20 @@ class ProviderSafetyError(ProviderError):
     error_code = "provider_safety_rejected"
 
 
+class TransientProviderError(ProviderError):
+    """Retryable provider failure (network blip, 5xx, rate limit)."""
+
+    http_status = 502
+    error_code = "provider_transient"
+
+
+class AllProvidersFailedError(ProviderError):
+    """Every provider in the fallback chain failed."""
+
+    http_status = 502
+    error_code = "all_providers_failed"
+
+
 class ProviderTimeoutError(ProviderError):
     """Provider job did not complete within the allotted polling window."""
 

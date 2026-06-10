@@ -51,6 +51,9 @@ from videocreator.application.use_cases.pods import (
     ListPods,
     UpdatePodConfig,
 )
+from videocreator.application.use_cases.analyze_video import AnalyzeVideoUseCase
+from videocreator.application.use_cases.hook_rewrite import HookRewriteUseCase
+from videocreator.application.use_cases.native_short import GenerateNativeShortUseCase
 from videocreator.application.use_cases.scripts import GenerateScript, ListScripts, ReviewScript
 from videocreator.application.use_cases.secrets import (
     DeleteProviderKey,
@@ -419,6 +422,7 @@ class UseCases:
         self.auth = _AuthUseCases(c)
         self.jobs = _JobUseCases(c)
         self.pod_sources = _PodSourceUseCases(c)
+        self.brain = _BrainUseCases(c)
 
 
 class _AuthUseCases:
@@ -467,6 +471,7 @@ class _ScriptUseCases:
         )
         self.list = ListScripts(c.pod_repo(), c.script_repo())
         self.review = ReviewScript(c.pod_repo(), c.script_repo(), c.llm())
+        self.rewrite_hook = HookRewriteUseCase(c.llm(), c.script_repo())
 
 
 class _EpisodeUseCases:
@@ -497,6 +502,7 @@ class _ShortsUseCases:
         )
         self.list = ListShorts(c.pod_repo(), c.short_repo())
         self.get = GetShort(c.pod_repo(), c.short_repo())
+        self.generate_native = GenerateNativeShortUseCase(c.llm())
 
 
 class _SeoUseCases:
@@ -531,6 +537,11 @@ class _JobUseCases:
         self.get = GetJob(c.job_repo())
         self.list_recent = ListRecentJobs(c.job_repo())
         self.delete = DeleteJob(c.job_repo())
+
+
+class _BrainUseCases:
+    def __init__(self, c: Container) -> None:
+        self.analyze_video = AnalyzeVideoUseCase(c.llm())
 
 
 class _PodSourceUseCases:
