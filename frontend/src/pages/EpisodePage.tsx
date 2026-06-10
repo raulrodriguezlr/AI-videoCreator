@@ -14,7 +14,6 @@ export function EpisodePage() {
   const { podId = "", episodeId = "" } = useParams();
   const nav = useNavigate();
   const qc = useQueryClient();
-  const toast = useToast();
 
   const detail = useQuery<EpisodeDetail>({
     queryKey: ["episode-detail", episodeId],
