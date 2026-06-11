@@ -115,12 +115,14 @@ class CapabilityExecutor:
                 log.info("capexec.provider_done", node=node.id,
                          provider=lp.manifest.id)
                 video_url = None
+                storage_key = None
                 if result.video_bytes and self._storage:
                     import uuid
                     key = f"runs/{node.id}_{uuid.uuid4().hex}.mp4"
                     await self._storage.put("media", key, result.video_bytes)
                     video_url = await self._storage.url_for("media", key)
-                    
+                    storage_key = f"media/{key}"
+
                 return {
                     "provider": lp.manifest.id,
                     "duration_s": result.duration_s,
@@ -128,6 +130,7 @@ class CapabilityExecutor:
                     "height": result.height,
                     "bytes": len(result.video_bytes),
                     "video_url": video_url,
+                    "storage_key": storage_key,
                     "metadata": result.metadata,
                 }
             except Exception as e:

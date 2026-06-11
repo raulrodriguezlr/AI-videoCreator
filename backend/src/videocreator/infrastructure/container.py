@@ -540,9 +540,79 @@ class Container:
             paths = render_carousel(slides, out_dir)
             return {"slides": len(paths), "paths": [str(p) for p in paths]}
 
+        async def run_tts(node, upstream):  # type: ignore[no-untyped-def]
+            """Narrated voiceover via the engine's ElevenLabs client."""
+            text = str(node.params.get("text", "")).strip()
+            if not text:
+                # native_short structure upstream → join its segment narration
+                for value in upstream.values():
+                    if isinstance(value, dict) and "segments" in value:
+                        text = " ".join(
+                            s.get("audio_text") or ""
+                            for s in value["segments"] if isinstance(s, dict)
+                        ).strip()
+                        if text:
+                            break
+                    elif isinstance(value, str) and value.strip():
+                        text = value.strip()[:2500]
+                        break
+            if not text:
+                raise RuntimeError("tts: no text in params or upstream")
+            from videocreator.infrastructure.engine.providers.elevenlabs_provider import (
+                ElevenLabsProvider,
+            )
+            import uuid
+            out_dir = self.settings.var_dir / "runs" / "audio"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / f"tts_{uuid.uuid4().hex}.mp3"
+            character = str(node.params.get("character", "Narrador"))
+            import asyncio as _aio
+            result = await _aio.to_thread(
+                ElevenLabsProvider().generate_dialogue,
+                text, character, str(out_path),
+            )
+            if not result:
+                raise RuntimeError("tts: ElevenLabs returned no audio "
+                                   "(missing ELEVENLABS_API_KEY?)")
+            key = f"runs/audio/{out_path.name}"
+            await self.storage().put("media", key, out_path.read_bytes())
+            return {"audio_key": f"media/{key}", "text_chars": len(text)}
+
+        async def run_compose_short(node, upstream):  # type: ignore[no-untyped-def]
+            """Concat upstream clips + mux voiceover into the final short."""
+            from videocreator.infrastructure.queue.compose_helpers import (
+                collect_media_inputs,
+                compose_media,
+            )
+            videos, audio = collect_media_inputs(upstream)
+            if not videos:
+                raise RuntimeError(
+                    "compose_short: no upstream video results to compose"
+                )
+            storage = self.storage()
+            local_videos = []
+            for vkey in videos:
+                bucket, _, key = vkey.partition("/")
+                local_videos.append(await storage.open_path(bucket, key))
+            local_audio = None
+            if audio:
+                bucket, _, key = audio.partition("/")
+                local_audio = await storage.open_path(bucket, key)
+            import uuid
+            out_path = (self.settings.var_dir / "runs"
+                        / f"short_{uuid.uuid4().hex}.mp4")
+            await compose_media(local_videos, local_audio, out_path)
+            key = f"runs/{out_path.name}"
+            await storage.put("media", key, out_path.read_bytes())
+            url = await storage.url_for("media", key)
+            return {"video_url": url, "storage_key": f"media/{key}",
+                    "clips": len(local_videos), "has_voiceover": audio is not None}
+
         executor.register("native_short", run_native_short)
         executor.register("carousel_slides", run_carousel_slides)
         executor.register("carousel_render", run_carousel_render)
+        executor.register("tts", run_tts)
+        executor.register("compose_short", run_compose_short)
 
     def template_gallery(self) -> TemplateGallery:
         return self._get("template_gallery", TemplateGallery)

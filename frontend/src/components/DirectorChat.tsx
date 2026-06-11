@@ -108,8 +108,14 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
         </div>
         <div className="chat-history" ref={historyRef}>
           {history.length === 0 && (
-            <Empty emoji="🎬" title="Empieza la conversación">
-              Por ejemplo: "añade un paso de subtítulos al final" o "cambia la duración a 45 segundos".
+            <Empty emoji="🎬" title="¿Cómo funciona el Director?">
+              La receta de la izquierda es el pipeline que producirá tu video
+              (estructura → clips → voz → montaje). Aquí la editas en lenguaje
+              natural: "haz el hook más agresivo", "añade subtítulos",
+              "cámbialo a 45 segundos". Cuando te guste, pulsa{" "}
+              <strong>Generar</strong> y se ejecuta de verdad: cada nodo corre
+              con su proveedor (Veo, LTX, ElevenLabs…) y acabas en la pantalla
+              del run con el video final.
             </Empty>
           )}
           {history.map((turn, i) => (

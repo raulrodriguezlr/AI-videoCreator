@@ -136,8 +136,10 @@ class VeoVertexProvider(BaseVideoProvider):
         """
         config = self._build_config(mode=mode)
         
-        # Vertex AI uses the GA suffix (-001) instead of the preview suffix
-        vertex_model = VEO_MODEL.replace("-preview", "-001") if "veo" in VEO_MODEL else VEO_MODEL
+        # Vertex AI only serves GA `-001` ids — explicit setting, never derived
+        # from the Gemini-API id by string surgery (the two catalogs differ).
+        from videocreator.shared.config import get_settings
+        vertex_model = get_settings().vertex_veo_model
 
         # Base parameters
         gen_params = {
@@ -311,7 +313,8 @@ class VeoVertexProvider(BaseVideoProvider):
         pass
 
     def _model_label(self) -> str:
-        return VEO_MODEL.replace("-preview", "-001") if "veo" in VEO_MODEL else VEO_MODEL
+        from videocreator.shared.config import get_settings
+        return get_settings().vertex_veo_model
 
     # ==========================================
     # INTERNAL HELPER METHODS

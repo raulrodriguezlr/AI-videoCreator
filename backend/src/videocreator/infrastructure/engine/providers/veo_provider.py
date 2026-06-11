@@ -367,8 +367,8 @@ class VeoProvider(BaseVideoProvider):
                 )
             raise RuntimeError(
                 "Backend response did not contain 'generated_videos'. "
-                f"Modelo: {VEO_MODEL} — si es un id '-preview' retirado, "
-                f"actualiza VEO_MODEL en engine/variables.py. "
+                f"Modelo: {VEO_MODEL} (Gemini API usa ids '-preview'; "
+                f"Vertex usa '-001' — VEO_MODEL/VERTEX_VEO_MODEL en .env). "
                 f"Respuesta: {operation.response!r}"[:500]
             )
 

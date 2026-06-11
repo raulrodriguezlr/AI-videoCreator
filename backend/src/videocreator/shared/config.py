@@ -145,7 +145,10 @@ class Settings(BaseSettings):
     # These back the constants the old `engine/` pipeline imports from
     # `variables.py`. Defaults mirror the values that module previously
     # hardcoded; override via env/`.env` instead of editing variables.py.
-    veo_model: str = "veo-3.0-generate-001"
+    # Gemini API (ai.google.dev) Veo id — ONLY `-preview` ids exist there.
+    veo_model: str = "veo-3.1-generate-preview"
+    # Vertex AI Veo id — ONLY `-001` GA ids exist there (3.0-001 discontinued).
+    vertex_veo_model: str = "veo-3.1-generate-001"
     veo_resolution: str = "720p"
     veo_aspect_ratio: str = "16:9"
     ltx_fps: int = 24
