@@ -61,7 +61,12 @@ from videocreator.application.use_cases.scene_recreation import (
     PlanSceneRecreationUseCase,
     SceneTrendMatchUseCase,
 )
-from videocreator.application.use_cases.scripts import GenerateScript, ListScripts, ReviewScript
+from videocreator.application.use_cases.scripts import (
+    DeleteScript,
+    GenerateScript,
+    ListScripts,
+    ReviewScript,
+)
 from videocreator.application.use_cases.secrets import (
     DeleteProviderKey,
     ListProviderKeys,
@@ -453,6 +458,68 @@ class Container:
     def run_registry(self) -> RunRegistry:
         return self._get("run_registry", RunRegistry)
 
+    def capability_executor(self) -> "CapabilityExecutor":
+        return self._get("capability_executor", self._build_capability_executor)
+
+    def _build_capability_executor(self) -> "CapabilityExecutor":
+        from videocreator.infrastructure.queue.capability_executor import (
+            CapabilityExecutor,
+        )
+        executor = CapabilityExecutor(
+            self.llm(), provider_registry=self.provider_registry(),
+        )
+        self._register_capability_handlers(executor)
+        return executor
+
+    def _register_capability_handlers(self, executor: "CapabilityExecutor") -> None:
+        """Wire app-level capabilities the SDK registry doesn't cover."""
+        from videocreator.application.use_cases.multiply import (
+            GenerateCarouselSlidesUseCase,
+        )
+        from videocreator.application.use_cases.native_short import (
+            GenerateNativeShortUseCase,
+        )
+
+        native = GenerateNativeShortUseCase(self.llm())
+        slides_uc = GenerateCarouselSlidesUseCase(self.llm())
+
+        async def run_native_short(node, upstream):  # type: ignore[no-untyped-def]
+            concept = str(node.params.get("concept", "") or
+                          next((v for v in upstream.values()
+                                if isinstance(v, str) and v.strip()), ""))
+            structure = await native.execute(
+                concept or "short video",
+                content_type=str(node.params.get("content_type", "other")),
+            )
+            return structure.model_dump(mode="json")
+
+        async def run_carousel_slides(node, upstream):  # type: ignore[no-untyped-def]
+            script = str(node.params.get("script", "") or
+                         next((v for v in upstream.values()
+                               if isinstance(v, str) and v.strip()), ""))
+            slides = await slides_uc.execute(script or "untitled")
+            return [{"index": s.index, "title": s.title, "body": s.body}
+                    for s in slides]
+
+        async def run_carousel_render(node, upstream):  # type: ignore[no-untyped-def]
+            from videocreator.application.use_cases.multiply import CarouselSlide
+            from videocreator.infrastructure.media.carousel_render import (
+                render_carousel,
+            )
+            raw = next((v for v in upstream.values() if isinstance(v, list)), [])
+            slides = [CarouselSlide(index=s["index"], title=s["title"],
+                                    body=s.get("body", ""))
+                      for s in raw if isinstance(s, dict) and "title" in s]
+            if not slides:
+                raise RuntimeError("carousel_render: no slides from upstream")
+            out_dir = self.settings.var_dir / "runs" / "carousels"
+            paths = render_carousel(slides, out_dir)
+            return {"slides": len(paths), "paths": [str(p) for p in paths]}
+
+        executor.register("native_short", run_native_short)
+        executor.register("carousel_slides", run_carousel_slides)
+        executor.register("carousel_render", run_carousel_render)
+
     def template_gallery(self) -> TemplateGallery:
         return self._get("template_gallery", TemplateGallery)
 
@@ -533,6 +600,7 @@ class _ScriptUseCases:
         self.list = ListScripts(c.pod_repo(), c.script_repo())
         self.review = ReviewScript(c.pod_repo(), c.script_repo(), c.llm())
         self.rewrite_hook = HookRewriteUseCase(c.llm(), c.script_repo())
+        self.delete = DeleteScript(c.pod_repo(), c.script_repo(), c.episode_repo())
 
 
 class _EpisodeUseCases:

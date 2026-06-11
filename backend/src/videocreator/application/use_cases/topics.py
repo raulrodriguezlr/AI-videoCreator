@@ -26,6 +26,9 @@ from videocreator.shared.errors import (
     ProviderError,
 )
 from videocreator.shared.ids import PodId, TopicId, UserId, new_topic_id
+from videocreator.shared.logging import get_logger
+
+log = get_logger(__name__)
 
 
 async def _owned_topic(
@@ -102,7 +105,12 @@ class GenerateTopics:
 
         trend_terms: list[str] = []
         if use_trends and self.trends is not None:
-            trend_terms = await self.trends.fetch(language=pod.config.language, limit=15)
+            try:
+                trend_terms = await self.trends.fetch(language=pod.config.language, limit=15)
+            except Exception:
+                # Trends are best-effort grounding, not a requirement — generate
+                # topics without them rather than failing the whole request.
+                log.warning("topics.trends_unavailable", pod_id=str(pod_id), exc_info=True)
 
         prompt = _render_topic_prompt(
             series_name=pod.config.series_name,

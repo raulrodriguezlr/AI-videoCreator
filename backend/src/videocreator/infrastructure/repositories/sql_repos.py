@@ -325,6 +325,13 @@ class SqlScriptRepository(SqlBase):
             await session.commit()
             return script
 
+    async def delete(self, script_id: ScriptId) -> None:
+        async with self._session() as session:
+            row = await session.get(ScriptRow, script_id)
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
+
 
 class SqlEpisodeRepository(SqlBase):
     async def get(self, episode_id: EpisodeId) -> Episode | None:

@@ -23,12 +23,14 @@ from typing import Any
 from videocreator.domain.entities import Character, Scene, Script
 from videocreator.domain.ports import (
     CharacterRepository,
+    EpisodeRepository,
     LLMPort,
     PodRepository,
     ScriptRepository,
     TopicRepository,
 )
 from videocreator.shared.errors import (
+    ConflictError,
     ForbiddenError,
     PodNotFound,
     ProviderError,
@@ -475,6 +477,37 @@ class ListScripts:
         return await self.script_repo.list_for_pod(pod_id)
 
 
+@dataclass(frozen=True, slots=True)
+class DeleteScript:
+    """Delete a script, refusing if any episode still references it.
+
+    Deleting a script that an episode points at would orphan that episode's
+    `script_id`, so the use case raises `ConflictError` instead — the caller
+    must delete (or repoint) the dependent episode(s) first.
+    """
+
+    pod_repo: PodRepository
+    script_repo: ScriptRepository
+    episode_repo: EpisodeRepository
+
+    async def execute(self, *, script_id: ScriptId, requester_id: UserId) -> None:
+        script = await self.script_repo.get(script_id)
+        if script is None:
+            raise ScriptNotFound(f"script {script_id} not found")
+        pod = await self.pod_repo.get(script.pod_id)
+        if pod is None or not pod.is_owned_by(requester_id):
+            raise ForbiddenError("script belongs to a pod owned by a different user")
+
+        episodes = await self.episode_repo.list_for_pod(script.pod_id)
+        if any(ep.script_id == script_id for ep in episodes):
+            raise ConflictError(
+                f"cannot delete script {script_id}: one or more episodes "
+                "still reference it"
+            )
+
+        await self.script_repo.delete(script_id)
+
+
 _REVIEW_SYSTEM = (
     "You are 'The Supervisor', a veteran Animation Director. Your job is to "
     "strictly enforce video creation rules, ensuring clean transitions, logical "
@@ -593,4 +626,4 @@ class ReviewScript:
         return await self.script_repo.save(updated)
 
 
-__all__ = ["GenerateScript", "ListScripts", "ReviewScript"]
+__all__ = ["DeleteScript", "GenerateScript", "ListScripts", "ReviewScript"]

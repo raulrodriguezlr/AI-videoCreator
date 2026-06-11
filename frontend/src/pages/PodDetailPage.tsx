@@ -206,6 +206,11 @@ function ScriptsTab({ podId, q }: { podId: string; q: UseQueryResult<Script[]> }
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["episodes", podId] }); toast.ok("Episodio creado", "Disponible en Episodios"); },
     onError: (e) => toast.err("No se pudo crear", (e as Error).message),
   });
+  const del = useMutation({
+    mutationFn: (scriptId: string) => api.delete(`/pods/${podId}/scripts/${scriptId}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scripts", podId] }); toast.ok("Guión borrado"); },
+    onError: (e) => toast.err("No se pudo borrar", (e as Error).message),
+  });
   if (q.isLoading) return <Loading />;
   if (!q.data?.length) return <Empty emoji="📝" title="Sin guiones">Genera un guión desde un tema.</Empty>;
   return (
@@ -220,6 +225,8 @@ function ScriptsTab({ podId, q }: { podId: string; q: UseQueryResult<Script[]> }
             <Button size="sm" variant="ghost" onClick={() => setViewing(s)}><IcFile /> Ver guión</Button>
             <Button size="sm" variant="primary" loading={makeEp.isPending && makeEp.variables?.id === s.id}
               onClick={() => makeEp.mutate(s)}><IcPlus /> Crear episodio</Button>
+            <Button size="sm" variant="ghost" loading={del.isPending && del.variables === s.id}
+              onClick={() => confirmThen("¿Borrar este guión?", () => del.mutate(s.id))}><IcTrash /></Button>
           </div>
         </div>
       ))}

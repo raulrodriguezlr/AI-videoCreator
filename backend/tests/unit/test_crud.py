@@ -10,6 +10,7 @@ import pytest
 from videocreator.application.use_cases.characters import UpdateCharacter
 from videocreator.application.use_cases.episodes import DeleteEpisode
 from videocreator.application.use_cases.jobs import DeleteJob
+from videocreator.application.use_cases.scripts import DeleteScript
 from videocreator.application.use_cases.topics import DeleteTopic, UpdateTopic
 from videocreator.domain.entities import (
     LOCAL_USER_ID,
@@ -18,10 +19,11 @@ from videocreator.domain.entities import (
     Job,
     Pod,
     PodConfig,
+    Script,
     Topic,
 )
 from videocreator.domain.value_objects import JobKind, JobState, TopicStatus
-from videocreator.shared.errors import ConflictError, ForbiddenError
+from videocreator.shared.errors import ConflictError, ForbiddenError, ScriptNotFound
 from videocreator.shared.ids import (
     JobId,
     PodId,
@@ -29,6 +31,7 @@ from videocreator.shared.ids import (
     new_character_id,
     new_episode_id,
     new_pod_id,
+    new_script_id,
     new_topic_id,
 )
 
@@ -96,6 +99,62 @@ async def test_delete_topic_checks_ownership() -> None:
 
     await uc.execute(topic_id=topic.id, requester_id=LOCAL_USER_ID)
     assert repo.deleted == [topic.id]
+
+
+# --------------------------------------------------------------------------
+# Scripts
+# --------------------------------------------------------------------------
+class _EpisodeListRepo:
+    """Fake episode repo exposing only `list_for_pod`, as `DeleteScript` needs."""
+
+    def __init__(self, episodes: list[Episode] | None = None) -> None:
+        self.episodes = episodes or []
+
+    async def list_for_pod(self, pod_id: PodId) -> list[Episode]:
+        return [ep for ep in self.episodes if ep.pod_id == pod_id]
+
+
+def _script(pod: Pod) -> Script:
+    return Script(id=new_script_id(), pod_id=pod.id, title="s")
+
+
+async def test_delete_script_checks_ownership() -> None:
+    pod = _pod()
+    script = _script(pod)
+    repo = _Repo(script)
+    uc = DeleteScript(_PodRepo(pod), repo, _EpisodeListRepo())  # type: ignore[arg-type]
+
+    with pytest.raises(ForbiddenError):
+        await uc.execute(script_id=script.id, requester_id=OTHER)
+    assert repo.deleted == []
+
+    await uc.execute(script_id=script.id, requester_id=LOCAL_USER_ID)
+    assert repo.deleted == [script.id]
+
+
+async def test_delete_script_not_found() -> None:
+    pod = _pod()
+    script = _script(pod)
+    repo = _Repo(script)
+    uc = DeleteScript(_PodRepo(pod), repo, _EpisodeListRepo())  # type: ignore[arg-type]
+
+    with pytest.raises(ScriptNotFound):
+        await uc.execute(script_id=new_script_id(), requester_id=LOCAL_USER_ID)
+    assert repo.deleted == []
+
+
+async def test_delete_script_conflicts_when_episode_references_it() -> None:
+    pod = _pod()
+    script = _script(pod)
+    repo = _Repo(script)
+    ep = Episode(
+        id=new_episode_id(), pod_id=pod.id, title="ep", number=1, script_id=script.id,
+    )
+    uc = DeleteScript(_PodRepo(pod), repo, _EpisodeListRepo([ep]))  # type: ignore[arg-type]
+
+    with pytest.raises(ConflictError, match="episodes"):
+        await uc.execute(script_id=script.id, requester_id=LOCAL_USER_ID)
+    assert repo.deleted == []
 
 
 # --------------------------------------------------------------------------

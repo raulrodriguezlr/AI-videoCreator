@@ -1,7 +1,7 @@
 """Script endpoints — generate from topic + list."""
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 
 from videocreator.interfaces.rest.deps import UseCasesDep, UserIdDep
 from videocreator.interfaces.rest.schemas import (
@@ -93,6 +93,16 @@ async def rewrite_hook(
         )
         for v in variants
     ]
+
+
+@router.delete(
+    "/{script_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a script",
+)
+async def delete_script(
+    pod_id: str, script_id: str, uc: UseCasesDep, user_id: UserIdDep,
+) -> None:
+    del pod_id
+    await uc.scripts.delete.execute(script_id=ScriptId(script_id), requester_id=user_id)
 
 
 __all__ = ["router"]

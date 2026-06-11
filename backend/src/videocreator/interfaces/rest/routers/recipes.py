@@ -2,11 +2,14 @@
 
 Director's Chat takes the DagSpec inline for now: recipes aren't persisted
 per-episode yet, so the client owns the recipe document and round-trips it.
+`POST /runs` is the "Generar" button: it executes a recipe through the
+CapabilityExecutor in the background and streams progress over SSE.
 """
 from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -82,6 +85,44 @@ def _to_template_response(t) -> TemplateResponse:  # type: ignore[no-untyped-def
         tags=list(t.tags), preview=t.preview,
         dag=_to_spec_schema(t.dag),
     )
+
+
+@router.post(
+    "/runs",
+    response_model=RunSnapshotResponse,
+    status_code=202,
+    summary="Execute a recipe — starts a DAG run in the background",
+)
+async def start_run(
+    body: DagSpecSchema, container: ContainerDep, user_id: UserIdDep,
+) -> RunSnapshotResponse:
+    try:
+        spec = DagSpec.model_validate(body.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"invalid recipe: {e}") from e
+
+    from videocreator.infrastructure.queue.dag_executor import DagExecutor, DagRun
+
+    run = DagRun(run_id=f"run_{uuid.uuid4().hex[:12]}", spec=spec)
+    registry = container.run_registry()
+    registry.register(run)
+    bus = container.event_bus()
+
+    async def _emit(run_id: str, event: dict) -> None:
+        await bus.publish(f"run:{run_id}", event)
+
+    executor = DagExecutor(container.capability_executor(), on_event=_emit)
+
+    async def _execute() -> None:
+        try:
+            await executor.run(run)
+        except Exception as e:  # defensive: a crashed run must stay inspectable
+            log.error("run.crashed", run_id=run.run_id, error=str(e))
+
+    asyncio.create_task(_execute())
+    snapshot = registry.snapshot(run.run_id)
+    assert snapshot is not None
+    return RunSnapshotResponse.model_validate(snapshot)
 
 
 @router.get(

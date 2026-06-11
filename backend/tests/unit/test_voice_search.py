@@ -1,11 +1,17 @@
 """Tests for the ElevenLabs shared-voices search adapter (ported from v2)."""
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import httpx
 import pytest
 import respx
 
-from videocreator.infrastructure.providers.elevenlabs_voices import ElevenLabsVoiceSearch
+from videocreator.infrastructure.providers.elevenlabs_voices import (
+    ElevenLabsVoiceSearch,
+    VoiceOption,
+)
+from videocreator.interfaces.rest.schemas import VoiceOptionResponse
 from videocreator.shared.config import Settings
 from videocreator.shared.errors import ProviderUnavailableError
 
@@ -60,3 +66,23 @@ async def test_search_requires_api_key() -> None:
     uc = ElevenLabsVoiceSearch(Settings(elevenlabs_api_key=None), llm)  # type: ignore[call-arg,arg-type]
     with pytest.raises(ProviderUnavailableError, match="ELEVENLABS_API_KEY"):
         await uc.search(query="x")
+
+
+def test_voice_option_serializes_to_response() -> None:
+    """`VoiceOption` is a `slots=True` dataclass — it has no `__dict__`, so the
+    REST router must use `dataclasses.asdict()` (not `vars()`, which raises
+    `TypeError` on slotted dataclasses) to build `VoiceOptionResponse`."""
+    option = VoiceOption(
+        voice_id="v1", name="Lucía", preview_url="http://x/1.mp3",
+        description="sweet", gender="female", age="young",
+        accent="neutral", language="es",
+    )
+
+    with pytest.raises(TypeError, match="__dict__"):
+        vars(option)  # the bug: this is what the route used to call
+
+    response = VoiceOptionResponse(**asdict(option))
+
+    assert response.voice_id == "v1"
+    assert response.name == "Lucía"
+    assert response.language == "es"

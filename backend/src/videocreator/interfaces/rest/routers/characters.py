@@ -1,6 +1,8 @@
 """Character endpoints — scoped under a pod (incl. reference-image assets)."""
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from fastapi import APIRouter, File, Query, UploadFile, status
 
 from videocreator.interfaces.rest.deps import ContainerDep, UseCasesDep, UserIdDep
@@ -138,7 +140,9 @@ async def search_voices(
     # Ownership: the requester must own the pod this character lives in.
     await uc.pods.get.execute(pod_id=PodId(pod_id), requester_id=user_id)
     options = await container.voice_search().search(query=body.query)
-    return [VoiceOptionResponse(**vars(o)) for o in options]
+    # `VoiceOption` is a `slots=True` dataclass — it has no `__dict__`, so
+    # `vars(o)` raises `TypeError`. `asdict()` works on slotted dataclasses.
+    return [VoiceOptionResponse(**asdict(o)) for o in options]
 
 
 __all__ = ["router"]
