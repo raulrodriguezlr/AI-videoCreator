@@ -38,3 +38,6 @@ export const IcMessageCircle = (p: P) => (<svg {...base(p)}><path d="M21 12a8 8 
 export const IcArrowRight = (p: P) => (<svg {...base(p)}><path d="M5 12h14M13 5l7 7-7 7"/></svg>);
 export const IcGitBranch = (p: P) => (<svg {...base(p)}><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M6 8.5v7M8.5 6H14a4 4 0 0 1 4 4v.5"/></svg>);
 export const IcSend = (p: P) => (<svg {...base(p)}><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>);
+export const IcRadar = (p: P) => (<svg {...base(p)}><path d="M12 12 19 6"/><path d="M12 12a8 8 0 1 1-5.66-7.66"/><path d="M12 12a4 4 0 1 1-2.83-3.83"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>);
+export const IcCopy = (p: P) => (<svg {...base(p)}><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>);
+export const IcAlertTriangle = (p: P) => (<svg {...base(p)}><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>);

@@ -85,12 +85,21 @@ class OpenApiAdapter(AdapterBase):
 
     @staticmethod
     def _get_path(data: dict[str, Any], path: str) -> Any:
-        """Resolve a dotted path like `result.video.url` against a dict."""
+        """Resolve a dotted path like `result.video.url` or `output.0`.
+
+        Numeric segments index into lists (Runway-style `{"output": [url]}`).
+        """
         current: Any = data
         for part in path.split("."):
-            if not isinstance(current, dict) or part not in current:
+            if isinstance(current, list) and part.isdigit():
+                idx = int(part)
+                if idx >= len(current):
+                    return None
+                current = current[idx]
+            elif isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
                 return None
-            current = current[part]
         return current
 
     async def generate(self, request: GenRequest) -> GenResult:

@@ -57,6 +57,10 @@ from videocreator.application.use_cases.director_chat import DirectorChatUseCase
 from videocreator.application.use_cases.hook_rewrite import HookRewriteUseCase
 from videocreator.application.use_cases.multiply import GenerateCarouselSlidesUseCase
 from videocreator.application.use_cases.native_short import GenerateNativeShortUseCase
+from videocreator.application.use_cases.scene_recreation import (
+    PlanSceneRecreationUseCase,
+    SceneTrendMatchUseCase,
+)
 from videocreator.application.use_cases.scripts import GenerateScript, ListScripts, ReviewScript
 from videocreator.application.use_cases.secrets import (
     DeleteProviderKey,
@@ -585,6 +589,8 @@ class _BrainUseCases:
         self.carousel_slides = GenerateCarouselSlidesUseCase(c.llm())
         self.director_chat = DirectorChatUseCase(c.llm())
         self.concept_visualizer = ConceptVisualizerUseCase(c.llm())
+        self.plan_recreation = PlanSceneRecreationUseCase(c.llm())
+        self.scene_trend_match = SceneTrendMatchUseCase(c.llm())
 
 
 class _PodSourceUseCases:

@@ -438,6 +438,45 @@ export function subscribeToRun(
 }
 
 // ---------------------------------------------------------------------------
+// Recreations — famous-scene recreation planner (§16)
+// ---------------------------------------------------------------------------
+export interface FairUse {
+  closeness: number;
+  transformative: number;
+  risk: "low" | "medium" | "high";
+  guidance: string;
+  requires_confirmation: boolean;
+}
+
+export interface RecreationBeat {
+  beat: string;
+  duration_s: number;
+  description: string;
+}
+
+export interface RecreationPlan {
+  title: string;
+  v2v_prompt: string;
+  reference_description: string;
+  beats: RecreationBeat[];
+  audio_note: string;
+  fair_use: FairUse;
+  provider_hint: string[];
+}
+
+export interface SceneCandidate {
+  term: string;
+  scene: string;
+  why_trending: string;
+}
+
+export const planRecreation = (original: string, niche: string, twist: string) =>
+  api.post<RecreationPlan>("/brain/recreations/plan", { original, niche, twist });
+
+export const sceneTrendMatch = (terms: string[]) =>
+  api.post<SceneCandidate[]>("/brain/recreations/trend-match", { terms });
+
+// ---------------------------------------------------------------------------
 // Streaming NDJSON (Ollama model pull progress)
 // ---------------------------------------------------------------------------
 export async function streamOllamaPull(

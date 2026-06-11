@@ -536,3 +536,62 @@ p { margin: 0 0 12px; }
 .patch-value { font-family: var(--font-mono); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .patch-actions { display: flex; gap: 10px; margin-top: 10px; }
+
+/* =========================================================================
+   Recreations — scene radar + recreation planner (§16)
+   ========================================================================= */
+.scene-candidates { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.scene-candidate { display: flex; flex-direction: column; gap: 10px; }
+.scene-candidate .term { font-family: var(--font-mono); font-size: 11px; color: var(--accent-ink); }
+.scene-candidate .why { color: var(--text-2); font-size: 12.5px; }
+
+/* fair-use assessment card */
+.fair-use-card { display: flex; flex-direction: column; gap: 14px; }
+.fair-use-bars { display: flex; flex-direction: column; gap: 12px; }
+.fair-use-bar-label { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-2); margin-bottom: 6px; }
+.fair-use-bar-label strong { color: var(--text); font-weight: 600; }
+.fair-use-guidance { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+
+.warn-banner {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 16px; border-radius: var(--r-md);
+  background: var(--amber-soft); border: 1px solid rgba(251, 191, 36, 0.35);
+  color: var(--amber);
+}
+.warn-banner svg { flex: none; margin-top: 1px; }
+.warn-banner .body { color: var(--text); font-size: 13px; line-height: 1.6; }
+.warn-banner .body strong { color: var(--amber); }
+
+/* beats timeline */
+.beat-row {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 13px 14px; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.beat-pill {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 64px; padding: 4px 10px; border-radius: var(--r-pill);
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
+  background: var(--accent-soft); color: var(--accent-ink); border: 1px solid var(--accent-line);
+  text-align: center;
+}
+.beat-duration { flex: none; font-family: var(--font-mono); font-size: 12px; color: var(--text-3); padding-top: 4px; }
+.beat-desc { flex: 1; min-width: 0; font-size: 13.5px; color: var(--text-2); line-height: 1.6; }
+
+/* copyable mono block */
+.copy-block {
+  position: relative; margin: 0;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 14px 44px 14px 14px; font-family: var(--font-mono); font-size: 12.5px;
+  line-height: 1.6; color: var(--text-2); white-space: pre-wrap; word-break: break-word;
+}
+.copy-block-btn {
+  position: absolute; top: 8px; right: 8px; width: 30px; height: 30px;
+  display: grid; place-items: center; border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  color: var(--text-2); cursor: pointer; transition: color 0.14s ease, border-color 0.14s ease;
+}
+.copy-block-btn:hover { color: var(--text); border-color: var(--accent); }
+.copy-block-btn svg { width: 15px; height: 15px; }
+
+.recreation-result { display: flex; flex-direction: column; gap: 18px; }

@@ -758,6 +758,64 @@ class RunSnapshotResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Scene Recreation (V2V, §3.3)
+# ---------------------------------------------------------------------------
+class PlanRecreationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    original: str = Field(..., min_length=3, max_length=2000,
+                          examples=["The Matrix bullet-time rooftop scene"])
+    niche: str = Field("general", max_length=200)
+    twist: str = Field(..., min_length=3, max_length=2000,
+                       examples=["the bullets are unpaid invoices"])
+
+
+class FairUseResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    closeness: float
+    transformative: float
+    risk: str
+    guidance: str
+    requires_confirmation: bool
+
+
+class RecreationBeatResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    beat: str
+    duration_s: float
+    description: str
+
+
+class RecreationPlanResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    v2v_prompt: str
+    reference_description: str
+    beats: list[RecreationBeatResponse]
+    audio_note: str
+    fair_use: FairUseResponse
+    provider_hint: list[str]
+
+
+class SceneTrendMatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    terms: list[str] = Field(default_factory=list,
+                             description="Trend terms; empty = fetch live trends")
+
+
+class SceneCandidateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    term: str
+    scene: str
+    why_trending: str
+
+
+# ---------------------------------------------------------------------------
 # Publishing — YouTube OAuth (§16.14)
 # ---------------------------------------------------------------------------
 class ConnectYouTubeRequest(BaseModel):
@@ -859,4 +917,10 @@ __all__ = [
     "RunSnapshotResponse",
     "ConnectYouTubeRequest",
     "YouTubeStatusResponse",
+    "PlanRecreationRequest",
+    "FairUseResponse",
+    "RecreationBeatResponse",
+    "RecreationPlanResponse",
+    "SceneTrendMatchRequest",
+    "SceneCandidateResponse",
 ]
