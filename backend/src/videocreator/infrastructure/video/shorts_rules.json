@@ -19,7 +19,7 @@
     },
     {
       "platform": "tiktok",
-      "max_duration_s": 180.0,
+      "max_duration_s": 60.0,
       "min_duration_s": 5.0,
       "aspect": "9:16",
       "width": 1080,

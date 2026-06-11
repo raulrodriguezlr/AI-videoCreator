@@ -51,14 +51,14 @@ def test_plan_clamps_to_available_source_after_start() -> None:
     assert seg.duration_s == pytest.approx(8.0)
 
 
-def test_plan_requested_zero_falls_back_to_max() -> None:
-    # Act
+def test_plan_requested_zero_falls_back_to_default_target() -> None:
+    # A short is a highlight, not the whole episode: with no requested
+    # duration the planner targets DEFAULT_TARGET_S, never the platform max.
     timeline = ShortPlanner().plan(
         source_duration_s=300.0, requested_duration_s=0.0, rule=_rule()
     )
 
-    # Assert
-    assert timeline.total_duration_s == 60.0
+    assert timeline.total_duration_s == ShortPlanner.DEFAULT_TARGET_S
 
 
 def test_plan_short_source_uses_whole_clip_below_min() -> None:

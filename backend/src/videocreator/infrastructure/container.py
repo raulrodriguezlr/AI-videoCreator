@@ -148,7 +148,11 @@ from videocreator.infrastructure.repositories.sql_repos import (
 )
 from videocreator.infrastructure.security.cipher import SecretCipher
 from videocreator.infrastructure.security.passwords import Argon2PasswordHasher
-from videocreator.infrastructure.security.secret_vault import DbSecretVault, EnvSecretVault
+from videocreator.infrastructure.security.secret_vault import (
+    DbSecretVault,
+    EnvSecretVault,
+    LayeredSecretVault,
+)
 from videocreator.infrastructure.security.tokens import JwtTokenService
 from videocreator.infrastructure.storage.file_storage import LocalFileStorage
 from videocreator.infrastructure.system.ollama_admin import OllamaAdmin
@@ -290,16 +294,29 @@ class Container:
         return self._get("secret_vault", self._build_secret_vault)
 
     def _build_secret_vault(self) -> SecretVaultPort:
-        """Pick the encrypted DB vault when a key is configured, else env vault.
+        """Encrypted DB vault always; env vars as read-only fallback.
 
-        This keeps the zero-config local experience (keys via env) while letting
-        any mode opt into encrypted, per-user BYO keys just by setting
-        `secret_encryption_key`.
+        Without `secret_encryption_key` a Fernet key is generated once and
+        stored at `<var_dir>/secret.key`, so saving an API key from the UI
+        persists encrypted at rest in every mode (the old env-only vault
+        silently dropped writes — keys "saved" in Settings never stuck).
         """
-        key = self.settings.secret_encryption_key
-        if key:
-            return DbSecretVault(self._sessionmaker(), SecretCipher(key))
-        return EnvSecretVault(self.settings)
+        key = self.settings.secret_encryption_key or self._local_secret_key()
+        return LayeredSecretVault(
+            DbSecretVault(self._sessionmaker(), SecretCipher(key)),
+            EnvSecretVault(self.settings),
+        )
+
+    def _local_secret_key(self) -> str:
+        """Load (or create once) the local at-rest encryption key."""
+        key_path = self.settings.var_dir / "secret.key"
+        if key_path.exists():
+            return key_path.read_text(encoding="utf-8").strip()
+        key = SecretCipher.generate_key()
+        key_path.parent.mkdir(parents=True, exist_ok=True)
+        key_path.write_text(key, encoding="utf-8")
+        log.info("vault.local_key_created", path=str(key_path))
+        return key
 
     def runtime_config(self) -> JsonRuntimeConfig:
         return self._get(

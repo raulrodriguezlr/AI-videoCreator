@@ -353,9 +353,24 @@ class VeoProvider(BaseVideoProvider):
         if not hasattr(operation, "response") or not operation.response:
             raise RuntimeError("Backend returned an empty response with no errors.")
 
-        # Download the generated video
+        # Download the generated video. An empty list here usually means the
+        # RAI safety filter dropped the output — surface the reason instead of
+        # the opaque legacy message.
         if not hasattr(operation.response, "generated_videos") or not operation.response.generated_videos:
-            raise RuntimeError("Backend response did not contain 'generated_videos'.")
+            filtered = getattr(operation.response, "rai_media_filtered_count", 0)
+            reasons = getattr(operation.response, "rai_media_filtered_reasons", None)
+            if filtered:
+                raise RuntimeError(
+                    f"Veo filtró el video por políticas de contenido "
+                    f"({filtered} filtrados): {reasons or 'sin detalle'}. "
+                    f"Reformula el prompt de la escena."
+                )
+            raise RuntimeError(
+                "Backend response did not contain 'generated_videos'. "
+                f"Modelo: {VEO_MODEL} — si es un id '-preview' retirado, "
+                f"actualiza VEO_MODEL en engine/variables.py. "
+                f"Respuesta: {operation.response!r}"[:500]
+            )
 
         generated = operation.response.generated_videos[0]
         self.client.files.download(file=generated.video)

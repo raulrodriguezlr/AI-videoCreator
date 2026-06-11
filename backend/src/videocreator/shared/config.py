@@ -111,7 +111,9 @@ class Settings(BaseSettings):
     # Image generation model. A `gemini-*-image-generation` model uses the
     # generate_content path (works on standard Gemini API keys); an `imagen-*`
     # model uses the Imagen predict path (often requires a paid/Vertex tier).
-    image_model: str = "gemini-2.0-flash-preview-image-generation"
+    # gemini-2.0-flash-preview-image-generation was retired from v1beta;
+    # gemini-2.5-flash-image is the GA replacement on standard API keys.
+    image_model: str = "gemini-2.5-flash-image"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:14b-instruct"
     ollama_timeout_seconds: float = 300.0

@@ -115,4 +115,37 @@ class DbSecretVault:
             return [provider for (provider,) in result.all()]
 
 
-__all__ = ["DbSecretVault", "EnvSecretVault"]
+class LayeredSecretVault:
+    """DB vault for writes + reads, env vault as read-only fallback.
+
+    Fixes the local-mode trap where saving a key in Settings silently
+    no-opped: writes always land in the encrypted DB vault; reads prefer the
+    DB and fall back to environment variables so existing .env setups keep
+    working untouched.
+    """
+
+    name = "layered-vault"
+
+    def __init__(self, primary: DbSecretVault, fallback: EnvSecretVault) -> None:
+        self._primary = primary
+        self._fallback = fallback
+
+    async def get_secret(self, user_id: UserId, provider: str) -> str | None:
+        value = await self._primary.get_secret(user_id, provider)
+        if value is not None:
+            return value
+        return await self._fallback.get_secret(user_id, provider)
+
+    async def set_secret(self, user_id: UserId, provider: str, value: str) -> None:
+        await self._primary.set_secret(user_id, provider, value)
+
+    async def delete_secret(self, user_id: UserId, provider: str) -> None:
+        await self._primary.delete_secret(user_id, provider)
+
+    async def list_providers(self, user_id: UserId) -> list[str]:
+        db = await self._primary.list_providers(user_id)
+        env = await self._fallback.list_providers(user_id)
+        return sorted(set(db) | set(env))
+
+
+__all__ = ["DbSecretVault", "EnvSecretVault", "LayeredSecretVault"]

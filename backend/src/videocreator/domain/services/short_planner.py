@@ -125,10 +125,18 @@ class ShortPlanner:
         latest_start = max(0.0, source_duration_s - min_tail)
         return min(max(0.0, start_s), latest_start)
 
+    #: Default short length when the caller does not request one. A short is
+    #: a highlight, not the whole episode — defaulting to the platform max
+    #: produced multi-minute "shorts" of unedited source.
+    DEFAULT_TARGET_S = 30.0
+
     @staticmethod
     def _clamp_duration(requested_s: float, rule: PlatformRule, available_s: float) -> float:
         """Clamp the requested duration to [min, max] ∩ available source."""
-        target = requested_s if requested_s > 0.0 else rule.max_duration_s
+        if requested_s > 0.0:
+            target = requested_s
+        else:
+            target = min(ShortPlanner.DEFAULT_TARGET_S, rule.max_duration_s)
         target = min(target, rule.max_duration_s, available_s)
         # Honor the floor only if the source is long enough to reach it.
         return max(target, min(rule.min_duration_s, available_s))
