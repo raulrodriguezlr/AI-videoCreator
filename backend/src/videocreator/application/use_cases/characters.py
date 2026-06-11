@@ -119,7 +119,9 @@ class UpdateCharacter:
 
     pod_repo: PodRepository
     char_repo: CharacterRepository
-    file_store: PodFileStore
+    #: optional — when absent the DB stays the single source of truth and the
+    #: legacy config.json sync is skipped (tests, future engine retirement).
+    file_store: PodFileStore | None = None
 
     async def execute(
         self, *, character_id: CharacterId, requester_id: UserId,
@@ -153,7 +155,9 @@ class UpdateCharacter:
                     pod = pod.model_copy(update={"config": updated_config})
                     await self.pod_repo.save(pod)
             
-            # 2. Update config.json
+            # 2. Update config.json (legacy engine reads it; skip without store)
+            if self.file_store is None:
+                return saved
             try:
                 config_json = self.file_store.read_pod_file(pod.name, "config.json")
                 data = json.loads(config_json)

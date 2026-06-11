@@ -42,12 +42,13 @@ def _status_detail(exc: Exception) -> str:
 # (KNOWN_VIDEO_PROVIDERS). Both dropdowns (pod default + per-episode) must offer
 # the full set so a series can default to veo/ltx, not just artlist/elevenlabs.
 # LTX is split in two: the local Desktop app vs the ComfyUI backend (LoRAs).
-_ENGINE_PROVIDER_NAMES = ("veo", "ltx_desktop", "ltx_comfyui")
+_ENGINE_PROVIDER_NAMES = ("veo", "veo_vertex", "ltx_desktop", "ltx_comfyui")
 
 # Human-friendly labels for the provider dropdowns (the raw `name` is the value
 # the backend routes on; the label is what the user reads).
 _PROVIDER_LABELS: dict[str, str] = {
-    "veo": "Google Veo (cloud)",
+    "veo": "Google Veo (Cloud API - Antigua)",
+    "veo_vertex": "Google Veo (Vertex AI - Gratis)",
     "ltx_desktop": "LTX Desktop (app local, rápido)",
     "ltx_comfyui": "LTX ComfyUI (LoRAs, consistencia)",
     "artlist": "Artlist",
@@ -156,7 +157,21 @@ async def _engine_entries(container: ContainerDep) -> list[ProviderCatalogEntry]
         message=None if settings.google_api_key else "Falta GOOGLE_API_KEY",
         models=["veo-3.1-generate-preview", "veo-3.0-generate-001", "veo-2.0-generate-001"],
     )
-    return [veo, await _ltx_desktop_entry(container), await _ltx_comfyui_entry()]
+    
+    # Check if the vertex JSON exists
+    import os
+    vertex_json_path = settings.vertex_key_path if settings.vertex_key_path else "vertex-key.json"
+    full_vertex_path = os.path.join(str(settings.project_root), vertex_json_path)
+    vertex_available = os.path.exists(full_vertex_path)
+    
+    veo_vertex = ProviderCatalogEntry(
+        name="veo_vertex", label=_PROVIDER_LABELS["veo_vertex"],
+        available=vertex_available,
+        message=None if vertex_available else f"Falta el archivo {vertex_json_path}",
+        models=["veo-3.1-generate-001", "veo-3.0-generate-001", "veo-2.0-generate-001", "veo-3.1-fast-generate-001"],
+    )
+    
+    return [veo, veo_vertex, await _ltx_desktop_entry(container), await _ltx_comfyui_entry()]
 
 
 @router.get(

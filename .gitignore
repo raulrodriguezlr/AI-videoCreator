@@ -86,3 +86,7 @@ frontend/*.tsbuildinfo
 .claude/
 Claude.md
 graphify-out/
+
+vertex-key*.json
+backend/vertex-key*.json
+backend/test_video.mp4

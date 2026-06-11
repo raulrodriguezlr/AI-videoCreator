@@ -403,8 +403,16 @@ class BaseVideoProvider(ABC):
         from videocreator.infrastructure.engine.utils.audio_separator import AudioSeparator
         audio_text = scene.get("audio_text", "")
         character_name = scene.get("character", "")
-        if not audio_text or not character_name:
+        if not audio_text:
             return
+        if not character_name:
+            # Narrator fallback: scenes with narration but no assigned
+            # character get dubbed with the default voice (one consistent
+            # narrator across the whole video) instead of silently delegating
+            # to the provider's native audio. The unknown name resolves to
+            # ELEVENLABS_DEFAULT_VOICE_ID via voice_map.get(..., DEFAULT).
+            character_name = "Narrador"
+            log.info("dubbing.narrator_fallback", scene=scene_num_str)
 
         audio_filename = f"dialogue_{scene_num_str}.wav"
         

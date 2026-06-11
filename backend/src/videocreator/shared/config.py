@@ -120,9 +120,11 @@ class Settings(BaseSettings):
 
     # --- providers ---
     google_api_key: str | None = None
+    vertex_project_id: str | None = "project-fc1695a5-5fa9-463c-bf0"
+    vertex_key_path: str | None = "vertex-key.json"
     elevenlabs_api_key: str | None = None
     artlist_api_token: str | None = None
-    video_provider_default: Literal["veo", "ltx", "artlist", "elevenlabs_studio"] = "veo"
+    video_provider_default: Literal["veo", "veo_vertex", "ltx", "artlist", "elevenlabs_studio"] = "veo"
     # ElevenLabs Studio 3.0 (distinct from classic TTS)
     elevenlabs_studio_model_id: str = "studio-3.0"
     elevenlabs_studio_tier: Literal["free", "creator", "pro"] = "creator"

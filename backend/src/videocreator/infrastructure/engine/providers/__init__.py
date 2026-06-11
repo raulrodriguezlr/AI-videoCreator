@@ -8,6 +8,7 @@ Usage:
 
 from videocreator.infrastructure.engine import variables
 from videocreator.infrastructure.engine.providers.veo_provider import VeoProvider
+from videocreator.infrastructure.engine.providers.veo_vertex_provider import VeoVertexProvider
 from videocreator.infrastructure.engine.providers.ltx_desktop_provider import LtxDesktopProvider
 from videocreator.infrastructure.engine.providers.http_cloud_providers import (
     ArtlistProvider,
@@ -35,6 +36,8 @@ def get_provider(pod_config_path: str):
     provider = variables.VIDEO_PROVIDER
     if provider == "veo":
         return VeoProvider(pod_config_path)
+    elif provider == "veo_vertex":
+        return VeoVertexProvider(pod_config_path)
     elif provider in ("ltx", "ltx_desktop", "ovi"):
         # LTX-Desktop app (local FastAPI, port 41954). 'ltx'/'ovi' are legacy
         # aliases kept so existing pods/episodes keep rendering on Desktop.
