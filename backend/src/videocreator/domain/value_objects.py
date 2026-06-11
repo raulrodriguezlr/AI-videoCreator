@@ -46,6 +46,13 @@ class EpisodeState(str, Enum):
     FAILED = "failed"
 
 
+class RecreationState(str, Enum):
+    DRAFT = "draft"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
 class TopicStatus(str, Enum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"

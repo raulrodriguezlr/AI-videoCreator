@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type HealthResponse, type LlmConfig } from "../api/client";
-import { IcActivity, IcCloud, IcCpu, IcFilm, IcLayout, IcMessageCircle, IcRadar, IcSliders } from "../ui/icons";
+import { IcActivity, IcCloud, IcCpu, IcFilm, IcLaugh, IcLayout, IcMessageCircle, IcRadar, IcSliders } from "../ui/icons";
 
 export function AppShell() {
   const location = useLocation();
@@ -29,6 +29,7 @@ export function AppShell() {
         <NavLink to="/" end className={navCls}><IcFilm /> Pods</NavLink>
         <NavLink to="/templates" className={navCls}><IcLayout /> Plantillas</NavLink>
         <NavLink to="/director" className={navCls}><IcMessageCircle /> Director</NavLink>
+        <NavLink to="/memes" className={navCls}><IcLaugh /> Memes</NavLink>
         <NavLink to="/recreations" className={navCls}><IcRadar /> Recreaciones</NavLink>
         <NavLink to="/jobs" className={navCls}><IcActivity /> Trabajos</NavLink>
 
@@ -92,6 +93,7 @@ function routeLabel(path: string): string {
   if (path.startsWith("/create")) return "Crear pod";
   if (path.startsWith("/templates")) return "Plantillas";
   if (path.startsWith("/director")) return "Director";
+  if (path.startsWith("/memes")) return "Memes";
   if (path.startsWith("/recreations")) return "Recreaciones";
   if (path.startsWith("/runs/")) return "Ejecución";
   if (path.includes("/episodes/")) return "Episodio";

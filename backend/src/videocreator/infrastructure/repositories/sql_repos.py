@@ -21,10 +21,12 @@ from videocreator.domain.entities import (
     Short,
     Topic,
     User,
+    Recreation,
 )
 from videocreator.domain.value_objects import (
     JobKind,
     JobState,
+    RecreationState,
 )
 from videocreator.infrastructure.persistence.models.tables import (
     CharacterRow,
@@ -36,6 +38,7 @@ from videocreator.infrastructure.persistence.models.tables import (
     ShortRow,
     TopicRow,
     UserRow,
+    RecreationRow,
 )
 from videocreator.shared.ids import (
     CharacterId,
@@ -47,6 +50,7 @@ from videocreator.shared.ids import (
     ShortId,
     TopicId,
     UserId,
+    RecreationId,
 )
 from videocreator.shared.time import utcnow
 
@@ -575,7 +579,110 @@ __all__ = [
     "SqlShortRepository",
     "SqlTopicRepository",
     "SqlUserRepository",
+    "SqlRecreationRepository",
 ]
+
+
+# ----------------------------------------------------------------------------
+# Recreations
+# ----------------------------------------------------------------------------
+class SqlRecreationRepository(SqlBase):
+    async def get(self, recreation_id: RecreationId) -> Recreation | None:
+        async with self._session() as session:
+            row = await session.get(RecreationRow, str(recreation_id))
+            return _recreation_from_row(row) if row else None
+
+    async def list_for_user(self, user_id: UserId) -> list[Recreation]:
+        async with self._session() as session:
+            result = await session.execute(
+                select(RecreationRow)
+                .where(RecreationRow.owner_id == str(user_id))
+                .order_by(RecreationRow.created_at.desc())
+            )
+            return [_recreation_from_row(r) for r in result.scalars().all()]
+
+    async def save(self, recreation: Recreation) -> Recreation:
+        async with self._session() as session:
+            row = await session.get(RecreationRow, str(recreation.id))
+            if row is None:
+                row = _row_from_recreation(recreation)
+                session.add(row)
+            else:
+                row.state = recreation.state.value
+                row.run_id = recreation.run_id
+                row.payload_json = {
+                    "title": recreation.title,
+                    "original": recreation.original,
+                    "niche": recreation.niche,
+                    "twist": recreation.twist,
+                    "v2v_prompt": recreation.v2v_prompt,
+                    "beats": recreation.beats,
+                    "audio_note": recreation.audio_note,
+                    "reference_description": recreation.reference_description,
+                    "fair_use": recreation.fair_use,
+                    "provider": recreation.provider,
+                    "model": recreation.model,
+                    "result": recreation.result,
+                }
+                row.updated_at = utcnow()
+            await session.commit()
+            return recreation
+
+    async def delete(self, recreation_id: RecreationId) -> None:
+        async with self._session() as session:
+            row = await session.get(RecreationRow, str(recreation_id))
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
+
+
+def _recreation_from_row(row: RecreationRow) -> Recreation:
+    payload = _ensure_dict(row.payload_json)
+    return Recreation(
+        id=RecreationId(row.id),
+        owner_id=UserId(row.owner_id),
+        state=RecreationState(row.state),
+        run_id=row.run_id,
+        title=payload.get("title", ""),
+        original=payload.get("original", ""),
+        niche=payload.get("niche", "general"),
+        twist=payload.get("twist", ""),
+        v2v_prompt=payload.get("v2v_prompt", ""),
+        beats=payload.get("beats", []),
+        audio_note=payload.get("audio_note", ""),
+        reference_description=payload.get("reference_description", ""),
+        fair_use=payload.get("fair_use", {}),
+        provider=payload.get("provider"),
+        model=payload.get("model"),
+        result=payload.get("result"),
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _row_from_recreation(rec: Recreation) -> RecreationRow:
+    return RecreationRow(
+        id=rec.id,
+        owner_id=rec.owner_id,
+        state=rec.state.value,
+        run_id=rec.run_id,
+        payload_json={
+            "title": rec.title,
+            "original": rec.original,
+            "niche": rec.niche,
+            "twist": rec.twist,
+            "v2v_prompt": rec.v2v_prompt,
+            "beats": rec.beats,
+            "audio_note": rec.audio_note,
+            "reference_description": rec.reference_description,
+            "fair_use": rec.fair_use,
+            "provider": rec.provider,
+            "model": rec.model,
+            "result": rec.result,
+        },
+        created_at=rec.created_at,
+        updated_at=rec.updated_at,
+    )
 
 
 # Module-level helpers used by infrastructure-internal code

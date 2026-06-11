@@ -22,6 +22,7 @@ from videocreator.domain.value_objects import (
     TopicStatus,
     TransitionType,
     VoiceSettings,
+    RecreationState,
 )
 from videocreator.shared.ids import (
     CharacterId,
@@ -34,6 +35,7 @@ from videocreator.shared.ids import (
     ShortId,
     TopicId,
     UserId,
+    RecreationId,
 )
 from videocreator.shared.time import utcnow
 
@@ -262,6 +264,29 @@ class User(BaseModel):
     email: str
     role: Literal["admin", "creator", "viewer"] = "creator"
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class Recreation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: RecreationId
+    owner_id: UserId
+    state: RecreationState = RecreationState.DRAFT
+    run_id: str | None = None
+    title: str
+    original: str
+    niche: str = "general"
+    twist: str
+    v2v_prompt: str
+    beats: list[dict[str, Any]] = Field(default_factory=list)
+    audio_note: str = ""
+    reference_description: str = ""
+    fair_use: dict[str, Any] = Field(default_factory=dict)
+    provider: str | None = None
+    model: str | None = None
+    result: dict[str, Any] | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
 
 LOCAL_USER_ID = UserId("usr_LOCAL000000000000000000")

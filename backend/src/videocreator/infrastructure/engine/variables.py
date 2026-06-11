@@ -22,11 +22,13 @@ VIDEO_PROVIDER = "veo"
 # ==========================
 # VEO — Google Veo 3.1 (Cloud)
 # ==========================
-# Modelos disponibles (ids GA — los "-preview" fueron retirados y la API
-# devuelve respuestas vacías sin 'generated_videos' al usarlos):
-#   "veo-3.1-generate-001"        → Máxima calidad, más lento
-#   "veo-3.1-fast-generate-001"   → Rápido, buena calidad
-VEO_MODEL = "veo-3.1-generate-001"
+# Modelos disponibles (junio 2026):
+#   "veo-3.1-generate-preview"      → Máxima calidad, más lento (preview)
+#   "veo-3.1-fast-generate-preview"  → Rápido, buena calidad (preview)
+#   "veo-3.1-lite-generate-preview"  → Ligero (preview)
+#   "veo-3.0-generate-001"          → GA estable
+#   "veo-3.0-fast-generate-001"     → GA rápido
+VEO_MODEL = "veo-3.0-generate-001"
 
 # Resolución: "720p", "1080p", "4k"
 VEO_RESOLUTION = "720p"

@@ -117,6 +117,7 @@ from videocreator.domain.ports import (
     UserRepository,
     VideoAssemblerPort,
     VideoProviderPort,
+    RecreationRepository,
 )
 from videocreator.domain.services.linucb import LinUcbBandit
 from videocreator.domain.services.provider_router import ProviderRouter
@@ -150,6 +151,7 @@ from videocreator.infrastructure.repositories.sql_repos import (
     SqlShortRepository,
     SqlTopicRepository,
     SqlUserRepository,
+    SqlRecreationRepository,
 )
 from videocreator.infrastructure.security.cipher import SecretCipher
 from videocreator.infrastructure.security.passwords import Argon2PasswordHasher
@@ -227,6 +229,9 @@ class Container:
 
     def user_repo(self) -> UserRepository:
         return self._get("user_repo", lambda: SqlUserRepository(self._sessionmaker()))
+
+    def recreation_repo(self) -> RecreationRepository:
+        return self._get("recreation_repo", lambda: SqlRecreationRepository(self._sessionmaker()))
 
     def storage(self) -> StoragePort:
         return self._get("storage", self._build_storage)
@@ -466,7 +471,9 @@ class Container:
             CapabilityExecutor,
         )
         executor = CapabilityExecutor(
-            self.llm(), provider_registry=self.provider_registry(),
+            self.llm(),
+            provider_registry=self.provider_registry(),
+            storage=self.storage(),
         )
         self._register_capability_handlers(executor)
         return executor

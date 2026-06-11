@@ -1,4 +1,4 @@
-// Minimal typed REST client. We avoid axios so the bundle stays tiny and so
+﻿// Minimal typed REST client. We avoid axios so the bundle stays tiny and so
 // SSE/streaming can use the native fetch + EventSource without interceptors.
 
 const BASE_URL = "/api/v1";
@@ -24,7 +24,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       code = data.error_code ?? code;
       message = data.message ?? data.detail ?? message;
     } catch {
-      /* non-JSON body — keep status text */
+      /* non-JSON body â€” keep status text */
     }
     throw new ApiError(res.status, code, message);
   }
@@ -35,7 +35,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 async function upload<T>(path: string, files: File[], field = "files"): Promise<T> {
   const form = new FormData();
   for (const f of files) form.append(field, f);
-  // No explicit Content-Type — the browser sets the multipart boundary.
+  // No explicit Content-Type â€” the browser sets the multipart boundary.
   const res = await fetch(`${BASE_URL}${path}`, { method: "POST", body: form });
   if (!res.ok) {
     let code = `http_${res.status}`;
@@ -45,7 +45,7 @@ async function upload<T>(path: string, files: File[], field = "files"): Promise<
       code = data.error_code ?? code;
       message = data.message ?? data.detail ?? message;
     } catch {
-      /* non-JSON body — keep status text */
+      /* non-JSON body â€” keep status text */
     }
     throw new ApiError(res.status, code, message);
   }
@@ -65,7 +65,7 @@ export const api = {
 export const mediaUrl = (path: string) => `${BASE_URL}${path.replace(/^\/api\/v1/, "")}`;
 
 // ---------------------------------------------------------------------------
-// Types — hand-written; mirror the backend Pydantic schemas.
+// Types â€” hand-written; mirror the backend Pydantic schemas.
 // ---------------------------------------------------------------------------
 export interface HealthResponse {
   status: string;
@@ -326,7 +326,7 @@ export interface PodBlueprint {
 }
 
 // ---------------------------------------------------------------------------
-// SSE — live job progress
+// SSE â€” live job progress
 // ---------------------------------------------------------------------------
 export interface JobEvent {
   event: string;
@@ -410,9 +410,10 @@ export const getTemplate = (id: string) => api.get<Template>(`/templates/${id}`)
 export const directorChat = (spec: DagSpecDto, message: string) =>
   api.post<DirectorChatResponse>("/director/chat", { spec, message });
 export const getRun = (runId: string) => api.get<RunSnapshot>(`/runs/${runId}`);
+export const startRun = (spec: DagSpecDto) => api.post<RunSnapshot>("/runs", spec);
 
 // ---------------------------------------------------------------------------
-// SSE — live run progress
+// SSE â€” live run progress
 // ---------------------------------------------------------------------------
 export interface RunEvent {
   event: "node_running" | "node_done" | "node_retry" | "node_failed" | "node_cancelled" | "run_complete";
@@ -438,7 +439,7 @@ export function subscribeToRun(
 }
 
 // ---------------------------------------------------------------------------
-// Recreations — famous-scene recreation planner (§16)
+// Recreations â€” famous-scene recreation planner (Â§16)
 // ---------------------------------------------------------------------------
 export interface FairUse {
   closeness: number;
@@ -455,6 +456,7 @@ export interface RecreationBeat {
 }
 
 export interface RecreationPlan {
+  id: string;
   title: string;
   v2v_prompt: string;
   reference_description: string;
@@ -462,6 +464,41 @@ export interface RecreationPlan {
   audio_note: string;
   fair_use: FairUse;
   provider_hint: string[];
+}
+
+export interface Recreation {
+  id: string;
+  owner_id: string;
+  state: string;
+  run_id: string | null;
+  title: string;
+  original: string;
+  niche: string;
+  twist: string;
+  v2v_prompt: string;
+  beats: RecreationBeat[];
+  audio_note: string;
+  reference_description: string;
+  fair_use: FairUse;
+  provider: string | null;
+  model: string | null;
+  result: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecreationListResponse {
+  recreations: Recreation[];
+}
+
+export interface UpdateRecreationRequest {
+  title?: string;
+  v2v_prompt?: string;
+  reference_description?: string;
+  beats?: RecreationBeat[];
+  audio_note?: string;
+  provider?: string;
+  video_model?: string;
 }
 
 export interface SceneCandidate {
@@ -472,6 +509,13 @@ export interface SceneCandidate {
 
 export const planRecreation = (original: string, niche: string, twist: string) =>
   api.post<RecreationPlan>("/brain/recreations/plan", { original, niche, twist });
+
+export const getRecreations = () => api.get<RecreationListResponse>("/brain/recreations");
+export const getRecreation = (id: string) => api.get<Recreation>(`/brain/recreations/${id}`);
+export const updateRecreation = (id: string, updates: UpdateRecreationRequest) =>
+  api.patch<Recreation>(`/brain/recreations/${id}`, updates);
+export const runRecreation = (id: string) => api.post<{ run_id: string }>(`/brain/recreations/${id}/run`);
+export const deleteRecreation = (id: string) => api.delete<void>(`/brain/recreations/${id}`);
 
 export const sceneTrendMatch = (terms: string[]) =>
   api.post<SceneCandidate[]>("/brain/recreations/trend-match", { terms });

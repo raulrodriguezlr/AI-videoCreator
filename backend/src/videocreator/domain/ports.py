@@ -19,6 +19,7 @@ from videocreator.domain.entities import (
     Short,
     Topic,
     User,
+    Recreation,
 )
 from videocreator.domain.value_objects import (
     ClipArtifact,
@@ -40,6 +41,7 @@ from videocreator.shared.ids import (
     ShortId,
     TopicId,
     UserId,
+    RecreationId,
 )
 
 
@@ -111,6 +113,14 @@ class JobRepository(Protocol):
     async def reconcile_interrupted(self) -> int:
         """Fail jobs left running/queued by a previous process. Returns the count."""
         ...
+
+
+@runtime_checkable
+class RecreationRepository(Protocol):
+    async def get(self, recreation_id: RecreationId) -> Recreation | None: ...
+    async def list_for_user(self, user_id: UserId) -> list[Recreation]: ...
+    async def save(self, recreation: Recreation) -> Recreation: ...
+    async def delete(self, recreation_id: RecreationId) -> None: ...
 
 
 @runtime_checkable

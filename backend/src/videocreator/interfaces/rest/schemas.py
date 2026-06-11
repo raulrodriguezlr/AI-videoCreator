@@ -791,6 +791,7 @@ class RecreationBeatResponse(BaseModel):
 class RecreationPlanResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    id: str  # ID of the drafted recreation
     title: str
     v2v_prompt: str
     reference_description: str
@@ -798,6 +799,47 @@ class RecreationPlanResponse(BaseModel):
     audio_note: str
     fair_use: FairUseResponse
     provider_hint: list[str]
+
+
+class RecreationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    owner_id: str
+    state: str
+    run_id: str | None
+    title: str
+    original: str
+    niche: str
+    twist: str
+    v2v_prompt: str
+    beats: list[RecreationBeatResponse]
+    audio_note: str
+    reference_description: str
+    fair_use: dict[str, Any]
+    provider: str | None
+    model: str | None
+    result: dict[str, Any] | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RecreationListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    recreations: list[RecreationResponse]
+
+
+class UpdateRecreationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = None
+    v2v_prompt: str | None = None
+    reference_description: str | None = None
+    beats: list[RecreationBeatResponse] | None = None
+    audio_note: str | None = None
+    provider: str | None = None
+    video_model: str | None = None
 
 
 class SceneTrendMatchRequest(BaseModel):
@@ -921,6 +963,9 @@ __all__ = [
     "FairUseResponse",
     "RecreationBeatResponse",
     "RecreationPlanResponse",
+    "RecreationResponse",
+    "RecreationListResponse",
+    "UpdateRecreationRequest",
     "SceneTrendMatchRequest",
     "SceneCandidateResponse",
 ]

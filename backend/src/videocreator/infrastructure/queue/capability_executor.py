@@ -45,9 +45,11 @@ class CapabilityExecutor:
         llm: LLMPort,
         *,
         provider_registry: Any = None,
+        storage: Any = None,
     ) -> None:
         self._llm = llm
         self._registry = provider_registry
+        self._storage = storage
         self._handlers: dict[str, CapabilityHandler] = {
             "llm_text": self._run_llm_text,
             "load_master": self._run_passthrough,
@@ -112,12 +114,20 @@ class CapabilityExecutor:
                 result = await lp.adapter.generate(request)
                 log.info("capexec.provider_done", node=node.id,
                          provider=lp.manifest.id)
+                video_url = None
+                if result.video_bytes and self._storage:
+                    import uuid
+                    key = f"runs/{node.id}_{uuid.uuid4().hex}.mp4"
+                    await self._storage.put("media", key, result.video_bytes)
+                    video_url = await self._storage.url_for("media", key)
+                    
                 return {
                     "provider": lp.manifest.id,
                     "duration_s": result.duration_s,
                     "width": result.width,
                     "height": result.height,
                     "bytes": len(result.video_bytes),
+                    "video_url": video_url,
                     "metadata": result.metadata,
                 }
             except Exception as e:

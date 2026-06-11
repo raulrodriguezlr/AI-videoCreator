@@ -41,3 +41,4 @@ export const IcSend = (p: P) => (<svg {...base(p)}><path d="m22 2-7 20-4-9-9-4z"
 export const IcRadar = (p: P) => (<svg {...base(p)}><path d="M12 12 19 6"/><path d="M12 12a8 8 0 1 1-5.66-7.66"/><path d="M12 12a4 4 0 1 1-2.83-3.83"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>);
 export const IcCopy = (p: P) => (<svg {...base(p)}><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>);
 export const IcAlertTriangle = (p: P) => (<svg {...base(p)}><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>);
+export const IcLaugh = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="9.5"/><path d="M8 13.5a4.5 4.5 0 0 0 8 0"/><path d="M8.5 9h.01M15.5 9h.01"/></svg>);

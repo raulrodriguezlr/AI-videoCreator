@@ -595,3 +595,13 @@ p { margin: 0 0 12px; }
 .copy-block-btn svg { width: 15px; height: 15px; }
 
 .recreation-result { display: flex; flex-direction: column; gap: 18px; }
+
+/* =========================================================================
+   Memes — standalone meme generator
+   ========================================================================= */
+.explainer-card {
+  display: flex; align-items: flex-start; gap: 14px;
+  margin-top: 22px; color: var(--text-2);
+}
+.explainer-card svg { flex: none; width: 22px; height: 22px; color: var(--accent); margin-top: 2px; }
+.explainer-card h3 { color: var(--text); }

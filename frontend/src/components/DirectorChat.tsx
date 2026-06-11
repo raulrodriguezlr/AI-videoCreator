@@ -3,12 +3,13 @@
 // Patch against the spec, rendered as a readable diff the user can apply
 // or discard.
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import {
-  directorChat, type DagSpecDto, type DirectorChatResponse, type JsonPatchOp,
+  directorChat, startRun, type DagSpecDto, type DirectorChatResponse, type JsonPatchOp,
 } from "../api/client";
 import { Button, Empty, useToast } from "../ui/primitives";
-import { IcCheck, IcSend, IcX } from "../ui/icons";
+import { IcCheck, IcSend, IcSparkles, IcX } from "../ui/icons";
 import { DagPipeline } from "./DagPipeline";
 
 interface ChatTurn {
@@ -20,6 +21,7 @@ interface ChatTurn {
 }
 
 export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
+  const nav = useNavigate();
   const toast = useToast();
   const [spec, setSpec] = useState<DagSpecDto>(initialSpec);
   const [history, setHistory] = useState<ChatTurn[]>([]);
@@ -40,6 +42,12 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
       });
     },
     onError: (e) => toast.err("El director no respondió", (e as Error).message),
+  });
+
+  const generate = useMutation({
+    mutationFn: () => startRun(spec),
+    onSuccess: (res) => nav(`/runs/${res.run_id}`),
+    onError: (e) => toast.err("No se pudo iniciar la generación", (e as Error).message),
   });
 
   const send = () => {
@@ -70,6 +78,10 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
           <h2>Receta actual</h2>
           <span className="dim mono" style={{ fontSize: 11 }}>{spec.nodes.length} nodos</span>
         </div>
+        <Button variant="primary" loading={generate.isPending} disabled={spec.nodes.length === 0}
+          onClick={() => generate.mutate()}>
+          <IcSparkles /> Generar
+        </Button>
         <DagPipeline nodes={spec.nodes} />
         <div className="divider" />
         <div className="recipe-list">

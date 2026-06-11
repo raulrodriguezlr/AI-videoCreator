@@ -59,6 +59,22 @@ def hint_for(content_type: str, *, duration_s: float = 30.0) -> ProviderHint | N
     return hint
 
 
+def filter_available(hint: ProviderHint | None, available_names: set[str]) -> list[str]:
+    """Return only the providers from the hint that are available.
+    
+    If none are available, falls back to a default active provider (e.g., 'veo' or whatever
+    is in available_names).
+    """
+    if hint is None:
+        return list(available_names)[:1]
+    
+    filtered = [p for p in hint.priorities if p in available_names]
+    if not filtered:
+        return list(available_names)[:1]
+    return filtered
+
+
+
 def format_suggestion(hint: ProviderHint, *, current_provider: str) -> str | None:
     """UI copy per §5: suggestion + explicit confirmation. None when current
     provider already matches the top hint."""
@@ -71,4 +87,4 @@ def format_suggestion(hint: ProviderHint, *, current_provider: str) -> str | Non
     )
 
 
-__all__ = ["ProviderHint", "format_suggestion", "hint_for"]
+__all__ = ["ProviderHint", "format_suggestion", "hint_for", "filter_available"]

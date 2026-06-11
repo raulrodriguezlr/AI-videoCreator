@@ -221,8 +221,14 @@ def _drawtext(textfile_path: str, height: int) -> str:
     """A bottom-centered, boxed caption drawtext filter reading from a file."""
     font_size = max(28, round(height * 0.030))   # ~58 on a 1920-tall frame
     margin = round(height * 0.10)                # keep clear of platform UI
+    
+    # Añadimos la fuente Arial explícitamente para evitar los cuadrados ("tofu boxes") 
+    # cuando FFmpeg intenta renderizar saltos de línea \n o caracteres especiales 
+    # con su fuente bitmap por defecto.
+    font = "fontfile='C\\:/Windows/Fonts/arial.ttf'"
+    
     return (
-        f"drawtext=textfile='{textfile_path}':fontcolor=white:fontsize={font_size}:"
+        f"drawtext=textfile='{textfile_path}':{font}:fontcolor=white:fontsize={font_size}:"
         f"line_spacing=8:box=1:boxcolor=black@0.5:boxborderw=16:"
         f"x=(w-text_w)/2:y=h-text_h-{margin}"
     )
