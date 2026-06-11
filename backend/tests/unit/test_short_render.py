@@ -92,7 +92,12 @@ class _FakeComposer:
         self.calls: list[tuple[Path, EditingTimeline, Path]] = []
 
     async def compose(
-        self, source_path: Path, timeline: EditingTimeline, output_path: Path
+        self,
+        source_path: Path,
+        timeline: EditingTimeline,
+        output_path: Path,
+        *,
+        crop_x: dict[int, str] | None = None,
     ) -> Path:
         self.calls.append((source_path, timeline, output_path))
         output_path.parent.mkdir(parents=True, exist_ok=True)

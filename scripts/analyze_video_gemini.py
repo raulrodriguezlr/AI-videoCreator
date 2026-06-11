@@ -11,7 +11,7 @@ from google import genai
 backend_env = Path(__file__).resolve().parent.parent / "backend" / ".env"
 load_dotenv(backend_env)
 
-GEMINI_MODEL_NAME = "gemini-1.5-pro"
+GEMINI_MODEL_NAME = "gemini-2.5-flash"
 
 def main():
     parser = argparse.ArgumentParser(description="Analizar qué está pasando en un video entero usando la API de Google Gemini.")

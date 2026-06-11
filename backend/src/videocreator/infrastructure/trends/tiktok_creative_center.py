@@ -121,8 +121,8 @@ async def fetch_trending_sounds(
                 if "/creative_radar_api/" in response.url and "sound" in response.url:
                     try:
                         captured.append(await response.json())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        log.debug("creative_center.response_parse_skipped", error=str(e))
 
             page.on("response", on_response)
             await page.goto(

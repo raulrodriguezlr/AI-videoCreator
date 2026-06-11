@@ -390,6 +390,23 @@ class Container:
             )
         raise NotImplementedError(f"video provider '{name}' is not wired in this build")
 
+    def available_provider_names(self) -> set[str]:
+        """The full catalog of provider names this build knows about.
+
+        Union of: the hand-wired `KNOWN_VIDEO_PROVIDERS`, every provider
+        registered via the SDK (`providers.d/*/provider.yaml`, including
+        hot-reloaded plugins), and the legacy engine paths ('veo'/'ltx') when
+        configured (i.e. the configured `video_provider_default`).
+
+        Deliberately uncached — the SDK registry can hot-reload, so this is
+        recomputed on every call rather than memoized like the singletons above.
+        """
+        names: set[str] = set(self.KNOWN_VIDEO_PROVIDERS)
+        names.update(lp.manifest.id for lp in self.provider_registry().providers.values())
+        if self.settings.video_provider_default in {"veo", "ltx"}:
+            names.add(self.settings.video_provider_default)
+        return names
+
     def video_assembler(self) -> VideoAssemblerPort:
         return self._get("video_assembler", FfmpegVideoAssembler)
 
@@ -580,10 +597,10 @@ class _PodUseCases:
 
 class _CharacterUseCases:
     def __init__(self, c: Container) -> None:
-        self.create = CreateCharacter(c.pod_repo(), c.character_repo())
+        self.create = CreateCharacter(c.pod_repo(), c.character_repo(), c.pod_file_store())
         self.list = ListCharacters(c.pod_repo(), c.character_repo())
-        self.update = UpdateCharacter(c.pod_repo(), c.character_repo())
-        self.delete = DeleteCharacter(c.pod_repo(), c.character_repo())
+        self.update = UpdateCharacter(c.pod_repo(), c.character_repo(), c.pod_file_store())
+        self.delete = DeleteCharacter(c.pod_repo(), c.character_repo(), c.pod_file_store())
         self.add_refs = AddCharacterReferences(c.pod_repo(), c.character_repo(), c.storage())
         self.generate_ref = GenerateCharacterReference(
             c.pod_repo(), c.character_repo(), c.storage(), c.image_provider(),

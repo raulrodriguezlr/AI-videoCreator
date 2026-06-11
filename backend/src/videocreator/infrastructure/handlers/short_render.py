@@ -232,10 +232,32 @@ class ShortRenderHandler:
     ) -> str:
         source_local = await self._resolve_source(short, episode)
         out_local = self._workdir(short) / f"{short.id}.mp4"
+        crop_map = self._analyze_crop(short, source_local, timeline)
         await ctx.progress(0.4, "reframing to 9:16")
-        await self._composer.compose(source_local, timeline, out_local)
+        await self._composer.compose(source_local, timeline, out_local, crop_x=crop_map)
         await ctx.progress(0.9, "storing short")
         return await self._store(short, out_local)
+
+    def _analyze_crop(
+        self, short: Short, source_local: Path, timeline: EditingTimeline
+    ) -> dict[int, str] | None:
+        """Best-effort Auto-Reframe: per-segment crop x-expressions, or `None`.
+
+        Smart reframe must NEVER break a render — any failure (missing
+        OpenCV/MediaPipe, a corrupt source, ...) is logged and degrades to the
+        composer's existing centered crop.
+        """
+        if not self._settings.smart_reframe_enabled:
+            return None
+        try:
+            from videocreator.infrastructure.video.smart_reframe import (  # noqa: PLC0415
+                analyze_timeline,
+            )
+
+            return analyze_timeline(source_local, timeline)
+        except Exception as exc:  # noqa: BLE001 — never fail render on reframe
+            log.warning("short.smart_reframe_error", short_id=short.id, error=str(exc))
+            return None
 
     # ---- source resolution ------------------------------------------------
     async def _resolve_source(self, short: Short, episode: Episode) -> Path:

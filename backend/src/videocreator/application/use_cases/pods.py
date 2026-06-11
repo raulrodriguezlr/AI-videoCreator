@@ -58,6 +58,37 @@ class UpdatePodConfig:
             raise PodNotFound(f"pod {pod_id} not found")
         if not pod.is_owned_by(requester_id):
             raise ForbiddenError("pod is owned by a different user")
+
+        new_name = config.series_name
+        if pod.name != new_name:
+            # Check if name is already taken
+            existing = await self.pod_repo.list_for_user(requester_id)
+            if any(p.name == new_name and p.id != pod.id for p in existing):
+                pass # Skip rename if conflict, just update config
+            else:
+                from videocreator.shared.config import get_settings
+                import shutil
+                settings = get_settings()
+
+                old_render = settings.var_dir / "render" / pod.name
+                new_render = settings.var_dir / "render" / new_name
+                if old_render.exists() and not new_render.exists():
+                    try:
+                        shutil.move(str(old_render), str(new_render))
+                    except Exception:
+                        pass
+
+                old_pods_dir = settings.pods_dir / pod.name
+                new_pods_dir = settings.pods_dir / new_name
+                if old_pods_dir.exists() and not new_pods_dir.exists():
+                    try:
+                        shutil.move(str(old_pods_dir), str(new_pods_dir))
+                    except Exception:
+                        pass
+
+                updated = pod.model_copy(update={"name": new_name, "config": config})
+                return await self.pod_repo.save(updated)
+
         updated = pod.model_copy(update={"config": config})
         return await self.pod_repo.save(updated)
 

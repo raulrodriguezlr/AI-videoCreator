@@ -81,15 +81,20 @@ async def test_compose_rejects_empty_timeline() -> None:
 
 
 # ---- layer 2: polish (captions / ken-burns / transitions) -----------------
-def test_filtergraph_ken_burns_uses_zoompan_instead_of_scale() -> None:
+def test_filtergraph_ken_burns_time_scale_not_zoompan() -> None:
+    # zoompan is a still-image filter: on video it multiplies duration
+    # (d output frames per INPUT frame) — the 26-minute-short bug. Ken-Burns
+    # must be a time-driven upscale + center crop that preserves duration.
     timeline = EditingTimeline(
         segments=(TimelineSegment(source_start_s=0.0, duration_s=4.0, ken_burns=True),),
         width=1080, height=1920,
     )
     graph, _, _ = FfmpegShortComposer._build_filtergraph(timeline)
-    assert "zoompan=z='min(zoom+0.0012,1.2)'" in graph
-    assert "s=1080x1920" in graph
-    assert "scale=1080:1920" not in graph  # zoompan replaces the plain scale
+    assert "zoompan" not in graph
+    assert "eval=frame" in graph              # per-frame zoom expression
+    assert "t/4.000" in graph                 # zoom driven by segment time
+    assert "crop=1080:1920" in graph          # re-crop to frame after upscale
+    assert "scale=1080:1920" in graph         # normalized base before the push
 
 
 def test_filtergraph_caption_emits_drawtext_with_textfile() -> None:

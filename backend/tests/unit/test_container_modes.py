@@ -37,3 +37,42 @@ def test_object_storage_still_unimplemented() -> None:
     c = Container(_server_settings(storage_url="s3://bucket/prefix"))
     with pytest.raises(NotImplementedError, match="s3://"):
         c.storage()
+
+
+def test_available_provider_names_is_superset() -> None:
+    """The catalog must include KNOWN_VIDEO_PROVIDERS, the SDK registry ids
+    (loaded from providers.d/), and the configured legacy engine default."""
+    pytest.importorskip("yaml")
+    c = Container(_server_settings(video_provider_default="veo"))
+
+    names = c.available_provider_names()
+
+    # KNOWN_VIDEO_PROVIDERS
+    assert "artlist" in names
+    assert "elevenlabs_studio" in names
+    # SDK registry ids (providers.d/*/provider.yaml)
+    sdk_ids = {lp.manifest.id for lp in c.provider_registry().providers.values()}
+    assert sdk_ids  # sanity: registry actually discovered something
+    assert sdk_ids <= names
+    # legacy engine default
+    assert "veo" in names
+
+
+def test_available_provider_names_recomputed_each_call() -> None:
+    """Not cached — a hot-reloaded registry must be reflected immediately."""
+    pytest.importorskip("yaml")
+    c = Container(_server_settings(video_provider_default="ltx"))
+
+    before = c.available_provider_names()
+    assert "ltx" in before
+    assert "veo" not in before
+
+    # Drop a provider from the live registry (one that isn't *also* in
+    # KNOWN_VIDEO_PROVIDERS) and confirm the next call sees it disappear.
+    registry = c.provider_registry()
+    candidates = [pid for pid in registry.providers if pid not in c.KNOWN_VIDEO_PROVIDERS]
+    if candidates:
+        removed_id = candidates[0]
+        registry._catalog.pop(removed_id)
+        after = c.available_provider_names()
+        assert removed_id not in after

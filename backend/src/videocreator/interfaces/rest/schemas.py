@@ -429,6 +429,10 @@ class ProviderHealthResponse(BaseModel):
     available: bool
     message: str | None = None
     cost_per_second_usd: float | None = None
+    #: Set when `available` came back `False` due to a caught exception —
+    #: the exception message (truncated), so the UI can surface *why* a
+    #: provider is broken instead of silently hiding it.
+    status_detail: str | None = None
 
 
 class ProviderCatalogEntry(BaseModel):
@@ -442,6 +446,10 @@ class ProviderCatalogEntry(BaseModel):
     models: list[str] = Field(default_factory=list)
     #: Human-friendly display name for the dropdown (defaults to `name`).
     label: str | None = None
+    #: Set when `available` came back `False` due to a caught exception —
+    #: the exception message (truncated), so the UI can surface *why* a
+    #: provider is broken instead of silently hiding it.
+    status_detail: str | None = None
 
 
 class ModelHandleResponse(BaseModel):

@@ -23,8 +23,19 @@ from videocreator.interfaces.rest.schemas import (
     ProviderSelectionResponse,
 )
 from videocreator.shared.errors import ProviderError
+from videocreator.shared.logging import get_logger
+
+log = get_logger(__name__)
 
 router = APIRouter(prefix="/providers", tags=["providers"])
+
+#: Truncation cap for `status_detail` — keep catalog payloads small and avoid
+#: leaking full stack-trace-y exception reprs into the UI.
+_STATUS_DETAIL_MAX_LEN = 200
+
+
+def _status_detail(exc: Exception) -> str:
+    return str(exc)[:_STATUS_DETAIL_MAX_LEN]
 
 
 # The local render-engine providers, in addition to the HTTP API ones
@@ -56,8 +67,8 @@ async def _provider_models(name: str, container: ContainerDep) -> list[str]:
             provider = container.video_provider("artlist")
             if isinstance(provider, ArtlistProvider):
                 return [m.id for m in await provider.catalog()]
-        except (ProviderError, NotImplementedError):
-            pass
+        except (ProviderError, NotImplementedError) as exc:
+            log.warning("providers.models_fetch_failed", provider=name, error=str(exc))
         return [m.id for m in _STATIC_CATALOG]
     if name == "elevenlabs_studio":
         return [container.settings.elevenlabs_studio_model_id]
@@ -155,14 +166,17 @@ async def _engine_entries(container: ContainerDep) -> list[ProviderCatalogEntry]
 async def providers_catalog(container: ContainerDep) -> list[ProviderCatalogEntry]:
     entries: list[ProviderCatalogEntry] = []
     for name in container.KNOWN_VIDEO_PROVIDERS:
-        available, message = False, None
+        available, message, status_detail = False, None, None
         try:
             health = await container.video_provider(name).availability()
             available, message = health.available, health.message
         except (NotImplementedError, ProviderError) as exc:
-            message = str(exc)
+            log.warning("providers.availability_failed", provider=name, error=str(exc))
+            message = "Provider error — see status_detail"
+            status_detail = _status_detail(exc)
         entries.append(ProviderCatalogEntry(
             name=name, label=_PROVIDER_LABELS.get(name), available=available, message=message,
+            status_detail=status_detail,
             models=await _provider_models(name, container),
         ))
     entries.extend(await _engine_entries(container))

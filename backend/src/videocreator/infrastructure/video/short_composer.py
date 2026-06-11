@@ -54,6 +54,7 @@ class FfmpegShortComposer:
         output_path: Path,
         *,
         beat_grid: BeatGrid | None = None,
+        crop_x: dict[int, str] | None = None,
     ) -> Path:
         if timeline.is_empty:
             raise ProviderError("short-composer: timeline has no segments")
@@ -68,7 +69,7 @@ class FfmpegShortComposer:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         caption_files = self._write_caption_files(timeline, output_path.parent)
         args = self._build_args(
-            self._bin, source_path, timeline, output_path, caption_files
+            self._bin, source_path, timeline, output_path, caption_files, crop_x
         )
         await self._run(args, output_path)
         return output_path
@@ -101,9 +102,10 @@ class FfmpegShortComposer:
         timeline: EditingTimeline,
         output_path: Path,
         caption_files: dict[int, str] | None = None,
+        crop_x: dict[int, str] | None = None,
     ) -> list[str]:
         filtergraph, out_v, out_a = FfmpegShortComposer._build_filtergraph(
-            timeline, caption_files
+            timeline, caption_files, crop_x
         )
         return [
             ffmpeg_bin,
@@ -122,31 +124,50 @@ class FfmpegShortComposer:
 
     @staticmethod
     def _build_filtergraph(
-        timeline: EditingTimeline, caption_files: dict[int, str] | None = None
+        timeline: EditingTimeline,
+        caption_files: dict[int, str] | None = None,
+        crop_x: dict[int, str] | None = None,
     ) -> tuple[str, str, str]:
         """Return `(filter_complex, video_out_label, audio_out_label)`.
 
-        Per segment: trim → center-crop → reframe (scale or Ken-Burns zoompan) →
-        optional caption. Segments are then hard-cut with `concat`, or crossfaded
-        with `xfade`/`acrossfade` when the timeline sets a transition.
+        Per segment: trim → crop (centered, or panned to follow the subject when
+        `crop_x` provides an x-position expression for that segment) → reframe
+        (scale or Ken-Burns zoompan) → optional caption. Segments are then
+        hard-cut with `concat`, or crossfaded with `xfade`/`acrossfade` when the
+        timeline sets a transition.
         """
         captions = caption_files or {}
+        crop_exprs = crop_x or {}
         w, h = timeline.width, timeline.height
-        crop = f"crop='min(iw,ih*{w}/{h})':ih"
+        center_crop = f"crop='min(iw,ih*{w}/{h})':ih"
         chains: list[str] = []
         concat_inputs: list[str] = []
         for i, seg in enumerate(timeline.segments):
             start, end = seg.source_start_s, seg.source_end_s
+            x_expr = crop_exprs.get(i)
+            crop = (
+                f"crop=w='min(iw,ih*{w}/{h})':h=ih:x={x_expr}:y=0"
+                if x_expr is not None
+                else center_crop
+            )
             vchain = [
                 f"[0:v]trim=start={start}:end={end}",
                 "setpts=PTS-STARTPTS",
                 crop,
             ]
             if seg.ken_burns:
-                frames = max(1, round(seg.duration_s * _FPS))
+                # Ken-Burns on VIDEO: a time-driven upscale + center crop.
+                # (`zoompan` is for still images — on video it emits `d`
+                # output frames PER input frame, inflating a 60s short into
+                # a half-hour of frozen frames.)
+                dur = max(seg.duration_s, 0.1)
+                grow = 0.12  # 12% push-in over the segment
+                vchain.append(f"scale={w}:{h}")
                 vchain.append(
-                    f"zoompan=z='min(zoom+0.0012,1.2)':d={frames}:s={w}x{h}:fps={_FPS}"
+                    f"scale=w='trunc({w}*(1+{grow}*t/{dur:.3f})/2)*2':"
+                    f"h='trunc({h}*(1+{grow}*t/{dur:.3f})/2)*2':eval=frame"
                 )
+                vchain.append(f"crop={w}:{h}")
             else:
                 vchain.append(f"scale={w}:{h}")
             vchain.append("setsar=1")

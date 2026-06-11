@@ -139,12 +139,30 @@ class Settings(BaseSettings):
     # the generation path is migrated off ComfyUI onto LTX-Desktop.
     comfyui_url: str = "http://127.0.0.1:8188"
 
+    # --- legacy engine knobs (infrastructure/engine/variables.py shim) ---
+    # These back the constants the old `engine/` pipeline imports from
+    # `variables.py`. Defaults mirror the values that module previously
+    # hardcoded; override via env/`.env` instead of editing variables.py.
+    veo_model: str = "veo-3.0-generate-001"
+    veo_resolution: str = "720p"
+    veo_aspect_ratio: str = "16:9"
+    ltx_fps: int = 24
+    ltx_width: int = 768
+    ltx_height: int = 512
+    elevenlabs_default_voice_id: str = "pNInz6obbf5cNed9uQcd"
+
     # --- logging ---
     log_level: str = "INFO"
     log_format: LogFormat = "console"
 
     # --- limits ---
     max_upload_bytes: int = 200 * 1024 * 1024  # 200 MB
+
+    # --- shorts engine ---
+    # Auto-Reframe (smart cropping): track the on-screen subject per segment and
+    # pan the 9:16 crop to follow it instead of a static center-crop. Best-effort
+    # (OpenCV/MediaPipe, both optional) — disable if it ever proves too slow.
+    smart_reframe_enabled: bool = True
 
     # --- derived helpers ---
     @property

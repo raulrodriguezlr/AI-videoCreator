@@ -81,10 +81,9 @@ async def plan_recreation(
     
     hint = hint_for("scene_recreation")
     available_providers = set(await container.secret_vault().list_providers(user_id))
-    # 'veo' doesn't use secrets in this project (uses API key in .env), so we might want to manually add it if needed, or check its health. Let's ask container for provider names if possible, but for now we just use the vault + hardcoded ones if needed.
-    # Actually, the catalog gets it from `ProviderCatalog`. Let's just use `container.provider_catalog().list_providers()` or similar if it existed, but `secret_vault().list_providers()` works for secrets. We'll use the proper catalog method if possible, but since we don't have it here directly, let's assume `available_providers` includes them. Wait, let's check `container`. We'll just pass a dummy set or check later.
-    
-    filtered_hint = filter_available(hint, available_providers | {"veo", "ltx"}) # veo and ltx are mostly available
+    available_providers |= container.available_provider_names()
+
+    filtered_hint = filter_available(hint, available_providers)
 
     # Persist as draft
     recreation = Recreation(

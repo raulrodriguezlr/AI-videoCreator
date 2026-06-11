@@ -83,6 +83,14 @@ bench = [
     "open-clip-torch>=2.24.0",
     "pytesseract>=0.3.0",
 ]
+reframe = [
+    # Auto-Reframe (smart cropping) subject tracking. opencv-python-headless is
+    # already a base dependency; listed here too so this group is self-describing
+    # if that ever changes. mediapipe adds face detection on top of OpenCV's
+    # bundled HOG person detector.
+    "opencv-python-headless>=4.9.0",
+    "mediapipe>=0.10",
+]
 server = [
     # postgres + redis + s3 stack
     "psycopg[binary,pool]>=3.1.18",
@@ -154,7 +162,7 @@ warn_redundant_casts = true
 disallow_untyped_decorators = false  # FastAPI/Typer decorators
 
 [[tool.mypy.overrides]]
-module = ["google.*", "cv2.*", "demucs.*", "librosa.*", "soundfile.*", "faster_whisper.*", "faiss.*", "lightgbm.*", "pyloudnorm.*", "pysubs2.*", "yt_dlp.*", "mcp.*", "apscheduler.*", "tenacity.*", "open_clip.*", "pytesseract.*"]
+module = ["google.*", "cv2.*", "mediapipe.*", "demucs.*", "librosa.*", "soundfile.*", "faster_whisper.*", "faiss.*", "lightgbm.*", "pyloudnorm.*", "pysubs2.*", "yt_dlp.*", "mcp.*", "apscheduler.*", "tenacity.*", "open_clip.*", "pytesseract.*"]
 ignore_missing_imports = true
 
 # ---------------- Pytest ----------------

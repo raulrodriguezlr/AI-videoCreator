@@ -1,6 +1,7 @@
 """Character CRUD + reference-image use cases scoped to a pod."""
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from secrets import token_hex
 
@@ -11,6 +12,7 @@ from videocreator.domain.ports import (
     PodRepository,
     StoragePort,
 )
+from videocreator.infrastructure.filesystem.file_store import PodFileStore
 from videocreator.domain.value_objects import VoiceSettings
 from videocreator.shared.errors import (
     CharacterNotFound,
@@ -42,6 +44,7 @@ async def _owned_character(
 class CreateCharacter:
     pod_repo: PodRepository
     char_repo: CharacterRepository
+    file_store: PodFileStore
 
     async def execute(
         self,
@@ -68,7 +71,32 @@ class CreateCharacter:
             look_description=look_description,
             voice=voice,
         )
-        return await self.char_repo.save(character)
+        saved = await self.char_repo.save(character)
+        
+        try:
+            config_json = self.file_store.read_pod_file(pod.name, "config.json")
+            data = json.loads(config_json)
+            if "characters" not in data:
+                data["characters"] = []
+            
+            new_char = {
+                "name": name,
+                "role": role,
+                "personality": personality,
+                "look_description": look_description,
+                "elevenlabs_voice_id": voice.voice_id if voice else None,
+                "elevenlabs_voice_settings": {
+                    k: getattr(voice, k) for k in voice.model_fields if k != "voice_id"
+                } if voice else {},
+                "reference_image": None,
+                "reference_images": []
+            }
+            data["characters"].append(new_char)
+            self.file_store.write_pod_file(pod.name, "config.json", json.dumps(data, indent=2))
+        except Exception:
+            pass
+            
+        return saved
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +119,7 @@ class UpdateCharacter:
 
     pod_repo: PodRepository
     char_repo: CharacterRepository
+    file_store: PodFileStore
 
     async def execute(
         self, *, character_id: CharacterId, requester_id: UserId,
@@ -101,6 +130,7 @@ class UpdateCharacter:
         character = await _owned_character(
             self.char_repo, self.pod_repo, character_id, requester_id,
         )
+        original_name = character.name
         updated = character.model_copy(update={
             k: v for k, v in {
                 "name": name.strip() if name else None,
@@ -110,13 +140,54 @@ class UpdateCharacter:
                 "voice": voice,
             }.items() if v is not None
         })
-        return await self.char_repo.save(updated)
+        saved = await self.char_repo.save(updated)
+        
+        pod = await self.pod_repo.get(character.pod_id)
+        if pod:
+            # 1. Update universe_memory if name changed
+            if name and name.strip() and original_name and name.strip() != original_name:
+                mem = pod.config.universe_memory
+                if mem and original_name in mem:
+                    new_mem = mem.replace(original_name, name.strip())
+                    updated_config = pod.config.model_copy(update={"universe_memory": new_mem})
+                    pod = pod.model_copy(update={"config": updated_config})
+                    await self.pod_repo.save(pod)
+            
+            # 2. Update config.json
+            try:
+                config_json = self.file_store.read_pod_file(pod.name, "config.json")
+                data = json.loads(config_json)
+                chars = data.get("characters", [])
+                
+                for char_cfg in chars:
+                    if isinstance(char_cfg, dict) and char_cfg.get("name") == original_name:
+                        if name is not None:
+                            char_cfg["name"] = name.strip() if name else "unnamed"
+                        if role is not None:
+                            char_cfg["role"] = role
+                        if personality is not None:
+                            char_cfg["personality"] = personality
+                        if look_description is not None:
+                            char_cfg["look_description"] = look_description
+                        if voice is not None:
+                            char_cfg["elevenlabs_voice_id"] = voice.voice_id
+                            char_cfg["elevenlabs_voice_settings"] = {
+                                k: getattr(voice, k) for k in voice.model_fields if k != "voice_id"
+                            }
+                        break
+                
+                self.file_store.write_pod_file(pod.name, "config.json", json.dumps(data, indent=2))
+            except Exception:
+                pass
+                
+        return saved
 
 
 @dataclass(frozen=True, slots=True)
 class DeleteCharacter:
     pod_repo: PodRepository
     char_repo: CharacterRepository
+    file_store: PodFileStore
 
     async def execute(self, *, character_id: CharacterId, requester_id: UserId) -> None:
         character = await self.char_repo.get(character_id)
@@ -126,6 +197,19 @@ class DeleteCharacter:
         if pod is None or not pod.is_owned_by(requester_id):
             raise ForbiddenError("character belongs to a pod owned by a different user")
         await self.char_repo.delete(character_id)
+        
+        try:
+            config_json = self.file_store.read_pod_file(pod.name, "config.json")
+            data = json.loads(config_json)
+            chars = data.get("characters", [])
+            original_name = character.name
+            
+            new_chars = [c for c in chars if not (isinstance(c, dict) and c.get("name") == original_name)]
+            if len(new_chars) != len(chars):
+                data["characters"] = new_chars
+                self.file_store.write_pod_file(pod.name, "config.json", json.dumps(data, indent=2))
+        except Exception:
+            pass
 
 
 @dataclass(frozen=True, slots=True)

@@ -205,7 +205,9 @@ def _format_characters(characters: list[Character]) -> str:
     """Format character info for the LLM prompt so it can assign `character` fields."""
     if not characters:
         return "(no characters defined — use 'Narrator' as the default character)"
-    lines: list[str] = []
+    lines: list[str] = [
+        "CRITICAL INSTRUCTION: You MUST use the EXACT character names provided below. DO NOT add surnames, real-world identities, or auto-complete their names (e.g., if the name is 'Cristiano', DO NOT write 'Cristiano Ronaldo')."
+    ]
     for c in characters:
         parts = [f"- **{c.name}**"]
         if c.role:
