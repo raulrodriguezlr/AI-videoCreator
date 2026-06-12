@@ -1,0 +1,62 @@
+{
+    "1":  {
+              "class_type":  "VHS_LoadVideo",
+              "inputs":  {
+                             "video":  "demo_video_19b_6s.mp4",
+                             "force_rate":  0.0,
+                             "force_size":  "Disabled",
+                             "custom_width":  0,
+                             "custom_height":  0,
+                             "frame_load_cap":  0,
+                             "skip_first_frames":  0,
+                             "select_every_nth":  1
+                         }
+          },
+    "2":  {
+              "class_type":  "UpscaleModelLoader",
+              "inputs":  {
+                             "model_name":  "4x-UltraSharp.pth"
+                         }
+          },
+    "3":  {
+              "class_type":  "ImageUpscaleWithModel",
+              "inputs":  {
+                             "upscale_model":  [
+                                                   "2",
+                                                   0
+                                               ],
+                             "image":  [
+                                           "1",
+                                           0
+                                       ]
+                         }
+          },
+    "4":  {
+              "class_type":  "ImageScale",
+              "inputs":  {
+                             "image":  [
+                                           "3",
+                                           0
+                                       ],
+                             "upscale_method":  "bicubic",
+                             "width":  1536,
+                             "height":  1024,
+                             "crop":  "disabled"
+                         }
+          },
+    "5":  {
+              "class_type":  "VHS_VideoCombine",
+              "inputs":  {
+                             "images":  [
+                                            "4",
+                                            0
+                                        ],
+                             "frame_rate":  25.0,
+                             "loop_count":  0,
+                             "filename_prefix":  "upscaled_video",
+                             "format":  "video/h264-mp4",
+                             "pingpong":  false,
+                             "save_output":  true
+                         }
+          }
+}

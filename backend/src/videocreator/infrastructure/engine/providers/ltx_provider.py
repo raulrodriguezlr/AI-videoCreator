@@ -43,6 +43,12 @@ from videocreator.infrastructure.engine.variables import (
 log = structlog.get_logger(__name__)
 
 
+# TODO: [MIGRACIÓN] Este proveedor está acoplado actualmente a ltx_provider.py con dos JSONs locales.
+# En el futuro, se debe migrar completamente la lógica de parseo al motor genérico usando 
+# un archivo yaml en `providers.d/comfyui-ltx2` como se hizo con el resto de modelos (runway, veo, etc),
+# de manera que se abstraiga la integración directa con ComfyUI.
+
+
 class LtxProvider(BaseVideoProvider):
     """Local video generation via ComfyUI with LTX-2."""
 
@@ -144,10 +150,32 @@ class LtxProvider(BaseVideoProvider):
             seed=actual_seed,
         )
 
-        output_path = self._submit_and_wait(workflow, save_dir, scene_index, prompt)
+        # 1. Base Generation (19B)
+        base_video_path = self._submit_and_wait(workflow, save_dir, scene_index, prompt, stage="base")
+
+        # 2. Upload to ComfyUI for Upscaling
+        log.info("ltx.uploading_for_upscale", path=base_video_path)
+        input_video_name = self._upload_video_to_comfyui(base_video_path)
+        if not input_video_name:
+            raise RuntimeError("[LTX] Failed to upload base video to ComfyUI for upscaling.")
+
+        # Pausa breve para asegurar que ComfyUI libera VRAM
+        time.sleep(2)
+
+        # 3. Upscale (4x-UltraSharp)
+        log.info("ltx.starting_upscale", scene=scene_index)
+        upscale_workflow = self._build_workflow_upscale(input_video_name)
+        final_video_path = self._submit_and_wait(upscale_workflow, save_dir, scene_index, prompt, stage="upscaled")
+
+        # Opcional: Borrar el video base local para no acumular basura
+        try:
+            if os.path.exists(base_video_path):
+                os.remove(base_video_path)
+        except Exception:
+            pass
 
         return VideoClip(
-            file_path=output_path,
+            file_path=final_video_path,
             duration=duration,
             seed=actual_seed,
         )
@@ -216,10 +244,27 @@ class LtxProvider(BaseVideoProvider):
             image_name=frame_name,
         )
 
-        output_path = self._submit_and_wait(workflow, save_dir, scene_index, prompt)
+        base_video_path = self._submit_and_wait(workflow, save_dir, scene_index, prompt, stage="base")
+
+        log.info("ltx.uploading_for_upscale", path=base_video_path)
+        input_video_name = self._upload_video_to_comfyui(base_video_path)
+        if not input_video_name:
+            raise RuntimeError("[LTX] Failed to upload base video to ComfyUI for upscaling.")
+
+        time.sleep(2)
+
+        log.info("ltx.starting_upscale", scene=scene_index)
+        upscale_workflow = self._build_workflow_upscale(input_video_name)
+        final_video_path = self._submit_and_wait(upscale_workflow, save_dir, scene_index, prompt, stage="upscaled")
+
+        try:
+            if os.path.exists(base_video_path):
+                os.remove(base_video_path)
+        except Exception:
+            pass
 
         return VideoClip(
-            file_path=output_path,
+            file_path=final_video_path,
             duration=8,
             seed=actual_seed,
         )
@@ -241,130 +286,24 @@ class LtxProvider(BaseVideoProvider):
         frames: int,
         seed: int,
     ) -> dict:
-        """Build ComfyUI API-format workflow for LTX-2 text-to-video.
-
-        Uses LowVRAM loaders for 12GB GPU compatibility.
-        FP4 checkpoint does NOT embed Gemma, so we load it separately.
-        """
-        return {
-            # 1. Load checkpoint MODEL + VAE
-            # ComfyUI handles VRAM offloading to CPU automatically
-            "1": {
-                "class_type": "CheckpointLoaderSimple",
-                "inputs": {"ckpt_name": LTX_CHECKPOINT},
-            },
-            # 2. Load Gemma text encoder separately (CLIP)
-            "2": {
-                "class_type": "LTXVGemmaCLIPModelLoader",
-                "inputs": {
-                    "gemma_path": self._resolved_text_encoder,
-                    "ltxv_path": LTX_CHECKPOINT,
-                    "max_length": 1024,
-                },
-            },
-            # 3. Load distilled LoRA (on MODEL from node 1)
-            "3": {
-                "class_type": "LoraLoaderModelOnly",
-                "inputs": {
-                    "model": ["1", 0],
-                    "lora_name": LTX_LORA,
-                    "strength_model": LTX_LORA_STRENGTH,
-                },
-            },
-            # 4. Positive prompt encoding (CLIP from Gemma, node 2)
-            "4": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {
-                    "text": prompt,
-                    "clip": ["2", 0],
-                },
-            },
-            # 5. Negative prompt encoding
-            "5": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {
-                    "text": negative_prompt,
-                    "clip": ["2", 0],
-                },
-            },
-            # 6. LTX-2 conditioning
-            "6": {
-                "class_type": "LTXVConditioning",
-                "inputs": {
-                    "positive": ["4", 0],
-                    "negative": ["5", 0],
-                    "frame_rate": LTX_FPS,
-                },
-            },
-            # 7. Empty latent video
-            "7": {
-                "class_type": "EmptyLTXVLatentVideo",
-                "inputs": {
-                    "width": LTX_WIDTH,
-                    "height": LTX_HEIGHT,
-                    "length": frames,
-                    "batch_size": 1,
-                },
-            },
-            # 8. KSampler (MODEL from LoRA node 3)
-            "8": {
-                "class_type": "KSampler",
-                "inputs": {
-                    "seed": seed,
-                    "steps": LTX_STEPS,
-                    "cfg": LTX_CFG,
-                    "sampler_name": "euler",
-                    "scheduler": "normal",
-                    "denoise": LTX_DENOISE,
-                    "model": ["3", 0],
-                    "positive": ["6", 0],
-                    "negative": ["6", 1],
-                    "latent_image": ["7", 0],
-                },
-            },
-            # 9. VAE Decode (VAE from checkpoint node 1, output 2)
-            "9": {
-                "class_type": "VAEDecode",
-                "inputs": {
-                    "samples": ["8", 0],
-                    "vae": ["1", 2],
-                },
-            },
-            # 10. Audio VAE loader
-            "10": {
-                "class_type": "LTXVAudioVAELoader",
-                "inputs": {
-                    "ckpt_name": LTX_CHECKPOINT,
-                },
-            },
-            # 11. Decode audio from sampled latents
-            "11": {
-                "class_type": "LTXVAudioVAEDecode",
-                "inputs": {
-                    "samples": ["8", 0],
-                    "audio_vae": ["10", 0],
-                },
-            },
-            # 12. Create video from frames + decoded audio
-            "12": {
-                "class_type": "CreateVideo",
-                "inputs": {
-                    "images": ["9", 0],
-                    "fps": float(LTX_FPS),
-                    "audio": ["11", 0],
-                },
-            },
-            # 13. Save video to disk
-            "13": {
-                "class_type": "SaveVideo",
-                "inputs": {
-                    "video": ["12", 0],
-                    "filename_prefix": f"ltx_t2v_{seed}",
-                    "format": "auto",
-                    "codec": "auto",
-                },
-            },
-        }
+        import json
+        import os
+        
+        json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "..", "providers.d", "comfyui-ltx2", "api_workflow.json")
+        with open(json_path, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+            
+        # Inject our values into the nodes we identified
+        # Prompt node
+        workflow["5222"]["inputs"]["value"] = prompt
+        
+        # Seed node
+        workflow["5232:5158"]["inputs"]["noise_seed"] = seed
+        
+        # Frames
+        workflow["5218"]["inputs"]["value"] = frames
+        
+        return workflow
 
     def _build_workflow_i2v(
         self,
@@ -374,34 +313,30 @@ class LtxProvider(BaseVideoProvider):
         seed: int,
         image_name: str,
     ) -> dict:
-        """Build ComfyUI API-format workflow for LTX-2 image-to-video."""
         workflow = self._build_workflow_t2v(prompt, negative_prompt, frames, seed)
+        
+        # NOTE: I2V is not implemented in the current JSON yet,
+        # but to prevent crashes if called, we just return the T2V workflow
+        # and ignore the input image for now.
+        return workflow
 
-        # Add LoadImage node (use IDs 20+ to avoid conflicts with T2V nodes)
-        workflow["20"] = {
-            "class_type": "LoadImage",
-            "inputs": {"image": image_name, "upload": "image"},
-        }
-
-        # Encode image as latent
-        workflow["21"] = {
-            "class_type": "VAEEncode",
-            "inputs": {
-                "pixels": ["20", 0],
-                "vae": ["1", 2],
-            },
-        }
-
-        # Update KSampler to use encoded image as latent (node 8 = KSampler)
-        workflow["8"]["inputs"]["latent_image"] = ["21", 0]
-        # Lower denoise for I2V (preserve more of the input image structure)
-        workflow["8"]["inputs"]["denoise"] = 0.85
-
-        # Update filename prefix (node 13 = SaveVideo)
-        workflow["13"]["inputs"]["filename_prefix"] = f"ltx_i2v_{seed}"
-        # Remove empty latent node (not needed for I2V, node 7 = EmptyLTXVLatentVideo)
-        del workflow["7"]
-
+    def _build_workflow_upscale(
+        self,
+        video_name: str,
+    ) -> dict:
+        import json
+        import os
+        
+        json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "..", "providers.d", "comfyui-ltx2", "api_upscale_workflow.json")
+        with open(json_path, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+            
+        for node_id, node in workflow.items():
+            if node.get("class_type") == "VHS_LoadVideo":
+                node["inputs"]["video"] = video_name
+            elif node.get("class_type") == "VHS_VideoCombine":
+                node["inputs"]["frame_rate"] = LTX_FPS
+                
         return workflow
 
     # ==========================================
@@ -414,6 +349,7 @@ class LtxProvider(BaseVideoProvider):
         save_dir: Optional[str],
         scene_index: Optional[int],
         prompt: str,
+        stage: str = "base"
     ) -> str:
         """Submit workflow to ComfyUI and wait for results."""
         client_id = str(uuid.uuid4())
@@ -430,7 +366,7 @@ class LtxProvider(BaseVideoProvider):
                 raise Exception(f"ComfyUI error: {response.status_code} - {error_detail}")
 
             prompt_id = response.json().get("prompt_id")
-            log.info("ltx.prompt_submitted", prompt_id=prompt_id[:12])
+            log.info("ltx.prompt_submitted", prompt_id=prompt_id[:12], stage=stage)
 
             # Poll for completion
             elapsed = 0
@@ -438,7 +374,9 @@ class LtxProvider(BaseVideoProvider):
                 time.sleep(5)
                 elapsed += 5
                 if elapsed % 30 == 0:
-                    log.info("ltx.polling", elapsed_s=elapsed)
+                    eta = 300 - elapsed if stage == "base" else 240 - elapsed
+                    eta = max(10, eta)
+                    log.info(f"ltx.polling_{stage}", elapsed_s=elapsed, estimated_eta_s=eta)
 
                 history = httpx.get(
                     f"{self.comfyui_url}/history/{prompt_id}",
@@ -491,7 +429,7 @@ class LtxProvider(BaseVideoProvider):
                         file_type = items[0].get("type", "output")
                         return self._download_output(
                             filename, subfolder, file_type,
-                            save_dir, scene_index, prompt,
+                            save_dir, scene_index, prompt, stage
                         )
 
                 raise RuntimeError(
@@ -527,6 +465,27 @@ class LtxProvider(BaseVideoProvider):
             log.warning("ltx.image_upload_error", error=str(e))
             return None
 
+    def _upload_video_to_comfyui(self, video_path: str) -> Optional[str]:
+        """Upload a video to ComfyUI's input folder for processing."""
+        try:
+            filename = os.path.basename(video_path)
+            with open(video_path, "rb") as f:
+                response = httpx.post(
+                    f"{self.comfyui_url}/upload/image",
+                    files={"image": (filename, f, "video/mp4")},
+                    data={"overwrite": "true", "type": "input"},
+                    timeout=60,
+                )
+            if response.status_code == 200:
+                result = response.json()
+                return result.get("name", filename)
+            else:
+                log.warning("ltx.video_upload_failed", status=response.status_code)
+                return None
+        except Exception as e:
+            log.warning("ltx.video_upload_error", error=str(e))
+            return None
+
     def _download_output(
         self,
         filename: str,
@@ -535,6 +494,7 @@ class LtxProvider(BaseVideoProvider):
         save_dir: Optional[str],
         scene_index: Optional[int],
         prompt: str,
+        stage: str = "base"
     ) -> str:
         """Download a generated video from ComfyUI's output."""
         url = f"{self.comfyui_url}/view"
@@ -544,9 +504,12 @@ class LtxProvider(BaseVideoProvider):
 
         # Build output filename
         if scene_index is not None:
-            out_filename = f"clip_{scene_index + 1:02d}.mp4"
+            if stage == "base":
+                out_filename = f"clip_{scene_index + 1:02d}_base.mp4"
+            else:
+                out_filename = f"clip_{scene_index + 1:02d}.mp4"
         else:
-            out_filename = f"ltx_{int(time.time())}.mp4"
+            out_filename = f"ltx_{int(time.time())}_{stage}.mp4"
 
         target_dir = save_dir if save_dir else self.assets_dir
         output_path = os.path.join(target_dir, out_filename)

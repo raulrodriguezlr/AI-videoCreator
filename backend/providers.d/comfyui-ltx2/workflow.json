@@ -30,7 +30,9 @@
   },
   "5219": {
     "class_type": "LTXVAudioVAELoader",
-    "inputs": {}
+    "inputs": {
+      "ckpt_name": "ltx-2-19b-distilled-fp8.safetensors"
+    }
   },
   "5224": {
     "class_type": "LTXVConditioning",
@@ -66,7 +68,9 @@
         "5229",
         0
       ],
-      "filename_prefix": "video/LTX-2"
+      "filename_prefix": "video/LTX-2",
+      "format": "mp4",
+      "codec": "h264"
     }
   },
   "5244": {
@@ -90,7 +94,7 @@
   "5227": {
     "class_type": "LTXVGemmaCLIPModelLoader",
     "inputs": {
-      "gemma_path": "gemma_3_12B_it_fp8_e4m3fn.safetensors",
+      "gemma_path": "gemma-3-12b-it-fp8\\model.safetensors",
       "ltxv_path": "ltx-2-19b-distilled-fp8.safetensors",
       "max_length": 1024
     }
@@ -171,11 +175,15 @@
   },
   "5232:5150": {
     "class_type": "KSamplerSelect",
-    "inputs": {}
+    "inputs": {
+      "sampler_name": "euler"
+    }
   },
   "5232:5152": {
     "class_type": "KSamplerSelect",
-    "inputs": {}
+    "inputs": {
+      "sampler_name": "euler"
+    }
   },
   "5232:5159": {
     "class_type": "SamplerCustomAdvanced",

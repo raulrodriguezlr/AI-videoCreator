@@ -91,13 +91,9 @@
   },
   "5227": {
     "inputs": {
-      "clip_name": "gemma-3-12b-it-Q4_K_M.gguf",
-      "type": "ltxv"
+      "text_encoder": "gemma-3-12b-it-fp8\\model.safetensors"
     },
-    "class_type": "CLIPLoaderGGUF",
-    "_meta": {
-      "title": "CLIPLoader (GGUF)"
-    }
+    "class_type": "LTXAVTextEncoderLoader"
   },
   "5228": {
     "_meta": {
@@ -210,18 +206,12 @@
     "class_type": "EmptyLTXVLatentVideo",
     "inputs": {
       "batch_size": 1,
-      "height": [
-        "5232:5165",
-        1
-      ],
+      "height": 512,
       "length": [
         "5218",
         0
       ],
-      "width": [
-        "5232:5165",
-        0
-      ]
+      "width": 768
     }
   },
   "5232:5164": {
