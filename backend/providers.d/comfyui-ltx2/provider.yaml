@@ -1,0 +1,30 @@
+id: comfyui-ltx2
+name: LTX-2 local (ComfyUI)
+version: "1.0.0"
+description: LTX-2 19B distilled fp8 on the local ComfyUI server — zero marginal cost, native audio.
+capabilities:
+  - text_to_video
+models:
+  - id: ltx-2-19b-distilled-fp8
+    family: ltx
+    capabilities: [text_to_video]
+    max_duration_s: 10
+    max_resolution: [1920, 1088]
+    cost: { per_second_usd: 0.0, per_request_usd: 0.0, currency: USD }
+    latency: { p50_s: 240.0, p95_s: 900.0, timeout_s: 1800.0 }
+    strengths: [local, free, native audio, distilled 8-step]
+cost: { per_second_usd: 0.0, per_request_usd: 0.0, currency: USD }
+latency: { p50_s: 240.0, p95_s: 900.0, timeout_s: 1800.0 }
+adapter:
+  type: comfyui_workflow
+  config:
+    base_url: http://127.0.0.1:8188
+    workflow_file: workflow.json
+    # LTXVGemmaEnhancePrompt node — raw concept goes here; Gemma expands it
+    prompt_node_id: "5225"
+    prompt_field: prompt
+    # stage-1 sampler noise
+    seed_node_id: "5232:5158"
+    seed_field: noise_seed
+    model_id: ltx-2-19b-distilled-fp8
+tags: [local, video, free, comfyui]
