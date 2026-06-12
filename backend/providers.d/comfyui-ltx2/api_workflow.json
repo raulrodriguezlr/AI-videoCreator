@@ -91,9 +91,11 @@
   },
   "5227": {
     "inputs": {
-      "text_encoder": "gemma-3-12b-it-fp8\\model.safetensors"
+      "gemma_path": "gemma-3-12b-it-fp8\\\\model.safetensors",
+      "ltxv_path": "ltx-2-19b-distilled-fp8.safetensors",
+      "max_length": 1024
     },
-    "class_type": "LTXAVTextEncoderLoader"
+    "class_type": "LTXVGemmaCLIPModelLoader"
   },
   "5228": {
     "_meta": {
