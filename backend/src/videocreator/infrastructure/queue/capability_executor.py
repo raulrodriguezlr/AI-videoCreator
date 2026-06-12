@@ -96,6 +96,19 @@ class CapabilityExecutor:
                 f"no provider declares capability '{node.capability}' "
                 f"(providers.d) — install one or register a handler"
             )
+        # Honor an explicit provider choice on the node (Director/Memes UI):
+        # requested one first, the rest stay as the fallback chain.
+        requested = str(node.params.get("provider", "") or "")
+        if requested:
+            chosen = [lp for lp in candidates if lp.manifest.id == requested]
+            if not chosen:
+                raise RuntimeError(
+                    f"provider '{requested}' not found or lacks capability "
+                    f"'{node.capability}' — available: "
+                    f"{[lp.manifest.id for lp in candidates]}"
+                )
+            candidates = chosen + [lp for lp in candidates
+                                   if lp.manifest.id != requested]
         prompt = str(node.params.get("prompt", ""))
         if not prompt:
             # fall back to the nearest upstream text result

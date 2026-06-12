@@ -130,3 +130,29 @@ class TestEndToEndRun:
         run = await DagExecutor(ex).run(DagRun(run_id="r", spec=spec))
         assert run.is_complete and not run.has_failures
         assert run.node_states["thread"].state == NodeState.DONE
+
+
+class TestProviderSelection:
+    @pytest.mark.asyncio
+    async def test_requested_provider_goes_first(self) -> None:
+        registry = _FakeRegistry([_FakeLoaded("ltx"), _FakeLoaded("veo-gemini")])
+        ex = CapabilityExecutor(FakeLLM(), provider_registry=registry)  # type: ignore[arg-type]
+        result = await ex(
+            _node("text_to_video", prompt="x", provider="veo-gemini"), {})
+        assert result["provider"] == "veo-gemini"
+
+    @pytest.mark.asyncio
+    async def test_unknown_requested_provider_clear_error(self) -> None:
+        registry = _FakeRegistry([_FakeLoaded("ltx")])
+        ex = CapabilityExecutor(FakeLLM(), provider_registry=registry)  # type: ignore[arg-type]
+        with pytest.raises(RuntimeError, match="not found or lacks"):
+            await ex(_node("text_to_video", prompt="x", provider="nope"), {})
+
+    @pytest.mark.asyncio
+    async def test_requested_provider_failure_falls_back(self) -> None:
+        registry = _FakeRegistry(
+            [_FakeLoaded("good"), _FakeLoaded("bad", fail=True)])
+        ex = CapabilityExecutor(FakeLLM(), provider_registry=registry)  # type: ignore[arg-type]
+        result = await ex(
+            _node("text_to_video", prompt="x", provider="bad"), {})
+        assert result["provider"] == "good"

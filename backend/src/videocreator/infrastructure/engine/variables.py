@@ -31,6 +31,12 @@ _s = get_settings()
 # 'ltx' = LTX-2 via ComfyUI local (GPU local, no gasta tokens, genera audio)
 VIDEO_PROVIDER = "veo"
 
+# Proxy workflow (COMPETITIVE_ANALYSIS §9.4): iterar con un provider barato
+# (LTX local / draft) y hacer SOLO el render final con el caro (Veo $/seg).
+# DESACTIVADO a propósito: pendiente de que el resultado de LTX local
+# convenza; activar cuando haya un provider de draft que merezca la pena.
+PROXY_WORKFLOW_ENABLED = False
+
 # ==========================
 # VEO — Google Veo 3.1 (Cloud)
 # ==========================
