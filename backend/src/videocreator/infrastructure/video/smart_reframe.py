@@ -139,15 +139,22 @@ def _read_frame_at(cap: object, cv2: object, t_s: float) -> object | None:
 
 
 def _build_face_detector() -> object | None:
-    """Build a MediaPipe face detector, or `None` if MediaPipe isn't installed."""
+    """Build a MediaPipe face detector, or `None` when MediaPipe is missing or
+    its legacy `solutions` API is unavailable (newer wheels drop it). Either
+    way the caller degrades to the OpenCV HOG person detector — never crashes."""
     try:
         import mediapipe as mp  # noqa: PLC0415 — lazy: optional/heavy dep
     except ImportError:
         log.info("smart_reframe.mediapipe_not_installed")
         return None
-    return mp.solutions.face_detection.FaceDetection(
-        model_selection=1, min_detection_confidence=0.5
-    )
+    try:
+        return mp.solutions.face_detection.FaceDetection(
+            model_selection=1, min_detection_confidence=0.5
+        )
+    except AttributeError:
+        log.info("smart_reframe.mediapipe_solutions_unavailable",
+                 version=getattr(mp, "__version__", "?"))
+        return None
 
 
 def _build_person_detector(cv2: object) -> object:

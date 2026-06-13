@@ -72,15 +72,28 @@ def test_montage_maps_indices_to_source_offsets() -> None:
     assert (timeline.width, timeline.height) == (1080, 1920)
 
 
-def test_montage_clamps_total_to_platform_budget() -> None:
-    # 10 scenes × 10s, pick all → must trim to the 60s ceiling
+def test_montage_defaults_to_target_not_platform_max() -> None:
+    # No requested duration: a short is a highlight, so the montage targets
+    # DEFAULT_TARGET_S (30s), NOT the 60s platform ceiling — the same
+    # anti-"multi-minute short" rule as the single-cut planner.
     planner = ShortPlanner()
     timeline = planner.plan_montage(
         scene_durations=[10.0] * 10,
         selected_indices=list(range(10)),
         rule=_rule(max_duration_s=60.0),
     )
-    assert timeline.total_duration_s == pytest.approx(60.0)
+    assert timeline.total_duration_s == pytest.approx(ShortPlanner.DEFAULT_TARGET_S)
+
+
+def test_montage_honors_requested_duration_up_to_max() -> None:
+    planner = ShortPlanner()
+    timeline = planner.plan_montage(
+        scene_durations=[10.0] * 10,
+        selected_indices=list(range(10)),
+        rule=_rule(max_duration_s=60.0),
+        requested_duration_s=50.0,
+    )
+    assert timeline.total_duration_s == pytest.approx(50.0)
 
 
 def test_montage_dedupes_and_ignores_out_of_range() -> None:

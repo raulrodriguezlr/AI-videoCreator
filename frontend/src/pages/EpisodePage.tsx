@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  api, type EpisodeDetail, type ProviderCatalogEntry, type Script, type SeoMetadata,
+  api, getTemplate, startRun,
+  type EpisodeDetail, type ProviderCatalogEntry, type Script, type SeoMetadata,
 } from "../api/client";
 import { MediaViewer } from "../components/MediaViewer";
 import {
@@ -24,6 +25,23 @@ export function EpisodePage() {
   });
   const anyAvailable = (providers.data ?? []).some((p) => p.available);
 
+  const toast = useToast();
+
+  const multiplyRun = useMutation({
+    mutationFn: async () => {
+      if (!detail.data) throw new Error("Datos no cargados");
+      const template = await getTemplate("multiply-full");
+      const spec = template.dag;
+      const master = spec.nodes.find((n) => n.id === "master");
+      if (master) {
+        master.params = { ...master.params, concept: detail.data.episode.title };
+      }
+      return startRun(spec);
+    },
+    onSuccess: (run) => { toast.ok("Multiplicación iniciada"); nav(`/runs/${run.run_id}`); },
+    onError: (e) => toast.err("No se pudo iniciar", (e as Error).message),
+  });
+
   if (detail.isLoading) return <div className="page"><Loading /></div>;
   if (detail.isError || !detail.data) return <div className="page"><ErrorState error={detail.error} /></div>;
 
@@ -31,7 +49,7 @@ export function EpisodePage() {
 
   return (
     <div className="page">
-      <div className="page-head">
+      <div className="page-head between">
         <div>
           <button className="btn ghost sm" onClick={() => nav(`/pods/${podId}`)} style={{ marginBottom: 8 }}>← Volver al pod</button>
           <div className="eyebrow">Episodio #{String(episode.number).padStart(2, "0")}</div>
@@ -43,6 +61,11 @@ export function EpisodePage() {
               <Badge tone="warn">sin proveedor de vídeo activo</Badge>
             )}
           </div>
+        </div>
+        <div style={{ alignSelf: "flex-end" }}>
+          <Button variant="mint" loading={multiplyRun.isPending} onClick={() => multiplyRun.mutate()}>
+            <IcRocket /> Multiplicar (DAG)
+          </Button>
         </div>
       </div>
 
