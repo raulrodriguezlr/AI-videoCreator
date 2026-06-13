@@ -263,6 +263,17 @@ export interface VoiceOption {
   language: string | null;
 }
 
+export interface SdkProvider {
+  id: string;
+  name: string;
+  capabilities: string[];
+  tags: string[];
+  adapter_type: string;
+  cost_per_second_usd: number;
+}
+
+export const getSdkProviders = () => api.get<SdkProvider[]>("/system/providers/sdk");
+
 export interface ModelHandle {
   id: string;
   family: string;

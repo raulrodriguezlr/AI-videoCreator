@@ -6,15 +6,18 @@ import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { startRun, type DagSpecDto } from "../api/client";
 import { Button, Field, useToast } from "../ui/primitives";
+import { ProviderSelect } from "../components/ProviderSelect";
 import { IcLaugh, IcSparkles } from "../ui/icons";
 
 const DURATIONS = [8, 12, 15] as const;
 
-function buildMemeSpec(concept: string, durationS: number): DagSpecDto {
+function buildMemeSpec(concept: string, durationS: number, provider: string | null): DagSpecDto {
+  const clipsParams: Record<string, unknown> = { duration_s: durationS };
+  if (provider) clipsParams.provider = provider;
   return {
     nodes: [
       { id: "structure", capability: "native_short", params: { concept, content_type: "meme" }, depends_on: [], max_retries: 2 },
-      { id: "clips", capability: "text_to_video", params: { duration_s: durationS }, depends_on: ["structure"], max_retries: 2 },
+      { id: "clips", capability: "text_to_video", params: clipsParams, depends_on: ["structure"], max_retries: 2 },
       { id: "compose", capability: "compose_short", params: {}, depends_on: ["clips"], max_retries: 1 },
     ],
   };
@@ -26,9 +29,10 @@ export function MemesPage() {
 
   const [concept, setConcept] = useState("");
   const [durationS, setDurationS] = useState<typeof DURATIONS[number]>(12);
+  const [provider, setProvider] = useState<string | null>(null);
 
   const generate = useMutation({
-    mutationFn: () => startRun(buildMemeSpec(concept.trim(), durationS)),
+    mutationFn: () => startRun(buildMemeSpec(concept.trim(), durationS, provider)),
     onSuccess: (res) => nav(`/runs/${res.run_id}`),
     onError: (e) => toast.err("No se pudo generar el meme", (e as Error).message),
   });
@@ -63,6 +67,8 @@ export function MemesPage() {
             {DURATIONS.map((d) => <option key={d} value={d}>{d}s</option>)}
           </select>
         </Field>
+
+        <ProviderSelect value={provider} onChange={setProvider} capability="text_to_video" label="Proveedor de video" />
 
         <div className="btn-row">
           <Button variant="primary" loading={generate.isPending} disabled={!canGenerate} onClick={() => generate.mutate()}>

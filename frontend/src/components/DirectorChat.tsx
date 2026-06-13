@@ -4,13 +4,34 @@
 // or discard.
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  directorChat, startRun, type DagSpecDto, type DirectorChatResponse, type JsonPatchOp,
+  directorChat, getSdkProviders, startRun,
+  type DagSpecDto, type DirectorChatResponse, type JsonPatchOp, type SdkProvider,
 } from "../api/client";
 import { Button, Empty, useToast } from "../ui/primitives";
 import { IcCheck, IcSend, IcSparkles, IcX } from "../ui/icons";
 import { DagPipeline } from "./DagPipeline";
+import { ProviderSelect } from "./ProviderSelect";
+
+const PROVIDER_CAPABILITIES = ["text_to_video", "video_to_video"] as const;
+
+/** Returns a new spec with `params.provider` set/removed on every node whose
+ * capability is text_to_video / video_to_video (and tts, when at least one
+ * SDK provider declares that capability). */
+function applyProviderToSpec(spec: DagSpecDto, provider: string | null, ttsSupported: boolean): DagSpecDto {
+  const capabilities: string[] = [...PROVIDER_CAPABILITIES];
+  if (ttsSupported) capabilities.push("tts");
+  return {
+    nodes: spec.nodes.map((node) => {
+      if (!capabilities.includes(node.capability)) return node;
+      const params = { ...node.params };
+      if (provider) params.provider = provider;
+      else delete params.provider;
+      return { ...node, params };
+    }),
+  };
+}
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -26,7 +47,20 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
   const [spec, setSpec] = useState<DagSpecDto>(initialSpec);
   const [history, setHistory] = useState<ChatTurn[]>([]);
   const [message, setMessage] = useState("");
+  const [provider, setProvider] = useState<string | null>(null);
   const historyRef = useRef<HTMLDivElement>(null);
+
+  const sdkProviders = useQuery<SdkProvider[]>({
+    queryKey: ["sdk-providers"],
+    queryFn: getSdkProviders,
+    retry: false,
+  });
+  const ttsSupported = (sdkProviders.data ?? []).some((p) => p.capabilities.includes("tts"));
+
+  const handleProviderChange = (id: string | null) => {
+    setProvider(id);
+    setSpec((s) => applyProviderToSpec(s, id, ttsSupported));
+  };
 
   const chat = useMutation({
     mutationFn: (msg: string) => directorChat(spec, msg),
@@ -64,7 +98,9 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
   const resolveTurn = (index: number, action: "applied" | "discarded") => {
     setHistory((h) => h.map((turn, i) => {
       if (i !== index) return turn;
-      if (action === "applied" && turn.nextSpec) setSpec(turn.nextSpec);
+      if (action === "applied" && turn.nextSpec) {
+        setSpec(applyProviderToSpec(turn.nextSpec, provider, ttsSupported));
+      }
       return { ...turn, resolved: action };
     }));
     if (action === "applied") toast.ok("Receta actualizada");
@@ -78,6 +114,7 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
           <h2>Receta actual</h2>
           <span className="dim mono" style={{ fontSize: 11 }}>{spec.nodes.length} nodos</span>
         </div>
+        <ProviderSelect value={provider} onChange={handleProviderChange} capability="text_to_video" label="Proveedor de video" />
         <Button variant="primary" loading={generate.isPending} disabled={spec.nodes.length === 0}
           onClick={() => generate.mutate()}>
           <IcSparkles /> Generar

@@ -161,6 +161,8 @@ async def list_sdk_providers(container: ContainerDep) -> list[dict]:
             "cost_per_second_usd": lp.manifest.cost.per_second_usd,
         }
         for lp in registry.providers.values()
+        # hide the integration-test dummy from the user-facing catalog
+        if "test" not in lp.manifest.tags
     ]
 
 
