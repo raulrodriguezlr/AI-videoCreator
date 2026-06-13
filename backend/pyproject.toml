@@ -43,6 +43,7 @@ dependencies = [
     "google-api-python-client>=2.0.0",
     "google-auth-oauthlib>=1.0.0",
     "requests>=2.31.0",
+    "mediapipe>=0.10",
 ]
 
 [project.optional-dependencies]
@@ -89,7 +90,6 @@ reframe = [
     # if that ever changes. mediapipe adds face detection on top of OpenCV's
     # bundled HOG person detector.
     "opencv-python-headless>=4.9.0",
-    "mediapipe>=0.10",
 ]
 server = [
     # postgres + redis + s3 stack

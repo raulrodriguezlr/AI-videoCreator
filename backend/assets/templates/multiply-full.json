@@ -1,21 +1,14 @@
 {
   "id": "multiply-full",
-  "name": "Multiplication matrix (full)",
-  "description": "One master episode into shorts, carousel, thumbnails A/B and thread.",
+  "name": "Multiplication matrix (local)",
+  "description": "One master episode into carousel and thread using local resources. No generative AI.",
   "tags": ["multiply", "publish"],
   "preview": null,
   "dag": {
     "nodes": [
       {"id": "master", "capability": "load_master", "params": {}},
-      {"id": "short-1", "capability": "native_short", "params": {"variant": 1}, "depends_on": ["master"]},
-      {"id": "short-2", "capability": "native_short", "params": {"variant": 2}, "depends_on": ["master"]},
-      {"id": "short-3", "capability": "native_short", "params": {"variant": 3}, "depends_on": ["master"]},
       {"id": "carousel-slides", "capability": "llm_text", "params": {"task": "carousel_slides"}, "depends_on": ["master"]},
       {"id": "carousel-render", "capability": "carousel_render", "params": {}, "depends_on": ["carousel-slides"]},
-      {"id": "thumb-prompts", "capability": "llm_text", "params": {"task": "thumbnail_prompts", "n": 3}, "depends_on": ["master"]},
-      {"id": "thumb-1", "capability": "text_to_image", "params": {"variant": 1}, "depends_on": ["thumb-prompts"]},
-      {"id": "thumb-2", "capability": "text_to_image", "params": {"variant": 2}, "depends_on": ["thumb-prompts"]},
-      {"id": "thumb-3", "capability": "text_to_image", "params": {"variant": 3}, "depends_on": ["thumb-prompts"]},
       {"id": "thread", "capability": "llm_text", "params": {"task": "thread"}, "depends_on": ["master"]}
     ]
   }

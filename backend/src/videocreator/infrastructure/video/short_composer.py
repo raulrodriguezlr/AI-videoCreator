@@ -90,7 +90,7 @@ class FfmpegShortComposer:
             if not seg.caption or not seg.caption.strip():
                 continue
             path = workdir / f"cap_{i}.txt"
-            path.write_text(_wrap_caption(seg.caption), encoding="utf-8")
+            path.write_text(_wrap_caption(seg.caption), encoding="utf-8", newline="\n")
             out[i] = _escape_path(str(path))
         return out
 

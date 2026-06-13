@@ -61,7 +61,7 @@ class _PolishOptions:
         raw_transition = payload.get("transition", "fade")
         transition = str(raw_transition) if raw_transition else None
         return cls(
-            captions=bool(payload.get("captions", True)),
+            captions=bool(payload.get("captions", False)),
             ken_burns=bool(payload.get("ken_burns", True)),
             transition=transition,
             transition_duration_s=float(payload.get("transition_duration_s", 0.3)),
@@ -120,6 +120,15 @@ class ShortRenderHandler:
         )
 
         key = await self._compose_and_store(short, episode, timeline, ctx)
+        
+        import shutil
+        import asyncio
+        workdir = self._workdir(short)
+        try:
+            await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
+        except Exception as e:
+            log.warning("short_render.cleanup_failed", short_id=short.id, error=str(e))
+            
         short.rendered_video_key = key
         short.duration_s = timeline.total_duration_s
         await self._shorts.save(short)
@@ -202,6 +211,7 @@ class ShortRenderHandler:
                     ken_burns=style.ken_burns,
                     transition=style.transition,
                     transition_duration_s=style.transition_duration_s,
+                    requested_duration_s=short.duration_s,
                 )
                 if not timeline.is_empty:
                     if selection.hook_text and not short.hook_text:
@@ -266,6 +276,8 @@ class ShortRenderHandler:
         Native episodes expose a stored `final_video_key`; legacy-imported ones
         only have per-scene clips on disk, so we concatenate those on demand.
         """
+        if episode.dubbed_video_key:
+            return await self._materialize(episode.dubbed_video_key)
         if episode.final_video_key:
             return await self._materialize(episode.final_video_key)
         clips = self._fs_clip_paths(episode)

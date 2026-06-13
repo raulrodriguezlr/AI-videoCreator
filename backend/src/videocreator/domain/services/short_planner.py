@@ -60,6 +60,7 @@ class ShortPlanner:
         ken_burns: bool = False,
         transition: str | None = None,
         transition_duration_s: float = 0.0,
+        requested_duration_s: float = 0.0,
     ) -> EditingTimeline:
         """Build a multi-cut montage `EditingTimeline` from chosen scene indices.
 
@@ -81,7 +82,12 @@ class ShortPlanner:
             offsets.append(acc)
             acc += max(0.0, dur)
 
-        budget = rule.max_duration_s
+        if requested_duration_s > 0.0:
+            target = requested_duration_s
+        else:
+            target = min(ShortPlanner.DEFAULT_TARGET_S, rule.max_duration_s)
+        budget = min(target, rule.max_duration_s)
+        
         segments: list[TimelineSegment] = []
         used = 0.0
         seen: set[int] = set()

@@ -5627,6 +5627,7 @@ dependencies = [
     { name = "google-auth-oauthlib" },
     { name = "google-genai" },
     { name = "httpx" },
+    { name = "mediapipe" },
     { name = "opencv-python-headless" },
     { name = "pillow" },
     { name = "psutil" },
@@ -5684,7 +5685,6 @@ local = [
     { name = "soundfile" },
 ]
 reframe = [
-    { name = "mediapipe" },
     { name = "opencv-python-headless" },
 ]
 resilience = [
@@ -5733,7 +5733,7 @@ requires-dist = [
     { name = "librosa", marker = "extra == 'local'", specifier = ">=0.10.0" },
     { name = "lightgbm", marker = "extra == 'local'", specifier = ">=4.3.0" },
     { name = "mcp", marker = "extra == 'brain'", specifier = ">=1.0.0" },
-    { name = "mediapipe", marker = "extra == 'reframe'", specifier = ">=0.10" },
+    { name = "mediapipe", specifier = ">=0.10" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
     { name = "open-clip-torch", marker = "extra == 'bench'", specifier = ">=2.24.0" },
     { name = "opencv-python-headless", specifier = ">=4.9.0" },

@@ -162,6 +162,8 @@ class BaseVideoProvider(ABC):
         context_mgr = SceneContextManager(episode_dir or clips_dir, pod_config=self.config)
 
         for i, scene in enumerate(scenes):
+            self._current_scene_index = i
+            self._total_scenes = len(scenes)
             scene_num = scene.get("scene_number", i + 1)
             if i < resume_from:
                 continue

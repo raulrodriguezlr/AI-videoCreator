@@ -143,12 +143,34 @@ class LtxProvider(BaseVideoProvider):
         frames = self._duration_to_frames(duration)
         actual_seed = seed or int(time.time() * 1000) % (2**32)
 
-        workflow = self._build_workflow_t2v(
-            prompt=prompt,
-            negative_prompt=negative_prompt or "blurry, low quality, watermark, text, subtitles",
-            frames=frames,
-            seed=actual_seed,
-        )
+        if reference_images and len(reference_images) > 0:
+            log.info("ltx.reference_image_found", count=len(reference_images))
+            ref_name = self._upload_image_to_comfyui(reference_images[0])
+            if not ref_name:
+                raise RuntimeError("[LTX] Failed to upload reference image to ComfyUI.")
+
+            anchor_workflow = self._build_workflow_anchor(prompt, ref_name)
+            log.info("ltx.starting_anchor_generation")
+            anchor_image_path = self._submit_and_wait(anchor_workflow, save_dir, scene_index, prompt, stage="anchor")
+
+            anchor_name = self._upload_image_to_comfyui(anchor_image_path)
+            if not anchor_name:
+                raise RuntimeError("[LTX] Failed to upload anchor image to ComfyUI.")
+
+            workflow = self._build_workflow_i2v(
+                prompt=prompt,
+                negative_prompt=negative_prompt or "blurry, low quality, watermark, text, subtitles",
+                frames=frames,
+                seed=actual_seed,
+                image_name=anchor_name,
+            )
+        else:
+            workflow = self._build_workflow_t2v(
+                prompt=prompt,
+                negative_prompt=negative_prompt or "blurry, low quality, watermark, text, subtitles",
+                frames=frames,
+                seed=actual_seed,
+            )
 
         # 1. Base Generation (19B)
         base_video_path = self._submit_and_wait(workflow, save_dir, scene_index, prompt, stage="base")
@@ -279,6 +301,23 @@ class LtxProvider(BaseVideoProvider):
     # COMFYUI WORKFLOW BUILDERS
     # ==========================================
 
+    def _build_workflow_anchor(
+        self,
+        prompt: str,
+        image_name: str,
+    ) -> dict:
+        import json
+        import os
+        
+        json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "..", "providers.d", "comfyui-ltx2", "api_anchor_workflow.json")
+        with open(json_path, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+            
+        workflow["6"]["inputs"]["text"] = prompt
+        workflow["12"]["inputs"]["image"] = image_name
+        
+        return workflow
+
     def _build_workflow_t2v(
         self,
         prompt: str,
@@ -313,11 +352,18 @@ class LtxProvider(BaseVideoProvider):
         seed: int,
         image_name: str,
     ) -> dict:
-        workflow = self._build_workflow_t2v(prompt, negative_prompt, frames, seed)
+        import json
+        import os
         
-        # NOTE: I2V is not implemented in the current JSON yet,
-        # but to prevent crashes if called, we just return the T2V workflow
-        # and ignore the input image for now.
+        json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "..", "providers.d", "comfyui-ltx2", "api_i2v_workflow.json")
+        with open(json_path, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+            
+        workflow["5222"]["inputs"]["value"] = prompt
+        workflow["5232:5158"]["inputs"]["noise_seed"] = seed
+        workflow["5218"]["inputs"]["value"] = frames
+        workflow["load_image"]["inputs"]["image"] = image_name
+        
         return workflow
 
     def _build_workflow_upscale(
@@ -373,10 +419,34 @@ class LtxProvider(BaseVideoProvider):
             while elapsed < LTX_TIMEOUT:
                 time.sleep(5)
                 elapsed += 5
-                if elapsed % 30 == 0:
-                    eta = 300 - elapsed if stage == "base" else 240 - elapsed
-                    eta = max(10, eta)
-                    log.info(f"ltx.polling_{stage}", elapsed_s=elapsed, estimated_eta_s=eta)
+                
+                # Emit progress ETA
+                cb = getattr(self, "progress_callback", None)
+                if cb:
+                    total_s = 300.0 if stage == "base" else (45.0 if stage == "anchor" else 240.0)
+                    pct_stage = min(elapsed / total_s, 0.95)
+                    
+                    if stage == "anchor":
+                        pct_scene = pct_stage * 0.1
+                    elif stage == "base":
+                        pct_scene = 0.1 + pct_stage * 0.5
+                    else:
+                        pct_scene = 0.6 + pct_stage * 0.4
+                        
+                    scene_idx = getattr(self, "_current_scene_index", 0)
+                    total = getattr(self, "_total_scenes", 1)
+                    total = max(1, total)
+                    overall_pct = (scene_idx + pct_scene) / total
+                    
+                    eta = max(10, int(total_s - elapsed))
+                    stage_label = "Imagen Ancla" if stage == "anchor" else ("Clip Base" if stage == "base" else "Escalado")
+                    msg = f"Escena {scene_idx+1}/{total} [{stage_label}] - ETA ~{eta}s"
+                    cb(overall_pct, msg)
+                else:
+                    if elapsed % 30 == 0:
+                        eta = 300 - elapsed if stage == "base" else 240 - elapsed
+                        eta = max(10, eta)
+                        log.info(f"ltx.polling_{stage}", elapsed_s=elapsed, estimated_eta_s=eta)
 
                 history = httpx.get(
                     f"{self.comfyui_url}/history/{prompt_id}",
@@ -503,13 +573,16 @@ class LtxProvider(BaseVideoProvider):
         response = httpx.get(url, params=params, timeout=60)
 
         # Build output filename
+        ext = ".png" if stage == "anchor" else ".mp4"
         if scene_index is not None:
             if stage == "base":
-                out_filename = f"clip_{scene_index + 1:02d}_base.mp4"
+                out_filename = f"clip_{scene_index + 1:02d}_base{ext}"
+            elif stage == "anchor":
+                out_filename = f"clip_{scene_index + 1:02d}_anchor{ext}"
             else:
-                out_filename = f"clip_{scene_index + 1:02d}.mp4"
+                out_filename = f"clip_{scene_index + 1:02d}{ext}"
         else:
-            out_filename = f"ltx_{int(time.time())}_{stage}.mp4"
+            out_filename = f"ltx_{int(time.time())}_{stage}{ext}"
 
         target_dir = save_dir if save_dir else self.assets_dir
         output_path = os.path.join(target_dir, out_filename)

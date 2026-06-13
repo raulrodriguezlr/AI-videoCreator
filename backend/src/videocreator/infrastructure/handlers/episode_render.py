@@ -207,6 +207,7 @@ def _ensure_engine_workspace(
 def _run_engine_sync(
     *, pod_config_path: Path, episode_dir: Path, script_dict: dict[str, Any],
     output_path: Path, provider_name: str = "veo", model: str | None = None,
+    progress_callback = None,
 ) -> Path:
     """Invoke the render engine's `VideoEngine.generate(...)` synchronously.
 
@@ -239,6 +240,8 @@ def _run_engine_sync(
     try:
         with redirect_stdout(buffer), redirect_stderr(buffer):
             engine = VideoEngine(str(pod_config_path))
+            if progress_callback:
+                engine.provider.progress_callback = progress_callback
             result = engine.generate(
                 script_dict,
                 output_path=str(output_path),
@@ -426,6 +429,12 @@ class EpisodeRenderHandler:
         # so the deliverable on disk is human-readable too — storage already
         # re-keys by title, this keeps the engine's own output consistent.
         output_path = episode_dir / f"{episode_filename(episode.title)}.mp4"
+        
+        loop = asyncio.get_running_loop()
+        def _on_progress(pct: float, msg: str):
+            # Scale the 0.0-1.0 engine progress into the 0.15-0.90 window
+            asyncio.run_coroutine_threadsafe(ctx.progress(0.15 + (pct * 0.75), msg), loop)
+
         try:
             mp4_path = await asyncio.to_thread(
                 _run_engine_sync,
@@ -435,6 +444,7 @@ class EpisodeRenderHandler:
                 output_path=output_path,
                 provider_name=name,
                 model=episode.video_model,
+                progress_callback=_on_progress,
             )
         except Exception as exc:
             raise ProviderError(
@@ -445,6 +455,12 @@ class EpisodeRenderHandler:
         final_key, dub_key = await _store_render_output(
             episode, episode_dir, mp4_path, self._storage
         )
+        import shutil
+        try:
+            await asyncio.to_thread(shutil.rmtree, episode_dir, ignore_errors=True)
+        except Exception as e:
+            log.warning("episode_render.cleanup_failed", episode_id=episode.id, error=str(e))
+        
         if dub_key:
             episode.dubbed_video_key = dub_key
         return final_key

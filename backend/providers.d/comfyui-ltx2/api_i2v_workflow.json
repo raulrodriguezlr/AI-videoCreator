@@ -186,7 +186,7 @@
         0
       ],
       "latent_image": [
-        "5232:5163",
+        "i2v_condition",
         0
       ],
       "noise": [
@@ -274,6 +274,31 @@
       ],
       "working_device": "auto",
       "working_dtype": "auto"
+    }
+  },
+  "load_image": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "anchor_image_00001.png"
+    }
+  },
+  "i2v_condition": {
+    "class_type": "LTXVImgToVideoConditionOnly",
+    "inputs": {
+      "vae": [
+        "5228",
+        2
+      ],
+      "image": [
+        "load_image",
+        0
+      ],
+      "latent": [
+        "5232:5163",
+        0
+      ],
+      "strength": 1.0,
+      "bypass": false
     }
   }
 }
