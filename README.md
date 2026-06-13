@@ -4,7 +4,7 @@ Plataforma local-first de creación automática de vídeos con IA. Un solo coman
 
 El motor de generación (Veo / LTX / ElevenLabs / Artlist — generar, extender, *jump-to-scene*, doblar y montar) vive **dentro del backend** en `infrastructure/engine/`; no hay un proyecto "v2" aparte ni CLI heredada, y toda la media se guarda en el object store (`var/storage`), nunca en `pods/`.
 
-> 🗺️ **Estado y hoja de ruta completa: [PLAN.md](PLAN.md)** — lo hecho y lo pendiente, consolidado.
+> 🗺️ **Estado y hoja de ruta completa: [STATUS.md](STATUS.md)** — matriz honesta de lo hecho (✅) y lo pendiente (⚠️/☐), consolidada.
 
 ---
 
@@ -453,9 +453,10 @@ Si es un contenedor legacy (`ai-videocreator-gpu-node`), su CMD/ENTRYPOINT neces
 
 ## Roadmap
 
-Ver [PLAN_MAESTRO.md](PLAN_MAESTRO.md) para el detalle completo.
+Ver [STATUS.md](STATUS.md) para la matriz completa de estado (✅/⚠️/☐) frente a
+[COMPETITIVE_ANALYSIS.md](COMPETITIVE_ANALYSIS.md).
 
-### Entregado (v3.0)
+### Entregado (v3.0 + v3.1 — motor de Shorts, Provider SDK, DAG, Cerebro Viral)
 
 - [x] Backend FastAPI · Clean Architecture · Hexagonal (domain/application/infrastructure/interfaces)
 - [x] Modo local zero-docker: SQLite + LocalFileStorage + InProcessJobQueue
@@ -471,10 +472,23 @@ Ver [PLAN_MAESTRO.md](PLAN_MAESTRO.md) para el detalle completo.
 - [x] **Fase 8** — AI Pod Wizard (idea → blueprint → pod) con Gemini structured outputs
 - [x] **Fase 9** — CI GitHub Actions (lint→unit→docker) + Dockerfile multi-stage + docker-compose
 - [x] **Fase 10** — BYO provider keys cifradas: `SecretCipher` (Fernet), `DbSecretVault`, endpoints `/secrets/*`
-- [x] Suite de tests: 99 tests unitarios, 0 fallos · ruff clean
+- [x] **Motor de Shorts v2** — beat-locking (librosa), SFX library + mixer LUFS, captions ASS word-by-word + keyword highlight, Hook Rewriter + LinUCB, pipeline nativo, smart auto-reframe (OpenCV/MediaPipe)
+- [x] **Provider SDK (§9)** — manifest + registry dinámico (`providers.d/`), 4 tipos de adapter, hot-reload, catálogo SDK
+- [x] **DAG Orchestrator (§11)** — `DagSpec` + executor (paralelo, retries, resume, cancel), SSE, capability router con circuit breaker + cost ledger
+- [x] **FAISS Asset Library + Format Library (§10.4/§12.4)** — embeddings + genome clustering + veto de formatos quemados
+- [x] **Cerebro Viral (§12.4)** — Video Analyst, brain agent (MCP), benchmark harness, trending audio, daily briefing, content moderation
+- [x] **Multiplicación de contenido (§13)** — shorts/carousel/thumbnails/thread/dubbing + publicación YouTube + métricas
+- [x] **Scene Recreation / V2V (§3.3)** — fair-use advisor, planner, trend match, Runway, `RecreationPage`
+- [x] Suite de tests: 99+ tests unitarios, 0 fallos · ruff clean
 
-### Siguientes pasos
+### Siguientes pasos (ver STATUS.md para detalle completo)
 
+- [ ] Convergencia `infrastructure/engine/` (VideoEngine legacy) → Provider SDK / DAG para episodios completos
+- [ ] Cablear `BrainScheduler` (daily_briefing / rebenchmark) en el lifespan de FastAPI
+- [ ] Auto-benchmark al instalar un provider nuevo (`registry.discover()`)
+- [ ] Proxy workflow (preview barato → render caro), actualmente `PROXY_WORKFLOW_ENABLED=False`
+- [ ] Node canvas (§10.1) + timeline frame-accurate (§10.3)
+- [ ] Autopilot supervisado (§12.3) — scheduler + cola de aprobación
 - [ ] Server-mode adapters: Postgres, Redis/ARQ, MinIO — actualmente lanzan `NotImplementedError`
 - [ ] JWT auth: `deps.py` `current_user_id()` devuelve 501 en server mode
 - [ ] Providers consuming vault: wiring BYO keys per-user al `VideoProviderPort`

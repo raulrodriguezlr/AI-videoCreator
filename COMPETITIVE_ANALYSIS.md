@@ -5,6 +5,21 @@
 
 ---
 
+## Estado de implementación (actualizado)
+
+> Matriz completa de estado (✅/⚠️/☐) por feature: **[STATUS.md](STATUS.md)**
+> (enlazada también desde el [README](README.md)).
+
+**Resumen de una línea**: la mayor parte de §1–§16 (incluida la ampliación
+"FAR BEYOND" — Provider SDK, DAG orchestrator, Cerebro Viral/MCP, FAISS,
+multiplicación de contenido, V2V) **ya está implementada**. Lo pendiente
+principal es: convergencia del engine legacy hacia el Provider SDK/DAG para
+episodios completos, cableado del scheduler (daily briefing/rebenchmark) en
+el lifespan de FastAPI, el canvas de nodos (§10.1) y los backends cloud
+(S3/Redis) — éstos últimos `NotImplementedError` por diseño local-first.
+
+---
+
 ## 1. Qué existe hoy: el panorama real
 
 ### 1.1 Competencia directa — cómo funcionan
