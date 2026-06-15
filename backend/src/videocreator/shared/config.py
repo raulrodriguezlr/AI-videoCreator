@@ -125,23 +125,17 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str | None = None
     artlist_api_token: str | None = None
     # Higgsfield AI — multi-model video/image hub (Wan, Kling, Seedance, Veo,
-    # Sora, Soul…). Credentials are a single `KEY_ID:KEY_SECRET` string sent as
-    # `Authorization: Key <id>:<secret>` (see providers.d/higgsfield).
+    # Sora, Soul…). `higgsfield_credentials` (KEY_ID:KEY_SECRET) is the legacy
+    # developer-API key, kept only for the vault UI; the app no longer renders
+    # through it (its credit wallet is separate and empty → 403). Generation now
+    # goes through the official CLI below, which spends the PLUS plan credits.
     higgsfield_credentials: str | None = None
     # Path to the official Higgsfield CLI binary (`@higgsfield/cli`, `hf`/`higgsfield`).
     # The CLI authenticates via device-code OAuth (`hf auth login`) against the
     # SAME session as the web app, so generations spend the user's PLUS
-    # SUBSCRIPTION credits — unlike the developer REST API key, whose credit
-    # wallet is separate (and was empty → 403). This is how the app spends the
-    # plan credits the user already pays for. Set to an absolute path if `hf` is
-    # not on PATH (e.g. C:\\Users\\you\\hftool\\hf.exe).
+    # SUBSCRIPTION credits. Set to an absolute path if `hf` is not on PATH
+    # (e.g. C:\\Users\\you\\hftool\\hf.exe).
     higgsfield_cli_path: str = "hf"
-    # Official, documented, stable API (DoP, Soul, Seedance v1, Kling v2.1…).
-    higgsfield_base_url: str = "https://platform.higgsfield.ai"
-    # Opt-in "web backend" hub (Wan 2.6, Seedance 2.0, Kling 3.0, Veo, Sora).
-    # Reverse-engineered, undocumented, "changes without notice" — models that
-    # target this host are flagged experimental in the catalog.
-    higgsfield_web_url: str = "https://cloud.higgsfield.ai"
     # Plus plan ≈ $34/mo for 1000 credits ⇒ ~$0.034/credit. Used to turn a
     # model's per-clip credit cost into an approximate $ figure for the UI.
     # APPROXIMATE — override to match your actual plan/credit value.

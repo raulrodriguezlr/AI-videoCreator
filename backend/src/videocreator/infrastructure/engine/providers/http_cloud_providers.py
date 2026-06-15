@@ -12,7 +12,6 @@ stay only for live model-catalog discovery in the REST layer.
 """
 
 import os
-import shutil
 import time
 from typing import Any, List, Optional
 
