@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   planRecreation, sceneTrendMatch, runRecreation, getRecreations, updateRecreation, getRecreation,
+  getSdkProviders,
   type FairUse, type SceneCandidate, type RecreationBeat,
-  type UpdateRecreationRequest
+  type UpdateRecreationRequest, type SdkProvider
 } from "../api/client";
 import { Badge, Button, Empty, ErrorState, Field, Loading, useToast, Tabs } from "../ui/primitives";
 import { IcAlertTriangle, IcRadar, IcSparkles, IcWand, IcEdit } from "../ui/icons";
@@ -373,22 +374,12 @@ function RecreationEditor({ id }: { id: string }) {
           </div>
         </div>
         
-        <div className="row" style={{ gap: 24, alignItems: "center" }}>
-          <div className="field" style={{ flex: 1 }}>
-            <label>Proveedor de Video</label>
-            <InlineEditableText
-              value={rec.provider || "veo"}
-              onSave={(v) => update.mutate({ provider: v })}
-            />
-          </div>
-          <div className="field" style={{ flex: 1 }}>
-            <label>Modelo (opcional)</label>
-            <InlineEditableText
-              value={rec.model || ""}
-              onSave={(v) => update.mutate({ video_model: v })}
-            />
-          </div>
-        </div>
+        <ProviderModelPicker
+          provider={rec.provider || ""}
+          model={rec.model || ""}
+          onProvider={(v) => update.mutate({ provider: v })}
+          onModel={(v) => update.mutate({ video_model: v })}
+        />
 
         <div className="stack" style={{ gap: 8, marginTop: 24 }}>
           <div className="btn-row">
@@ -402,6 +393,38 @@ function RecreationEditor({ id }: { id: string }) {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const _VIDEO_CAPS = ["text_to_video", "image_to_video", "video_to_video"];
+
+function ProviderModelPicker({ provider, model, onProvider, onModel }: {
+  provider: string; model: string; onProvider: (v: string) => void; onModel: (v: string) => void;
+}) {
+  const cat = useQuery<SdkProvider[]>({ queryKey: ["sdk-providers"], queryFn: getSdkProviders });
+  // Only providers that can generate/transform video are usable for a recreation.
+  const providers = (cat.data ?? []).filter((p) => p.capabilities.some((c) => _VIDEO_CAPS.includes(c)));
+  const selected = providers.find((p) => p.id === provider);
+  const models = (selected?.models ?? []).filter((m) => m.capabilities.some((c) => _VIDEO_CAPS.includes(c)));
+  return (
+    <div className="row" style={{ gap: 24, alignItems: "flex-start" }}>
+      <div className="field" style={{ flex: 1 }}>
+        <label>Proveedor de Video</label>
+        <select className="select" value={provider}
+          onChange={(e) => { onProvider(e.target.value); onModel(""); }}>
+          <option value="">— elige proveedor —</option>
+          {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </div>
+      <div className="field" style={{ flex: 1 }}>
+        <label>Modelo</label>
+        <select className="select mono" value={model} disabled={!selected}
+          onChange={(e) => onModel(e.target.value)}>
+          <option value="">auto</option>
+          {models.map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}
+        </select>
       </div>
     </div>
   );
