@@ -11,6 +11,10 @@ export function AppShell() {
   const llm = useQuery<LlmConfig>({
     queryKey: ["llm-config"], queryFn: () => api.get("/system/llm"), refetchInterval: 30_000,
   });
+  const hf = useQuery<HiggsfieldBalance>({
+    queryKey: ["hf-balance"], queryFn: () => api.get("/system/higgsfield/balance"),
+    refetchInterval: 60_000,
+  });
 
   return (
     <div className="shell">
@@ -38,6 +42,7 @@ export function AppShell() {
 
         <div className="sidebar-foot">
           <LlmChip llm={llm.data} />
+          <HiggsfieldChip data={hf.data} />
           <div className="muted" style={{ fontSize: 11.5, marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
             <span className={`badge ${health.data ? "ok" : "err"}`}>
               <span className="dot" />{health.data ? health.data.status : "offline"}
@@ -80,6 +85,24 @@ function LlmChip({ llm }: { llm?: LlmConfig }) {
         </div>
       </div>
       <span className="dot" style={{ width: 8, height: 8, borderRadius: "50%", background: healthy ? "var(--mint)" : "var(--amber)" }} />
+    </div>
+  );
+}
+
+type HiggsfieldBalance = {
+  available: boolean; credits: number | null; plan: string | null; detail: string;
+};
+
+function HiggsfieldChip({ data }: { data?: HiggsfieldBalance }) {
+  if (!data?.available) return null;  // hide until `hf auth login` is done
+  return (
+    <div className="statpill" style={{ marginTop: 8 }} title={data.detail}>
+      <IcCloud width={16} height={16} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="label">Higgsfield{data.plan ? ` · ${data.plan}` : ""}</div>
+        <div className="val">{data.credits != null ? `${data.credits.toFixed(2)} cr` : "—"}</div>
+      </div>
+      <span className="dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--mint)" }} />
     </div>
   );
 }
