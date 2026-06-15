@@ -47,7 +47,7 @@ class GeminiLLM:
     ) -> str:
         client = self._ensure_client()
         model_name = model or self._default_model
-        config: dict[str, Any] = {"temperature": temperature}
+        config: dict[str, Any] = {"temperature": temperature, "max_output_tokens": 8192}
         if response_schema is not None:
             config["response_mime_type"] = "application/json"
             config["response_schema"] = response_schema

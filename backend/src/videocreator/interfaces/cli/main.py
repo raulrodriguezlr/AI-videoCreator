@@ -85,6 +85,14 @@ def serve(
     """Start the FastAPI server (uvicorn)."""
     _bootstrap_local()
     settings = get_settings()
+    # Hot-reload must watch ONLY our source tree. Without this, watchfiles walks
+    # the whole CWD — including .venv (torch/sympy/…, tens of thousands of files)
+    # — making every reload crawl and spawn re-import storms on Windows.
+    src_dir = Path(__file__).resolve().parents[3]  # …/backend/src
+    reload_kwargs = (
+        {"reload_dirs": [str(src_dir)], "reload_excludes": ["*.venv*", "var/*"]}
+        if reload else {}
+    )
     uvicorn.run(
         "videocreator.interfaces.rest.app:create_app",
         host=host or settings.host,
@@ -92,6 +100,7 @@ def serve(
         reload=reload,
         factory=True,
         log_level=settings.log_level.lower(),
+        **reload_kwargs,
     )
 
 

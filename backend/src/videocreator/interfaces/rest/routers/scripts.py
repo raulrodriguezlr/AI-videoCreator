@@ -56,15 +56,16 @@ async def generate_script(
     )
     # 2. Director pass — storyboard that narrative into JSON scenes, preserving
     #    its dialogue. (Narrative lives only in memory — no DB schema change.)
-    draft_script = await uc.scripts.generate.execute(
+    #
+    # The automatic review pass was REMOVED: a 3rd LLM rewriting the whole script
+    # flattened the creative voice (lost the host's 4th-wall greeting) and just
+    # re-enforced rules the director already applies. `ReviewScript` stays as an
+    # on-demand tool via POST /scripts/{id}/review for scripts that need cleanup.
+    script = await uc.scripts.generate.execute(
         pod_id=PodId(pod_id), topic_id=TopicId(body.topic_id), requester_id=user_id,
         story_narrative=narrative,
     )
-    # 3. Review pass — enforce video rules and upgrade any weak dialogue.
-    reviewed_script = await uc.scripts.review.execute(
-        pod_id=PodId(pod_id), script_id=draft_script.id, requester_id=user_id,
-    )
-    return _to_response(reviewed_script)
+    return _to_response(script)
 
 
 @router.post(

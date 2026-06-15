@@ -130,8 +130,10 @@ happened. Show curiosity and personality.
 - NARRATIVE WEIGHT (mandatory): ~10% hook/intro, ~70% development + conflict \
 (the real substance — explore the topic deeply, the characters struggle, \
 discover, learn), ~20% climax + resolution.
-- GREETINGS/FAREWELLS: at most ONE intro/greeting beat and at most ONE farewell \
-beat. NEVER spend several scenes on 'hola' or 'adiós/hasta la próxima'.
+- GREETINGS/FAREWELLS: a warm, direct-to-audience greeting at the very start is \
+GOOD and on-brand (e.g. "¡Hola, soy Tico! Bienvenidos al bosque mágico") — keep \
+it. Just don't REPEAT it: at most ONE greeting beat and ONE farewell beat, never \
+several scenes of 'hola' or 'adiós/hasta la próxima'.
 - There MUST be a real obstacle, mystery, or question driving the middle — not a \
 flat list of facts or actions.
 - Age-appropriate but never dumbed-down: warm, witty, curious, specific.
