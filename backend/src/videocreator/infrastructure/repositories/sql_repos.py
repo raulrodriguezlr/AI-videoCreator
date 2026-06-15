@@ -426,6 +426,13 @@ class SqlShortRepository(SqlBase):
             await session.commit()
             return short
 
+    async def delete(self, short_id: ShortId) -> None:
+        async with self._session() as session:
+            row = await session.get(ShortRow, short_id)
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
+
 
 class SqlSeoRepository(SqlBase):
     async def get(self, seo_id: SeoId) -> SeoMetadata | None:

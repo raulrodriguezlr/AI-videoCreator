@@ -19,6 +19,7 @@ No paid APIs are used.
 """
 from __future__ import annotations
 
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -41,6 +42,17 @@ _DOWNSAMPLE_TARGET = 8
 # for embedding inside a `filter_complex` argument (commas are filtergraph
 # separators, so literal commas in math expressions need `\,`).
 _DEFAULT_CROP_W_EXPR = r"min(iw\,ih*9/16)"
+# Sentinel for the cached face-detector: distinguishes "not yet tried" from
+# "tried and got None" so the (possibly noisy) import+probe runs exactly once.
+_FACE_DETECTOR_NOT_TRIED = object()
+_cached_face_detector: object | None = _FACE_DETECTOR_NOT_TRIED
+# Google-hosted BlazeFace short-range model for the Tasks Vision FaceDetector.
+_FACE_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/"
+    "face_detector/blaze_face_short_range/float16/latest/"
+    "blaze_face_short_range.tflite"
+)
+_FACE_MODEL_FILENAME = "blaze_face_short_range.tflite"
 
 
 @dataclass(frozen=True)
@@ -138,23 +150,62 @@ def _read_frame_at(cap: object, cv2: object, t_s: float) -> object | None:
     return frame if ok else None
 
 
+def _ensure_face_model() -> Path | None:
+    """Return the local path to the BlazeFace `.tflite` model, downloading it
+    on first use into ``var/models/``.  Returns ``None`` on any failure so the
+    caller can degrade gracefully."""
+    from videocreator.shared.config import get_settings  # noqa: PLC0415
+
+    models_dir = get_settings().var_dir / "models"
+    model_path = models_dir / _FACE_MODEL_FILENAME
+    if model_path.exists():
+        return model_path
+    try:
+        models_dir.mkdir(parents=True, exist_ok=True)
+        log.info("smart_reframe.downloading_face_model", url=_FACE_MODEL_URL)
+        urllib.request.urlretrieve(_FACE_MODEL_URL, model_path)  # noqa: S310
+        log.info("smart_reframe.face_model_ready", path=str(model_path))
+        return model_path
+    except Exception:  # noqa: BLE001 — best-effort
+        log.warning("smart_reframe.face_model_download_failed", exc_info=True)
+        return None
+
+
 def _build_face_detector() -> object | None:
-    """Build a MediaPipe face detector, or `None` when MediaPipe is missing or
-    its legacy `solutions` API is unavailable (newer wheels drop it). Either
-    way the caller degrades to the OpenCV HOG person detector — never crashes."""
+    """Build a MediaPipe face detector using the Tasks Vision API, or ``None``
+    when MediaPipe is missing or the model cannot be obtained.
+
+    The result is cached at module level so the import + model download runs
+    exactly once per process — prevents log-spam when ``analyze_timeline``
+    iterates over many segments."""
+    global _cached_face_detector  # noqa: PLW0603
+    if _cached_face_detector is not _FACE_DETECTOR_NOT_TRIED:
+        return _cached_face_detector  # type: ignore[return-value]
     try:
         import mediapipe as mp  # noqa: PLC0415 — lazy: optional/heavy dep
     except ImportError:
         log.info("smart_reframe.mediapipe_not_installed")
+        _cached_face_detector = None
         return None
+
+    model_path = _ensure_face_model()
+    if model_path is None:
+        _cached_face_detector = None
+        return None
+
     try:
-        return mp.solutions.face_detection.FaceDetection(
-            model_selection=1, min_detection_confidence=0.5
+        base_options = mp.tasks.BaseOptions(model_asset_path=str(model_path))
+        options = mp.tasks.vision.FaceDetectorOptions(
+            base_options=base_options,
+            min_detection_confidence=0.5,
         )
-    except AttributeError:
-        log.info("smart_reframe.mediapipe_solutions_unavailable",
+        _cached_face_detector = mp.tasks.vision.FaceDetector.create_from_options(options)
+        log.info("smart_reframe.face_detector_ready",
                  version=getattr(mp, "__version__", "?"))
-        return None
+    except Exception:  # noqa: BLE001 — best-effort
+        log.warning("smart_reframe.face_detector_init_failed", exc_info=True)
+        _cached_face_detector = None
+    return _cached_face_detector  # type: ignore[return-value]
 
 
 def _build_person_detector(cv2: object) -> object:
@@ -186,15 +237,21 @@ def _detect_center(
 
 
 def _face_center(frame: object, cv2: object, detector: object, width: int) -> float | None:
+    import mediapipe as mp  # noqa: PLC0415 — guaranteed importable here
+
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # type: ignore[attr-defined]
-    result = detector.process(rgb)  # type: ignore[attr-defined]
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+    result = detector.detect(mp_image)  # type: ignore[attr-defined]
     detections = getattr(result, "detections", None)
     if not detections:
         return None
+    height = frame.shape[0]  # type: ignore[attr-defined]
     centers = []
     for det in detections:
-        bbox = det.location_data.relative_bounding_box
-        centers.append(bbox.xmin + bbox.width / 2.0)
+        bbox = det.bounding_box
+        # bbox fields are in pixels: origin_x, origin_y, width, height
+        center_px = bbox.origin_x + bbox.width / 2.0
+        centers.append(center_px / width)
     return sum(centers) / len(centers)
 
 

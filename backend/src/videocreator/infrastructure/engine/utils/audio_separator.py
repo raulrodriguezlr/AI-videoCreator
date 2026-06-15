@@ -40,8 +40,14 @@ class AudioSeparator:
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 timeout=10
             )
-            return result.returncode == 0
-        except Exception:
+            is_ok = result.returncode == 0
+            if not is_ok:
+                log.warning("demucs_not_installed", hint="Ejecuta 'pip install demucs' para habilitar el filtrado de ruido")
+                print("\n[WARNING] ⚠️ DEMUCS NO INSTALADO ⚠️\nEl sistema de doblaje no aislará la voz del ruido de fondo.\nPara solucionar los ruidos al principio/final de los clips, instala Demucs ejecutando:\n>>> pip install demucs\n")
+            return is_ok
+        except Exception as e:
+            log.warning("demucs_check_failed", error=str(e))
+            print(f"\n[WARNING] ⚠️ ERROR DE DEMUCS ⚠️\nFalló la comprobación: {e}\nEl filtrado de ruido estará desactivado. Instálalo con: pip install demucs\n")
             return False
 
     @staticmethod

@@ -91,7 +91,17 @@ class CharacterResponse(BaseModel):
     look_description: str | None
     voice: VoiceSettings | None
     reference_image_keys: list[str]
+    higgsfield_ref_id: str | None = None
+    higgsfield_ref_kind: str | None = None
     created_at: datetime
+
+
+class CharacterAnchorResponse(BaseModel):
+    """Result of a Higgsfield anchor sync — fail-soft, so `synced` may be False."""
+
+    character: CharacterResponse
+    synced: bool
+    detail: str
 
 
 class UpdateCharacterRequest(BaseModel):
@@ -109,6 +119,10 @@ class GenerateReferenceImageRequest(BaseModel):
 
     prompt: str = Field(..., min_length=3, max_length=1000,
                         examples=["Tico the squirrel, Pixar style, full body, neutral pose"])
+    #: Image engine: None/"gemini" → Imagen; "higgsfield" → SDK image models.
+    engine: str | None = Field(default=None, examples=["gemini", "higgsfield"])
+    #: Optional explicit model id for the chosen engine (e.g. "soul", "seedream-v4").
+    model: str | None = Field(default=None, examples=["soul", "seedream-v4"])
 
 
 class VoiceSearchRequest(BaseModel):
@@ -893,6 +907,7 @@ class HealthResponse(BaseModel):
 
 __all__ = [
     "CharacterBlueprintPayload",
+    "CharacterAnchorResponse",
     "CharacterResponse",
     "CreateCharacterRequest",
     "CreateEpisodeRequest",

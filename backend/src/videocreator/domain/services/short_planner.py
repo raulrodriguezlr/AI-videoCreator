@@ -95,10 +95,14 @@ class ShortPlanner:
             if idx < 0 or idx >= len(scene_durations) or idx in seen:
                 continue
             seen.add(idx)
-            remaining = budget - used
-            if remaining <= 0.01:
+            
+            remaining_hard = rule.max_duration_s - used
+            if remaining_hard <= 0.01:
                 break
-            span = min(max(0.0, scene_durations[idx]), remaining)
+            
+            full_span = max(0.0, scene_durations[idx])
+            span = min(full_span, remaining_hard)
+            
             if span <= 0.01:
                 continue
             caption = None
@@ -114,6 +118,9 @@ class ShortPlanner:
                 )
             )
             used += span
+            
+            if used >= budget:
+                break
 
         return EditingTimeline(
             segments=tuple(segments),

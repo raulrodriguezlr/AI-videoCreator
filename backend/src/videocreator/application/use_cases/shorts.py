@@ -15,6 +15,7 @@ from videocreator.domain.ports import (
     JobQueuePort,
     PodRepository,
     ShortRepository,
+    StoragePort,
 )
 from videocreator.domain.value_objects import JobKind
 from videocreator.shared.errors import (
@@ -131,8 +132,32 @@ class GetShort:
         return short
 
 
+@dataclass(frozen=True, slots=True)
+class DeleteShort:
+    pod_repo: PodRepository
+    short_repo: ShortRepository
+    storage: StoragePort
+
+    async def execute(self, *, short_id: ShortId, requester_id: UserId) -> None:
+        short = await self.short_repo.get(short_id)
+        if short is None:
+            return  # Idempotent
+
+        pod = await self.pod_repo.get(short.pod_id)
+        if pod is None or not pod.is_owned_by(requester_id):
+            raise ForbiddenError("short is owned by a different user")
+
+        # The storage key format is "shorts/<short_id>/short.mp4",
+        # so deleting the prefix "short_id" clears the directory completely.
+        bucket = "shorts"
+        await self.storage.delete_prefix(bucket, short_id)
+
+        await self.short_repo.delete(short_id)
+
+
 __all__ = [
     "CreateShortFromEpisode",
+    "DeleteShort",
     "EnqueueShortRender",
     "GetShort",
     "ListShorts",

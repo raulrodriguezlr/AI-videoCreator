@@ -300,6 +300,15 @@ function ShortsTab({ podId, q, episodes }: {
     onError: (e) => toast.err("No se pudo renderizar", (e as Error).message),
   });
 
+  const del = useMutation({
+    mutationFn: (shortId: string) => api.delete(`/pods/${podId}/shorts/${shortId}`),
+    onSuccess: () => {
+      toast.ok("Short eliminado");
+      qc.invalidateQueries({ queryKey: ["shorts", podId] });
+    },
+    onError: (e) => toast.err("No se pudo eliminar el short", (e as Error).message),
+  });
+
   return (
     <div className="stack">
       <div className="btn-row">
@@ -317,7 +326,13 @@ function ShortsTab({ podId, q, episodes }: {
           <div key={s.id} className="card card-pad stack">
             <div className="between">
               <Badge tone="accent">{s.target_platform}</Badge>
-              <span className="dim mono" style={{ fontSize: 11 }}>{s.aspect} · {s.duration_s}s</span>
+              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                <span className="dim mono" style={{ fontSize: 11 }}>{s.aspect} · {s.duration_s}s</span>
+                <Button variant="ghost" size="sm" loading={del.isPending && del.variables === s.id}
+                  onClick={() => confirmThen("¿Borrar este short y su video asociado?", () => del.mutate(s.id))}>
+                  <IcTrash />
+                </Button>
+              </div>
             </div>
             {s.rendered_video_key ? (
               <div className="stage" style={{ aspectRatio: "9/16", maxHeight: 320, margin: "0 auto" }}>
@@ -491,8 +506,12 @@ function EditCharacterModal({ podId, character, onClose, onSaved }: {
 
       <div className="divider" />
       <Field label="Voz (ElevenLabs)" hint={voiceId ? `Asignada: ${voiceId}` : "Sin voz asignada"}>
+        <div className="btn-row" style={{ marginBottom: 8 }}>
+          <input className="input" placeholder="ID manual (ej. MrYL6RcsgiFzIIWDirbQ)"
+            value={voiceId} onChange={(e) => setVoiceId(e.target.value)} />
+        </div>
         <div className="btn-row">
-          <input className="input" placeholder="describe la voz: niña dulce, narrador épico…"
+          <input className="input" placeholder="O busca por descripción: niña dulce, épico…"
             value={query} onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && query.trim().length > 1) search.mutate(); }} />
           <Button variant="default" loading={search.isPending} disabled={query.trim().length < 2}
@@ -526,6 +545,9 @@ function CharacterAssetsModal({ podId, character, onClose }: {
   const toast = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
   const [prompt, setPrompt] = useState("");
+  // Image engine: Gemini/Imagen (default) or Higgsfield's image models.
+  const [engine, setEngine] = useState<"gemini" | "higgsfield">("gemini");
+  const [hfModel, setHfModel] = useState("soul");
   const base = `/pods/${podId}/characters/${character.id}/references`;
   const refresh = () => qc.invalidateQueries({ queryKey: ["chars", podId] });
 
@@ -535,7 +557,11 @@ function CharacterAssetsModal({ podId, character, onClose }: {
     onError: (e) => toast.err("No se pudo subir", (e as Error).message),
   });
   const genM = useMutation({
-    mutationFn: () => api.post<Character>(`${base}/generate`, { prompt }),
+    mutationFn: () => api.post<Character>(`${base}/generate`, {
+      prompt,
+      engine,
+      model: engine === "higgsfield" ? hfModel : undefined,
+    }),
     onSuccess: () => { toast.ok("Imagen generada"); setPrompt(""); refresh(); },
     onError: (e) => toast.err("No se pudo generar", (e as Error).message),
   });
@@ -543,6 +569,16 @@ function CharacterAssetsModal({ podId, character, onClose }: {
     mutationFn: (ref: string) => api.delete<Character>(`${base}?ref=${encodeURIComponent(ref)}`),
     onSuccess: () => refresh(),
     onError: (e) => toast.err("No se pudo borrar", (e as Error).message),
+  });
+  const anchorM = useMutation({
+    mutationFn: () => api.post<{ character: Character; synced: boolean; detail: string }>(
+      `/pods/${podId}/characters/${character.id}/anchor`, {}),
+    onSuccess: (r) => {
+      if (r.synced) toast.ok("Personaje anclado en Higgsfield");
+      else toast.err("Anclaje pendiente", r.detail);
+      refresh();
+    },
+    onError: (e) => toast.err("No se pudo anclar", (e as Error).message),
   });
 
   const refs = character.reference_image_keys;
@@ -593,17 +629,56 @@ function CharacterAssetsModal({ podId, character, onClose }: {
 
         <div className="divider" />
 
-        <Field label="Generar con IA (Imagen)" hint="Describe el aspecto; se añade como referencia">
+        <Field label="Generar con IA" hint="Describe el aspecto; se añade como referencia">
           <textarea className="input" rows={2} value={prompt}
             placeholder={lookPrompt}
             onChange={(e) => setPrompt(e.target.value)} />
         </Field>
+        <div className="row" style={{ gap: 8 }}>
+          <Field label="Motor">
+            <select className="select" value={engine}
+              onChange={(e) => setEngine(e.target.value as "gemini" | "higgsfield")}>
+              <option value="gemini">Gemini · Imagen</option>
+              <option value="higgsfield">Higgsfield</option>
+            </select>
+          </Field>
+          {engine === "higgsfield" && (
+            <Field label="Modelo">
+              <select className="select" value={hfModel}
+                onChange={(e) => setHfModel(e.target.value)}>
+                <option value="soul">Soul · fotorrealista (~2 cr)</option>
+                <option value="seedream-v4">Seedream v4 · ilustración (~2 cr)</option>
+                <option value="nano-banana-2">Nano-Banana 2 · ilimitado (exp.)</option>
+              </select>
+            </Field>
+          )}
+        </div>
         <div className="btn-row">
           <Button variant="ghost" onClick={() => setPrompt(lookPrompt)}><IcWand /> Usar descripción</Button>
           <Button variant="primary" loading={genM.isPending}
             disabled={prompt.trim().length < 3}
             onClick={() => genM.mutate()}>
             <IcSparkles /> Generar
+          </Button>
+        </div>
+
+        <div className="divider" />
+
+        <div className="between">
+          <span className="eyebrow">Anclaje Higgsfield</span>
+          {character.higgsfield_ref_id
+            ? <Badge>{character.higgsfield_ref_kind ?? "element"}</Badge>
+            : <span className="dim" style={{ fontSize: 11.5 }}>sin anclar</span>}
+        </div>
+        <p className="dim" style={{ fontSize: 12 }}>
+          Reutiliza el mismo personaje en Higgsfield (un «element») a partir de sus
+          imágenes de referencia.
+        </p>
+        <div className="btn-row">
+          <Button variant="default" loading={anchorM.isPending}
+            disabled={refs.length === 0}
+            onClick={() => anchorM.mutate()}>
+            <IcSparkles /> {character.higgsfield_ref_id ? "Re-sincronizar" : "Anclar en Higgsfield"}
           </Button>
         </div>
       </div>
@@ -656,9 +731,11 @@ function SettingsTab({ pod }: { pod: Pod }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [cfg, setCfg] = useState(pod.config);
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [jsonText, setJsonText] = useState(JSON.stringify(pod.config, null, 2));
   const providers = useQuery<string[]>({ queryKey: ["providers"], queryFn: () => api.get("/providers") });
   const save = useMutation({
-    mutationFn: () => api.put<Pod>(`/pods/${pod.id}/config`, { config: cfg }),
+    mutationFn: (newCfg?: any) => api.put<Pod>(`/pods/${pod.id}/config`, { config: newCfg || cfg }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["pod", pod.id] });
       qc.invalidateQueries({ queryKey: ["pods"] });
@@ -668,43 +745,91 @@ function SettingsTab({ pod }: { pod: Pod }) {
   });
   const set = <K extends keyof typeof cfg>(k: K, v: (typeof cfg)[K]) => setCfg({ ...cfg, [k]: v });
 
+  const toggleMode = () => {
+    if (!advancedMode) {
+      setJsonText(JSON.stringify(cfg, null, 2));
+    } else {
+      try {
+        const parsed = JSON.parse(jsonText);
+        setCfg(parsed);
+      } catch (e) {
+        // If JSON is invalid, don't update cfg
+      }
+    }
+    setAdvancedMode(!advancedMode);
+  };
+
+  const handleSaveJson = () => {
+    try {
+      const parsed = JSON.parse(jsonText);
+      setCfg(parsed);
+      save.mutate(parsed);
+    } catch (e) {
+      toast.err("JSON inválido", "No se puede guardar un formato incorrecto");
+    }
+  };
+
   return (
     <div className="card card-pad" style={{ maxWidth: 720 }}>
-      <div className="row">
-        <Field label="Nombre de la serie"><input className="input" value={cfg.series_name} onChange={(e) => set("series_name", e.target.value)} /></Field>
-        <Field label="Idioma"><input className="input" value={cfg.language} onChange={(e) => set("language", e.target.value)} /></Field>
+      <div className="between" style={{ marginBottom: 16 }}>
+        <span className="eyebrow">Configuración del pod</span>
+        <button className="text-btn" onClick={toggleMode}>
+          {advancedMode ? "Volver a vista normal" : "Modo Avanzado (JSON)"}
+        </button>
       </div>
-      <div className="row">
-        <Field label="Audiencia"><input className="input" value={cfg.target_audience} onChange={(e) => set("target_audience", e.target.value)} /></Field>
-        <Field label="Duración (s)"><input className="input" type="number" value={cfg.duration_seconds} onChange={(e) => set("duration_seconds", Number(e.target.value))} /></Field>
-      </div>
-      <div className="row">
-        <Field label="Duración máx. por clip (s)" hint="Tope por escena (Veo=8). Otros motores pueden más">
-          <input className="input" type="number" value={cfg.max_clip_seconds} onChange={(e) => set("max_clip_seconds", Number(e.target.value))} />
-        </Field>
-        <Field label="Preguntas al público" hint="0 = ninguna. Para contenido infantil/educativo">
-          <input className="input" type="number" min={0} value={cfg.interactive_questions} onChange={(e) => set("interactive_questions", Number(e.target.value))} />
-        </Field>
-      </div>
-      <div className="row">
-        <Field label="Estilo visual">
-          <select className="select" value={cfg.style_profile} onChange={(e) => set("style_profile", e.target.value)}>
-            {STYLES.map((s) => <option key={s} value={s}>{prettyStyle(s)}</option>)}
-          </select>
-        </Field>
-        <Field label="Proveedor de vídeo por defecto" hint="Se puede sobreescribir por episodio">
-          <select className="select" value={cfg.provider_preferences?.primary ?? ""}
-            onChange={(e) => set("provider_preferences", { ...cfg.provider_preferences, primary: e.target.value })}>
-            <option value="">(automático según estilo)</option>
-            {(providers.data ?? []).map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </Field>
-      </div>
-      <Field label="Estilo de arte (texto libre)"><input className="input" value={cfg.art_style ?? ""} onChange={(e) => set("art_style", e.target.value || null)} /></Field>
-      <Field label="Contexto de la serie"><textarea className="textarea" value={cfg.series_context ?? ""} onChange={(e) => set("series_context", e.target.value || null)} /></Field>
-      <div className="btn-row" style={{ justifyContent: "flex-end" }}>
-        <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>Guardar cambios</Button>
-      </div>
+
+      {advancedMode ? (
+        <div className="stack">
+          <textarea
+            className="input mono json-editor"
+            style={{ minHeight: 400 }}
+            spellCheck={false}
+            value={jsonText}
+            onChange={(e) => setJsonText(e.target.value)}
+          />
+          <div className="btn-row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+            <Button variant="primary" loading={save.isPending} onClick={handleSaveJson}>Guardar JSON</Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="row">
+            <Field label="Nombre de la serie"><input className="input" value={cfg.series_name} onChange={(e) => set("series_name", e.target.value)} /></Field>
+            <Field label="Idioma"><input className="input" value={cfg.language} onChange={(e) => set("language", e.target.value)} /></Field>
+          </div>
+          <div className="row">
+            <Field label="Audiencia"><input className="input" value={cfg.target_audience} onChange={(e) => set("target_audience", e.target.value)} /></Field>
+            <Field label="Duración (s)"><input className="input" type="number" value={cfg.duration_seconds} onChange={(e) => set("duration_seconds", Number(e.target.value))} /></Field>
+          </div>
+          <div className="row">
+            <Field label="Duración máx. por clip (s)" hint="Tope por escena (Veo=8). Otros motores pueden más">
+              <input className="input" type="number" value={cfg.max_clip_seconds} onChange={(e) => set("max_clip_seconds", Number(e.target.value))} />
+            </Field>
+            <Field label="Preguntas al público" hint="0 = ninguna. Para contenido infantil/educativo">
+              <input className="input" type="number" min={0} value={cfg.interactive_questions} onChange={(e) => set("interactive_questions", Number(e.target.value))} />
+            </Field>
+          </div>
+          <div className="row">
+            <Field label="Estilo visual">
+              <select className="select" value={cfg.style_profile} onChange={(e) => set("style_profile", e.target.value)}>
+                {STYLES.map((s) => <option key={s} value={s}>{prettyStyle(s)}</option>)}
+              </select>
+            </Field>
+            <Field label="Proveedor de vídeo por defecto" hint="Se puede sobreescribir por episodio">
+              <select className="select" value={cfg.provider_preferences?.primary ?? ""}
+                onChange={(e) => set("provider_preferences", { ...cfg.provider_preferences, primary: e.target.value })}>
+                <option value="">(automático según estilo)</option>
+                {(providers.data ?? []).map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </Field>
+          </div>
+          <Field label="Estilo de arte (texto libre)"><input className="input" value={cfg.art_style ?? ""} onChange={(e) => set("art_style", e.target.value || null)} /></Field>
+          <Field label="Contexto de la serie"><textarea className="textarea" value={cfg.series_context ?? ""} onChange={(e) => set("series_context", e.target.value || null)} /></Field>
+          <div className="btn-row" style={{ justifyContent: "flex-end" }}>
+            <Button variant="primary" loading={save.isPending} onClick={() => save.mutate(cfg)}>Guardar cambios</Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

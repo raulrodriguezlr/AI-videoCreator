@@ -53,6 +53,10 @@ class Character(BaseModel):
     reference_image_keys: list[str] = Field(default_factory=list)
     wardrobe: list[str] = Field(default_factory=list)
     props: list[str] = Field(default_factory=list)
+    #: Higgsfield anchor mapping — the reusable identity this character is bound
+    #: to on Higgsfield (an "element" or trained "soul"). None until synced.
+    higgsfield_ref_id: str | None = None
+    higgsfield_ref_kind: str | None = None  # "element" | "soul"
     created_at: datetime = Field(default_factory=utcnow)
 
 

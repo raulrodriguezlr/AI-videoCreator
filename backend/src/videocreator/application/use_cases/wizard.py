@@ -288,11 +288,19 @@ class DraftPodBlueprint:
             raise ProviderError(f"LLM returned invalid JSON: {exc}") from exc
 
         bible = _parse_bible(data.get("bible"), language=language)
-        # Characters are only meaningful for modes that feature them.
-        characters = (
-            _parse_characters(data.get("characters"), limit=character_count)
-            if wants_characters else ()
-        )
+        # Parse characters regardless of wants_characters, because the prompt allows
+        # the LLM to return a character if it's "clearly needed" (like a narrator).
+        characters = _parse_characters(data.get("characters"), limit=character_count)
+
+        # If the LLM returned characters but the default mode was NONE, upgrade the mode
+        # so the characters aren't thrown away and the UI allows editing them.
+        if characters and char_mode == CharacterMode.NONE:
+            char_mode = CharacterMode.OPTIONAL
+
+        # If the mode is STILL none (no characters generated), enforce empty tuple.
+        if char_mode == CharacterMode.NONE:
+            characters = ()
+
         return PodBlueprint(
             series_name=str(data.get("series_name") or idea.strip()).strip(),
             bible=bible,

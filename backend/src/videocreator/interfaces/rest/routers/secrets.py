@@ -26,6 +26,8 @@ _SETTINGS_ATTR = {
     "elevenlabs": "elevenlabs_api_key",
     "elevenlabs_studio": "elevenlabs_api_key",
     "artlist": "artlist_api_token",
+    # Higgsfield key is a single "KEY_ID:KEY_SECRET" string.
+    "higgsfield": "higgsfield_credentials",
 }
 
 #: container singletons rebuilt lazily so they pick up the new key.

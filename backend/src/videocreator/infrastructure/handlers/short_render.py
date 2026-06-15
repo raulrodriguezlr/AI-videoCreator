@@ -53,18 +53,18 @@ class _PolishOptions:
 
     captions: bool = True
     ken_burns: bool = True
-    transition: str | None = "fade"
-    transition_duration_s: float = 0.3
+    transition: str | None = None
+    transition_duration_s: float = 0.0
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> _PolishOptions:
-        raw_transition = payload.get("transition", "fade")
+        raw_transition = payload.get("transition", None)
         transition = str(raw_transition) if raw_transition else None
         return cls(
             captions=bool(payload.get("captions", False)),
             ken_burns=bool(payload.get("ken_burns", True)),
             transition=transition,
-            transition_duration_s=float(payload.get("transition_duration_s", 0.3)),
+            transition_duration_s=float(payload.get("transition_duration_s", 0.0)),
         )
 
 

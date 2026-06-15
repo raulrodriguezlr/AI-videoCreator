@@ -8,10 +8,11 @@ Llama-3.1-8B; pick via `OLLAMA_MODEL`.
 Transport only: prompt construction stays in the application layer, exactly
 like `GeminiLLM`, so swapping providers never touches the prompts.
 
-Structured output: Ollama's `format="json"` guarantees syntactically valid
-JSON across every server version. When a `response_schema` is supplied we also
-append a compact rendering of it to the prompt so the model targets the right
-shape — the application layer then validates/coerces the parsed result.
+Structured output: when a `response_schema` is supplied we pass it to Ollama's
+`format` field (>=0.5 structured outputs), so generation is grammar-constrained
+to the schema — required keys are actually emitted, not just *valid* JSON. We
+also append a compact rendering of the schema to the prompt so the model has the
+field semantics; the application layer then validates/coerces the parsed result.
 """
 from __future__ import annotations
 
@@ -62,11 +63,23 @@ class OllamaLLM:
             "model": model or self._default_model,
             "prompt": self._build_prompt(prompt, response_schema),
             "stream": False,
-            "options": {"temperature": temperature},
+            "options": {
+                "temperature": temperature,
+                "num_ctx": 8192,
+                "num_predict": -1,
+            },
         }
         if response_schema is not None:
-            body["format"] = "json"
-        return self._parse(await self._post(body, allow_autostart=True))
+            # Ollama >=0.5 structured outputs: passing the JSON Schema object
+            # (not the bare string "json") constrains generation with a grammar,
+            # so required keys are actually emitted. The bare "json" mode only
+            # guarantees *syntactically* valid JSON — local models like
+            # qwen2.5 would happily return `"audio_text": ""`, dropping dialogue.
+            body["format"] = response_schema
+        log.info("ollama.request", model=body["model"], prompt_length=len(body["prompt"]))
+        response_text = self._parse(await self._post(body, allow_autostart=True))
+        log.info("ollama.response", response_length=len(response_text), preview=response_text[:200].replace("\n", " "))
+        return response_text
 
     async def _post(self, body: dict[str, Any], *, allow_autostart: bool) -> httpx.Response:
         try:

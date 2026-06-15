@@ -7,13 +7,17 @@ import { useMutation } from "@tanstack/react-query";
 import { startRun, type DagSpecDto } from "../api/client";
 import { Button, Field, useToast } from "../ui/primitives";
 import { ProviderSelect } from "../components/ProviderSelect";
+import { ModelAdvisor } from "../components/ModelAdvisor";
 import { IcLaugh, IcSparkles } from "../ui/icons";
 
 const DURATIONS = [8, 12, 15] as const;
 
-function buildMemeSpec(concept: string, durationS: number, provider: string | null): DagSpecDto {
+function buildMemeSpec(
+  concept: string, durationS: number, provider: string | null, model: string | null,
+): DagSpecDto {
   const clipsParams: Record<string, unknown> = { duration_s: durationS };
   if (provider) clipsParams.provider = provider;
+  if (model) clipsParams.model = model;
   return {
     nodes: [
       { id: "structure", capability: "native_short", params: { concept, content_type: "meme" }, depends_on: [], max_retries: 2 },
@@ -30,9 +34,17 @@ export function MemesPage() {
   const [concept, setConcept] = useState("");
   const [durationS, setDurationS] = useState<typeof DURATIONS[number]>(12);
   const [provider, setProvider] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
+  const [contentType, setContentType] = useState("quick_draft");
+
+  const handleProvider = (id: string | null) => { setProvider(id); setModel(null); };
+  const handleModel = (id: string | null, providerId?: string | null) => {
+    setModel(id);
+    if (providerId) setProvider(providerId);
+  };
 
   const generate = useMutation({
-    mutationFn: () => startRun(buildMemeSpec(concept.trim(), durationS, provider)),
+    mutationFn: () => startRun(buildMemeSpec(concept.trim(), durationS, provider, model)),
     onSuccess: (res) => nav(`/runs/${res.run_id}`),
     onError: (e) => toast.err("No se pudo generar el meme", (e as Error).message),
   });
@@ -68,7 +80,16 @@ export function MemesPage() {
           </select>
         </Field>
 
-        <ProviderSelect value={provider} onChange={setProvider} capability="text_to_video" label="Proveedor de video" />
+        <ProviderSelect value={provider} onChange={handleProvider} capability="text_to_video" label="Proveedor de video" />
+        <ModelAdvisor
+          provider={provider}
+          contentType={contentType}
+          onContentType={setContentType}
+          model={model}
+          onModel={handleModel}
+          durationS={durationS}
+          capability="text_to_video"
+        />
 
         <div className="btn-row">
           <Button variant="primary" loading={generate.isPending} disabled={!canGenerate} onClick={() => generate.mutate()}>

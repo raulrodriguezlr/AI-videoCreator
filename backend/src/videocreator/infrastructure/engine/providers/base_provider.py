@@ -603,27 +603,44 @@ class BaseVideoProvider(ABC):
                     normalized_paths.append(p) # fallback
             
             # Create concat file list for ffmpeg
-            concat_list_path = os.path.join(self.assets_dir, "_concat_list.txt")
-            with open(concat_list_path, "w") as f:
-                for p in normalized_paths:
-                    abs_path = os.path.abspath(p)
-                    safe_path = abs_path.replace("\\", "/")
-                    f.write(f"file '{safe_path}'\n")
+            def run_concat(paths, out_path):
+                concat_list_path = os.path.join(self.assets_dir, f"_concat_list_{int(time.time()*1000)}.txt")
+                with open(concat_list_path, "w") as f:
+                    for p in paths:
+                        safe_path = os.path.abspath(p).replace("\\", "/")
+                        f.write(f"file '{safe_path}'\n")
+                res = subprocess.run(
+                    ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_list_path, "-c", "copy", out_path],
+                    capture_output=True, text=True
+                )
+                if os.path.exists(concat_list_path):
+                    try: os.remove(concat_list_path)
+                    except: pass
+                return res
 
             # Run ffmpeg concat
             log.info("concat.joining_clips")
-            result = subprocess.run(
-                [
-                    "ffmpeg", "-y",
-                    "-f", "concat",
-                    "-safe", "0",
-                    "-i", concat_list_path,
-                    "-c", "copy",
-                    output_path,
-                ],
-                capture_output=True,
-                text=True,
-            )
+            result = run_concat(normalized_paths, output_path)
+
+            if result.returncode != 0:
+                log.warning("concat.ffmpeg_error", stderr=result.stderr[-500:])
+                log.info("concat.fallback_mode", msg="Attempting to identify and skip bad clips")
+                
+                valid_paths = [normalized_paths[0]] if normalized_paths else []
+                for p in normalized_paths[1:]:
+                    test_out = output_path + ".test.mp4"
+                    test_res = run_concat(valid_paths + [p], test_out)
+                    if test_res.returncode == 0:
+                        valid_paths.append(p)
+                    else:
+                        log.warning("concat.skipping_bad_clip", clip=p)
+                    if os.path.exists(test_out):
+                        try: os.remove(test_out)
+                        except: pass
+                        
+                if len(valid_paths) > 0 and len(valid_paths) < len(normalized_paths):
+                    log.info("concat.retrying_without_bad_clips")
+                    result = run_concat(valid_paths, output_path)
 
             # Cleanup temp normalization files
             for p in normalized_paths:
@@ -632,18 +649,16 @@ class BaseVideoProvider(ABC):
                         os.remove(p)
                     except:
                         pass
-            if os.path.exists(concat_list_path):
-                os.remove(concat_list_path)
 
             if result.returncode != 0:
-                log.warning("concat.ffmpeg_error", stderr=result.stderr[-500:])
-                return clips[0].file_path
+                log.warning("concat.fallback_failed")
+                return clips[0].dubbed_path if (use_dubbed and getattr(clips[0], 'dubbed_path', None)) else clips[0].file_path
 
             return output_path
 
         except FileNotFoundError:
             log.warning("concat.ffmpeg_not_found")
-            return clips[0].file_path
+            return clips[0].dubbed_path if (use_dubbed and getattr(clips[0], 'dubbed_path', None)) else clips[0].file_path
 
     def _save_last_frame(self, video_path: str, clips_dir: str, scene_index: int) -> None:
         """Persist the last frame as frames/last_frame_NN.png (resume/i2v seed)."""

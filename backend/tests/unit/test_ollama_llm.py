@@ -53,7 +53,9 @@ async def test_structured_output_forces_json_and_appends_schema() -> None:
 
     assert out == '{"ok": true}'
     sent = json.loads(route.calls.last.request.content)
-    assert sent["format"] == "json"
+    # Structured outputs: the schema object itself is sent as `format`, which
+    # grammar-constrains generation (required keys enforced), not the bare "json".
+    assert sent["format"] == schema
     assert "JSON Schema" in sent["prompt"]
     assert '"boolean"' in sent["prompt"]  # schema was rendered into the prompt
 

@@ -14,7 +14,9 @@ from videocreator.application.use_cases.characters import (
     AddCharacterReferences,
     GenerateCharacterReference,
     RemoveCharacterReference,
+    SyncCharacterAnchor,
 )
+from videocreator.infrastructure.providers.higgsfield_anchor import AnchorResult
 from videocreator.domain.entities import LOCAL_USER_ID, Character, Pod, PodConfig
 from videocreator.shared.errors import ForbiddenError, ValidationError
 from videocreator.shared.ids import (
@@ -114,6 +116,43 @@ async def test_generate_calls_image_port_and_attaches() -> None:
     assert len(storage.objects) == 1
 
 
+async def test_generate_uses_resolved_engine_when_requested() -> None:
+    # engine="higgsfield" → the use case calls image_for(engine, model) and uses
+    # that provider instead of the default Gemini one.
+    pods, chars, char = _fixture()
+    default = _FakeImages([b"gemini"])
+    hf = _FakeImages([b"higgsfield"])
+    seen: list[tuple[str | None, str | None]] = []
+
+    def _resolve(engine: str | None, model: str | None) -> _FakeImages:
+        seen.append((engine, model))
+        return hf
+
+    uc = GenerateCharacterReference(
+        pods, chars, _FakeStorage(), default, image_for=_resolve,  # type: ignore[arg-type]
+    )
+    await uc.execute(
+        character_id=char.id, requester_id=LOCAL_USER_ID, prompt="Tico",
+        engine="higgsfield", model="seedream-v4",
+    )
+
+    assert seen == [("higgsfield", "seedream-v4")]
+    assert hf.calls == ["Tico"]      # the resolved engine generated
+    assert default.calls == []       # the default was bypassed
+
+
+async def test_generate_uses_default_engine_when_none() -> None:
+    # No engine → the default `images` port is used even if a resolver exists.
+    pods, chars, char = _fixture()
+    default = _FakeImages([b"gemini"])
+    uc = GenerateCharacterReference(
+        pods, chars, _FakeStorage(), default,  # type: ignore[arg-type]
+        image_for=lambda *_: _FakeImages([b"other"]),
+    )
+    await uc.execute(character_id=char.id, requester_id=LOCAL_USER_ID, prompt="Tico")
+    assert default.calls == ["Tico"]
+
+
 async def test_generate_rejects_blank_prompt() -> None:
     pods, chars, char = _fixture()
     uc = GenerateCharacterReference(pods, chars, _FakeStorage(), _FakeImages([b"x"]))  # type: ignore[arg-type]
@@ -135,6 +174,45 @@ async def test_remove_detaches_and_deletes_from_storage() -> None:
 
     assert result.reference_image_keys == []
     assert storage.objects == {}  # blob deleted too
+
+
+class _FakeAnchor:
+    def __init__(self, result: AnchorResult) -> None:
+        self.result = result
+        self.calls: list[tuple[str, list[str]]] = []
+
+    async def create_element(self, *, name: str, image_urls: list[str]) -> AnchorResult:
+        self.calls.append((name, image_urls))
+        return self.result
+
+
+async def test_anchor_persists_ref_id_when_synced() -> None:
+    pods, chars, char = _fixture()
+    char.reference_image_keys.append("references/a/b/x.png")
+    storage = _FakeStorage()
+    anchor = _FakeAnchor(AnchorResult("elem_123", "element", True, "anchored"))
+    uc = SyncCharacterAnchor(pods, chars, storage, anchor)  # type: ignore[arg-type]
+
+    result_char, res = await uc.execute(character_id=char.id, requester_id=LOCAL_USER_ID)
+
+    assert res.synced is True
+    assert result_char.higgsfield_ref_id == "elem_123"
+    assert result_char.higgsfield_ref_kind == "element"
+    assert chars.store[char.id].higgsfield_ref_id == "elem_123"  # persisted
+    assert anchor.calls[0][0] == "Tico"  # the character name was anchored
+
+
+async def test_anchor_failsoft_leaves_character_unbound() -> None:
+    # Not configured/verified → synced False, no ref persisted, no crash.
+    pods, chars, char = _fixture()
+    anchor = _FakeAnchor(AnchorResult(None, None, False, "not verified yet"))
+    uc = SyncCharacterAnchor(pods, chars, _FakeStorage(), anchor)  # type: ignore[arg-type]
+
+    result_char, res = await uc.execute(character_id=char.id, requester_id=LOCAL_USER_ID)
+
+    assert res.synced is False
+    assert res.detail == "not verified yet"
+    assert result_char.higgsfield_ref_id is None
 
 
 async def test_upload_rejects_foreign_owner() -> None:

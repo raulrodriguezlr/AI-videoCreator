@@ -21,6 +21,17 @@ from videocreator.infrastructure.video.smart_reframe import (
     crop_x_expression,
 )
 
+# Reset the module-level face-detector cache before every test so one test's
+# cached result (or failure) doesn't leak into the next.
+from videocreator.infrastructure.video import smart_reframe as _sr_module
+
+
+@pytest.fixture(autouse=True)
+def _reset_face_detector_cache() -> None:  # noqa: PT004
+    _sr_module._cached_face_detector = _sr_module._FACE_DETECTOR_NOT_TRIED
+    yield  # type: ignore[misc]
+    _sr_module._cached_face_detector = _sr_module._FACE_DETECTOR_NOT_TRIED
+
 
 # ---- CropWindow smoothing ---------------------------------------------------
 def test_smooth_applies_moving_average_window_3() -> None:

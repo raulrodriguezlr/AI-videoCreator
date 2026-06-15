@@ -44,7 +44,7 @@
 | Catálogo SDK | ✅ | `GET /system/providers/sdk` |
 | Providers instalados (`backend/providers.d/`) | ✅ | `artlist`, `elevenlabs-studio`, `ltx-desktop`, `runway-v2v`, `veo-gemini`, `comfyui-ltx2`, `test-provider` |
 | Provider `veo-vertex` como manifest SDK | ☐ | carpeta `providers.d/veo-vertex/` existe pero **vacía** — el engine real (`infrastructure/engine/providers/veo_vertex_provider.py`) sigue fuera del SDK |
-| Provider `ltx` (engine legacy) como manifest SDK | ☐ | `infrastructure/engine/providers/ltx_provider.py` sigue fuera del SDK; `ltx-desktop` (SDK) y `comfyui-ltx2` (SDK) son adapters distintos/paralelos |
+| Provider `ltx` (engine legacy) como manifest SDK | ☐ | `infrastructure/engine/providers/ltx_provider.py` sigue fuera del SDK; `ltx-desktop` (SDK) y `comfyui-ltx2` (SDK) son adapters distintos/paralelos ( y esa es la idea, que LTX Desktop vaya por un lado y LTX Comfy UI por otro ) |
 | Auto-benchmark al instalar provider | ☐ | el harness existe (`application/use_cases/benchmark_provider.py`) pero **no se encola automáticamente** al `discover()` |
 
 ---

@@ -63,6 +63,16 @@ async def get_short(
     return _to_response(short)
 
 
+@router.delete(
+    "/{short_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a short"
+)
+async def delete_short(
+    pod_id: str, short_id: str, uc: UseCasesDep, user_id: UserIdDep,
+) -> None:
+    del pod_id
+    await uc.shorts.delete.execute(short_id=ShortId(short_id), requester_id=user_id)
+
+
 @router.post(
     "/{short_id}/render", response_model=EnqueueRenderResponse,
     status_code=status.HTTP_202_ACCEPTED,

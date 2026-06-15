@@ -116,10 +116,19 @@ class CapabilityExecutor:
                 if isinstance(value, str) and value.strip():
                     prompt = value[:2000]
                     break
+        # Forward a pinned model and any adapter-specific params (e.g.
+        # `input_image` for image-to-video). Reserved keys are consumed above;
+        # everything else rides along in `extra` for the adapter to use.
+        _reserved = {"provider", "model", "prompt", "duration_s", "seed",
+                     "negative_prompt"}
+        model = node.params.get("model")
         request = GenRequest(
             prompt=prompt,
             duration_s=float(node.params.get("duration_s", 5.0) or 5.0),
             seed=node.params.get("seed"),  # type: ignore[arg-type]
+            model_id=str(model) if model else None,
+            negative_prompt=node.params.get("negative_prompt"),
+            extra={k: v for k, v in node.params.items() if k not in _reserved},
         )
         last_error: Exception | None = None
         for lp in candidates:

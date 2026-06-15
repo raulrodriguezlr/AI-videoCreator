@@ -90,7 +90,24 @@ class UpdatePodConfig:
                 return await self.pod_repo.save(updated)
 
         updated = pod.model_copy(update={"config": config})
-        return await self.pod_repo.save(updated)
+        saved = await self.pod_repo.save(updated)
+        
+        # Keep legacy config.json in sync
+        from videocreator.shared.config import get_settings
+        import json
+        settings = get_settings()
+        legacy_file = settings.pods_dir / saved.name / "config.json"
+        if legacy_file.exists():
+            try:
+                base = json.loads(legacy_file.read_text(encoding="utf-8"))
+                if isinstance(base, dict):
+                    cfg_dict = config.model_dump(exclude={"schema_version"})
+                    base.update({k: v for k, v in cfg_dict.items() if v is not None})
+                    legacy_file.write_text(json.dumps(base, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass
+                
+        return saved
 
 
 @dataclass(frozen=True, slots=True)

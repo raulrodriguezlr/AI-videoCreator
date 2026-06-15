@@ -2,8 +2,16 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from secrets import token_hex
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from videocreator.infrastructure.providers.higgsfield_anchor import (
+        AnchorResult,
+        HiggsfieldAnchorClient,
+    )
 
 from videocreator.domain.entities import Character
 from videocreator.domain.ports import (
@@ -243,22 +251,35 @@ class AddCharacterReferences:
 
 @dataclass(frozen=True, slots=True)
 class GenerateCharacterReference:
-    """Generate a reference image from a text prompt and attach it."""
+    """Generate a reference image from a text prompt and attach it.
+
+    `images` is the default engine (Gemini/Imagen). `image_for`, when supplied,
+    resolves an alternative engine+model chosen by the caller (e.g. Higgsfield's
+    Soul/Seedream); it is only consulted when an explicit `engine` is passed to
+    `execute`, so the default path is unchanged.
+    """
 
     pod_repo: PodRepository
     char_repo: CharacterRepository
     storage: StoragePort
     images: ImageGenerationPort
+    image_for: Callable[[str | None, str | None], ImageGenerationPort] | None = None
 
     async def execute(
         self, *, character_id: CharacterId, requester_id: UserId, prompt: str,
+        engine: str | None = None, model: str | None = None,
     ) -> Character:
         character = await _owned_character(
             self.char_repo, self.pod_repo, character_id, requester_id,
         )
         if not prompt.strip():
             raise ValidationError("prompt must not be empty")
-        blobs = await self.images.generate(prompt, num_images=1)
+        provider = (
+            self.image_for(engine, model)
+            if engine and self.image_for is not None
+            else self.images
+        )
+        blobs = await provider.generate(prompt, num_images=1)
         for data in blobs:
             key = f"{character.pod_id}/{character_id}/{token_hex(8)}.png"
             ref = await self.storage.put(_REF_BUCKET, key, data)
@@ -287,6 +308,39 @@ class RemoveCharacterReference:
         return await self.char_repo.save(character)
 
 
+@dataclass(frozen=True, slots=True)
+class SyncCharacterAnchor:
+    """Bind a local character to a reusable Higgsfield identity (an Element).
+
+    Fail-soft: the anchor client returns an `AnchorResult` describing what
+    happened (synced or why not) rather than raising, so an un-verified/unset
+    Higgsfield integration degrades to a clear status instead of a 500. When a
+    `ref_id` comes back it is persisted on the character.
+    """
+
+    pod_repo: PodRepository
+    char_repo: CharacterRepository
+    storage: StoragePort
+    anchor: "HiggsfieldAnchorClient"
+
+    async def execute(
+        self, *, character_id: CharacterId, requester_id: UserId,
+    ) -> tuple[Character, "AnchorResult"]:
+        character = await _owned_character(
+            self.char_repo, self.pod_repo, character_id, requester_id,
+        )
+        urls: list[str] = []
+        for ref in character.reference_image_keys:
+            bucket, _, key = ref.partition("/")
+            urls.append(await self.storage.url_for(bucket, key))
+        result = await self.anchor.create_element(name=character.name, image_urls=urls)
+        if result.synced and result.ref_id:
+            character.higgsfield_ref_id = result.ref_id
+            character.higgsfield_ref_kind = result.kind
+            character = await self.char_repo.save(character)
+        return character, result
+
+
 __all__ = [
     "AddCharacterReferences",
     "CreateCharacter",
@@ -294,5 +348,6 @@ __all__ = [
     "GenerateCharacterReference",
     "ListCharacters",
     "RemoveCharacterReference",
+    "SyncCharacterAnchor",
     "UpdateCharacter",
 ]

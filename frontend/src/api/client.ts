@@ -1,4 +1,4 @@
-﻿// Minimal typed REST client. We avoid axios so the bundle stays tiny and so
+// Minimal typed REST client. We avoid axios so the bundle stays tiny and so
 // SSE/streaming can use the native fetch + EventSource without interceptors.
 
 const BASE_URL = "/api/v1";
@@ -122,6 +122,8 @@ export interface Character {
   look_description: string | null;
   voice: Record<string, unknown> | null;
   reference_image_keys: string[];
+  higgsfield_ref_id: string | null;
+  higgsfield_ref_kind: string | null;
   created_at: string;
 }
 
@@ -263,6 +265,20 @@ export interface VoiceOption {
   language: string | null;
 }
 
+export interface SdkModel {
+  id: string;
+  family: string;
+  capabilities: string[];
+  max_duration_s: number;
+  credits: number;
+  cost_per_second_usd: number;
+  est_usd_per_clip: number;
+  unlimited: boolean;
+  copyright_strict: boolean;
+  good_for: string[];
+  strengths: string[];
+}
+
 export interface SdkProvider {
   id: string;
   name: string;
@@ -270,9 +286,66 @@ export interface SdkProvider {
   tags: string[];
   adapter_type: string;
   cost_per_second_usd: number;
+  models: SdkModel[];
 }
 
 export const getSdkProviders = () => api.get<SdkProvider[]>("/system/providers/sdk");
+
+export interface ModelRecommendation {
+  provider_id: string;
+  model_id: string;
+  est_credits: number;
+  est_usd: number;
+  fits_content: boolean;
+  within_duration: boolean;
+  unlimited: boolean;
+  copyright_safe: boolean;
+  recommended: boolean;
+  reason: string;
+  backend: string;
+  experimental: boolean;
+}
+
+export interface RecommendResponse {
+  content_type: string;
+  duration_s: number;
+  copyright_flagged: boolean;
+  recommendations: ModelRecommendation[];
+}
+
+export const CONTENT_TYPES = [
+  "animation_2d", "animation_3d", "talking_head",
+  "realistic", "cinematic", "quick_draft",
+] as const;
+export type ProviderContentType = (typeof CONTENT_TYPES)[number];
+
+export const recommendModels = (params: {
+  content_type: string;
+  duration_s?: number;
+  capability?: string;
+  copyright_flagged?: boolean;
+  provider?: string | null;
+}) => {
+  const q = new URLSearchParams();
+  q.set("content_type", params.content_type);
+  if (params.duration_s != null) q.set("duration_s", String(params.duration_s));
+  if (params.capability) q.set("capability", params.capability);
+  if (params.copyright_flagged != null) q.set("copyright_flagged", String(params.copyright_flagged));
+  if (params.provider) q.set("provider", params.provider);
+  return api.get<RecommendResponse>(`/system/providers/recommend?${q.toString()}`);
+};
+
+export interface CopyrightScreenResult {
+  has_real_people: boolean;
+  real_people: string[];
+  copyrighted_characters: string[];
+  notes: string;
+  risky: boolean;
+  cached: boolean;
+}
+
+export const copyrightScreen = (text: string, force = false) =>
+  api.post<CopyrightScreenResult>("/system/copyright-screen", { text, force });
 
 export interface ModelHandle {
   id: string;

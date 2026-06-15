@@ -60,6 +60,18 @@ class LocalFileStorage:
         if path.exists():
             await asyncio.to_thread(path.unlink)
 
+    async def delete_prefix(self, bucket: str, prefix: str) -> None:
+        import shutil
+        base = (self._root / bucket).resolve()
+        if not base.exists():
+            return
+        prefix_path = (base / prefix).resolve() if prefix else base
+        if prefix_path.exists():
+            if prefix_path.is_dir():
+                await asyncio.to_thread(shutil.rmtree, prefix_path, ignore_errors=True)
+            else:
+                await asyncio.to_thread(prefix_path.unlink, missing_ok=True)
+
     async def url_for(self, bucket: str, key: str, expires_s: int = 3600) -> str:
         # In local mode we serve files via the REST API at /api/v1/storage/...
         return f"/api/v1/storage/{bucket}/{key}"

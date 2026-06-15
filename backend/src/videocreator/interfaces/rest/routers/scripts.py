@@ -48,10 +48,14 @@ async def list_scripts(
 async def generate_script(
     pod_id: str, body: GenerateScriptRequest, uc: UseCasesDep, user_id: UserIdDep,
 ) -> ScriptResponse:
-    script = await uc.scripts.generate.execute(
+    draft_script = await uc.scripts.generate.execute(
         pod_id=PodId(pod_id), topic_id=TopicId(body.topic_id), requester_id=user_id,
     )
-    return _to_response(script)
+    # Automatically run the review pass (as it was in the legacy pipeline)
+    reviewed_script = await uc.scripts.review.execute(
+        pod_id=PodId(pod_id), script_id=draft_script.id, requester_id=user_id,
+    )
+    return _to_response(reviewed_script)
 
 
 @router.post(

@@ -7,6 +7,7 @@ from fastapi import APIRouter, File, Query, UploadFile, status
 
 from videocreator.interfaces.rest.deps import ContainerDep, UseCasesDep, UserIdDep
 from videocreator.interfaces.rest.schemas import (
+    CharacterAnchorResponse,
     CharacterResponse,
     CreateCharacterRequest,
     GenerateReferenceImageRequest,
@@ -24,6 +25,8 @@ def _to_response(c) -> CharacterResponse:  # type: ignore[no-untyped-def]
         id=c.id, pod_id=c.pod_id, name=c.name, role=c.role,
         personality=c.personality, look_description=c.look_description,
         voice=c.voice, reference_image_keys=list(c.reference_image_keys),
+        higgsfield_ref_id=c.higgsfield_ref_id,
+        higgsfield_ref_kind=c.higgsfield_ref_kind,
         created_at=c.created_at,
     )
 
@@ -109,6 +112,7 @@ async def generate_reference(
     del pod_id
     character = await uc.characters.generate_ref.execute(
         character_id=CharacterId(character_id), requester_id=user_id, prompt=body.prompt,
+        engine=body.engine, model=body.model,
     )
     return _to_response(character)
 
@@ -126,6 +130,22 @@ async def remove_reference(
         character_id=CharacterId(character_id), requester_id=user_id, ref=ref,
     )
     return _to_response(character)
+
+
+@router.post(
+    "/{character_id}/anchor", response_model=CharacterAnchorResponse,
+    summary="Sync this character to a reusable Higgsfield identity (element)",
+)
+async def anchor_character(
+    pod_id: str, character_id: str, uc: UseCasesDep, user_id: UserIdDep,
+) -> CharacterAnchorResponse:
+    del pod_id  # path-scoped; ownership re-checked via the character
+    character, result = await uc.characters.anchor.execute(
+        character_id=CharacterId(character_id), requester_id=user_id,
+    )
+    return CharacterAnchorResponse(
+        character=_to_response(character), synced=result.synced, detail=result.detail,
+    )
 
 
 @router.post(

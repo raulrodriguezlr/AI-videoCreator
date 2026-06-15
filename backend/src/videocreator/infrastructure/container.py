@@ -31,6 +31,7 @@ from videocreator.application.use_cases.characters import (
     GenerateCharacterReference,
     ListCharacters,
     RemoveCharacterReference,
+    SyncCharacterAnchor,
     UpdateCharacter,
 )
 from videocreator.application.use_cases.episodes import (
@@ -80,6 +81,7 @@ from videocreator.application.use_cases.seo import (
 )
 from videocreator.application.use_cases.shorts import (
     CreateShortFromEpisode,
+    DeleteShort,
     EnqueueShortRender,
     GetShort,
     ListShorts,
@@ -433,6 +435,40 @@ class Container:
     def image_provider(self) -> ImageGenerationPort:
         return self._get("image_provider", lambda: GeminiImageProvider(self.settings))
 
+    #: engine -> (SDK provider_id, default text_to_image model). Gemini is the
+    #: built-in default; Higgsfield exposes its unlimited/cheap image models.
+    _IMAGE_ENGINES: dict[str, tuple[str, str]] = {
+        "higgsfield": ("higgsfield", "soul"),
+    }
+
+    def image_provider_for(
+        self, engine: str | None = None, model: str | None = None,
+    ) -> ImageGenerationPort:
+        """Resolve the image engine the caller chose (UI: Gemini vs Higgsfield).
+
+        `engine` is None/"gemini" → the default Gemini/Imagen provider. Any other
+        engine maps to an SDK `text_to_image` provider via `_IMAGE_ENGINES`; an
+        explicit `model` overrides that engine's default image model.
+        """
+        if not engine or engine == "gemini":
+            return self.image_provider()
+        mapping = self._IMAGE_ENGINES.get(engine)
+        if mapping is None:
+            raise ValueError(f"unknown image engine '{engine}'")
+        from videocreator.infrastructure.providers.sdk_image_provider import (
+            SdkImageProvider,
+        )
+        provider_id, default_model = mapping
+        return SdkImageProvider(self.provider_registry(), provider_id, model or default_model)
+
+    def higgsfield_anchor(self) -> "HiggsfieldAnchorClient":
+        def _build() -> "HiggsfieldAnchorClient":
+            from videocreator.infrastructure.providers.higgsfield_anchor import (
+                HiggsfieldAnchorClient,
+            )
+            return HiggsfieldAnchorClient(self.settings)
+        return self._get("higgsfield_anchor", _build)
+
     def trend_source(self) -> TrendSourcePort:
         return self._get("trend_source", GoogleTrendsRss)
 
@@ -674,8 +710,12 @@ class _CharacterUseCases:
         self.add_refs = AddCharacterReferences(c.pod_repo(), c.character_repo(), c.storage())
         self.generate_ref = GenerateCharacterReference(
             c.pod_repo(), c.character_repo(), c.storage(), c.image_provider(),
+            image_for=c.image_provider_for,
         )
         self.remove_ref = RemoveCharacterReference(c.pod_repo(), c.character_repo(), c.storage())
+        self.anchor = SyncCharacterAnchor(
+            c.pod_repo(), c.character_repo(), c.storage(), c.higgsfield_anchor(),
+        )
 
 
 class _TopicUseCases:
@@ -725,6 +765,7 @@ class _ShortsUseCases:
         )
         self.list = ListShorts(c.pod_repo(), c.short_repo())
         self.get = GetShort(c.pod_repo(), c.short_repo())
+        self.delete = DeleteShort(c.pod_repo(), c.short_repo(), c.storage())
         self.generate_native = GenerateNativeShortUseCase(c.llm())
 
 

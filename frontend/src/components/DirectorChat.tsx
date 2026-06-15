@@ -13,13 +13,16 @@ import { Button, Empty, useToast } from "../ui/primitives";
 import { IcCheck, IcSend, IcSparkles, IcX } from "../ui/icons";
 import { DagPipeline } from "./DagPipeline";
 import { ProviderSelect } from "./ProviderSelect";
+import { ModelAdvisor } from "./ModelAdvisor";
 
 const PROVIDER_CAPABILITIES = ["text_to_video", "video_to_video"] as const;
 
-/** Returns a new spec with `params.provider` set/removed on every node whose
- * capability is text_to_video / video_to_video (and tts, when at least one
- * SDK provider declares that capability). */
-function applyProviderToSpec(spec: DagSpecDto, provider: string | null, ttsSupported: boolean): DagSpecDto {
+/** Returns a new spec with `params.provider` and `params.model` set/removed on
+ * every node whose capability is text_to_video / video_to_video (and tts, when
+ * at least one SDK provider declares that capability). */
+function applySelectionToSpec(
+  spec: DagSpecDto, provider: string | null, model: string | null, ttsSupported: boolean,
+): DagSpecDto {
   const capabilities: string[] = [...PROVIDER_CAPABILITIES];
   if (ttsSupported) capabilities.push("tts");
   return {
@@ -28,6 +31,8 @@ function applyProviderToSpec(spec: DagSpecDto, provider: string | null, ttsSuppo
       const params = { ...node.params };
       if (provider) params.provider = provider;
       else delete params.provider;
+      if (model) params.model = model;
+      else delete params.model;
       return { ...node, params };
     }),
   };
@@ -48,6 +53,8 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
   const [history, setHistory] = useState<ChatTurn[]>([]);
   const [message, setMessage] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
+  const [contentType, setContentType] = useState("animation_3d");
   const historyRef = useRef<HTMLDivElement>(null);
 
   const sdkProviders = useQuery<SdkProvider[]>({
@@ -59,7 +66,15 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
 
   const handleProviderChange = (id: string | null) => {
     setProvider(id);
-    setSpec((s) => applyProviderToSpec(s, id, ttsSupported));
+    setModel(null); // model belongs to a provider — re-recommend for the new one
+    setSpec((s) => applySelectionToSpec(s, id, null, ttsSupported));
+  };
+
+  const handleModelChange = (id: string | null, providerId?: string | null) => {
+    const p = providerId ?? provider;
+    setModel(id);
+    if (providerId) setProvider(providerId);
+    setSpec((s) => applySelectionToSpec(s, p, id, ttsSupported));
   };
 
   const chat = useMutation({
@@ -99,7 +114,7 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
     setHistory((h) => h.map((turn, i) => {
       if (i !== index) return turn;
       if (action === "applied" && turn.nextSpec) {
-        setSpec(applyProviderToSpec(turn.nextSpec, provider, ttsSupported));
+        setSpec(applySelectionToSpec(turn.nextSpec, provider, model, ttsSupported));
       }
       return { ...turn, resolved: action };
     }));
@@ -115,6 +130,14 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
           <span className="dim mono" style={{ fontSize: 11 }}>{spec.nodes.length} nodos</span>
         </div>
         <ProviderSelect value={provider} onChange={handleProviderChange} capability="text_to_video" label="Proveedor de video" />
+        <ModelAdvisor
+          provider={provider}
+          contentType={contentType}
+          onContentType={setContentType}
+          model={model}
+          onModel={handleModelChange}
+          capability="text_to_video"
+        />
         <Button variant="primary" loading={generate.isPending} disabled={spec.nodes.length === 0}
           onClick={() => generate.mutate()}>
           <IcSparkles /> Generar

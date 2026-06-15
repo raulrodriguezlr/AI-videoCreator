@@ -72,11 +72,9 @@ morphing during pose/camera changes. When in doubt, ALWAYS use 'cut'.
 FORBIDDEN transition value: 'extend'.
 
 ### LIP-SYNC RULES (CRITICAL)
-- ABSOLUTELY FORBIDDEN: Do NOT write 'The squirrel says ...', 'The character \
-says ...' or ANY 'X says "..."' pattern inside visual_prompt.
-- visual_prompt contains ONLY physical descriptions: actions, environment, \
-expressions, poses. ZERO dialogue text.
-- All spoken dialogue goes EXCLUSIVELY in the audio_text field.
+- visual_prompt MUST NOT contain dialogue or quotes. Do not write 'X says ...' or ANY 'X says "..."' pattern inside visual_prompt.
+- visual_prompt contains ONLY physical descriptions: actions, environment, expressions, poses. ZERO dialogue text.
+- All spoken dialogue goes EXCLUSIVELY in the audio_text field. YOU MUST WRITE DIALOGUE (audio_text) for the characters to speak! Do NOT leave it empty.
 - When a character speaks, prefer 'close-up' or 'medium' shots.
 
 ### VISUAL CONTINUITY
@@ -136,8 +134,16 @@ _SCENE_SCHEMA: dict[str, Any] = {
                             "climax", "falling_action", "resolution", "transition",
                         ],
                     },
-                    "visual_prompt": {"type": "string"},
-                    "audio_text": {"type": "string"},
+                    "visual_prompt": {"type": "string", "minLength": 1},
+                    # minLength forces the structured-output grammar to emit
+                    # real dialogue — local models (qwen2.5) otherwise return an
+                    # empty string here, leaving scenes silent.
+                    "audio_text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The exact spoken dialogue/narration for "
+                        "this scene, in the target language. Never empty.",
+                    },
                     "character": {"type": "string"},
                     "voice_direction": {"type": "string"},
                     "camera": {
@@ -218,6 +224,18 @@ def _format_characters(characters: list[Character]) -> str:
             parts.append(f"[look: {c.look_description}]")
         lines.append(" ".join(parts))
     return "\n".join(lines)
+
+
+def _clean_json(raw: str) -> str:
+    """Strip markdown backticks that local LLMs sometimes hallucinate."""
+    s = raw.strip()
+    if s.startswith("```json"):
+        s = s[7:]
+    elif s.startswith("```"):
+        s = s[3:]
+    if s.endswith("```"):
+        s = s[:-3]
+    return s.strip()
 
 
 def _scene_count_targets(
@@ -304,14 +322,11 @@ def _render_script_prompt(
         f"Every visual_prompt MUST start with this art style prefix.\n\n"
         f"## DURATION (STRICT — NON-NEGOTIABLE)\n"
         f"- The episode MUST total AT LEAST {target_duration_s} seconds of video.\n"
-        f"- Produce BETWEEN {min_scenes} AND {typical_scenes} scenes, each 4-"
-        f"{max_clip_seconds} seconds long ({typical_scenes} is the ideal count).\n"
-        f"- The SUM of every scene's `duration_seconds` MUST be >= "
-        f"{target_duration_s}.\n"
+        f"- You MUST generate around {typical_scenes} scenes. Do not generate significantly fewer or many more.\n"
+        f"- Each scene should be 4-{max_clip_seconds} seconds long.\n"
+        f"- The SUM of every scene's `duration_seconds` MUST be >= {target_duration_s}.\n"
         f"- No single scene may exceed {max_clip_seconds} seconds.\n"
-        f"- A script with fewer scenes that does not reach {target_duration_s}s "
-        f"is INVALID. Do NOT compress the story into a handful of long scenes — "
-        f"tell it across MANY short, dynamic scenes.\n"
+        f"- A script that does not reach {target_duration_s}s is INVALID. Do NOT compress the story into a handful of long scenes — tell it across EXACTLY {typical_scenes} short, dynamic scenes.\n"
         f"- Each scene needs a vivid visual_prompt and audio_text.\n\n"
         f"## MANDATORY NARRATIVE STRUCTURE\n"
         f"Scenes MUST progress through: introduction -> establishing -> "
@@ -421,9 +436,10 @@ class GenerateScript:
         schema["properties"]["scenes"]["minItems"] = min_scenes
         raw = await self.llm.complete(prompt, response_schema=schema, temperature=0.8)
         try:
-            data = json.loads(raw)
+            data = json.loads(_clean_json(raw))
         except json.JSONDecodeError as exc:
-            raise ProviderError(f"LLM returned invalid JSON: {exc}") from exc
+            # Add a bit of the raw output to the error message for easier debugging
+            raise ProviderError(f"LLM returned invalid JSON. Snippet: {raw[:100]}... Error: {exc}") from exc
 
         scenes = [_to_scene(i, s) for i, s in enumerate(data.get("scenes") or [])
                   if isinstance(s, dict) and "visual_prompt" in s]
@@ -518,7 +534,7 @@ _REVIEW_SYSTEM = (
 )
 
 
-def _render_review_prompt(*, draft_json: str, language: str) -> str:
+def _render_review_prompt(*, draft_json: str, language: str, typical_scenes: int) -> str:
     return (
         f"Here is a drafted episode script.\n\n"
         f"## DRAFT SCRIPT (JSON)\n{draft_json}\n\n"
@@ -526,12 +542,13 @@ def _render_review_prompt(*, draft_json: str, language: str) -> str:
         f"1. Enforce the video rules below perfectly.\n"
         f"2. Fix transitions: Use 'cut' strictly for action changes. "
         f"Use 'continue' only for static moments.\n"
-        f"3. Make sure `audio_text` is pure spoken dialogue in {language}.\n"
+        f"3. Make sure `audio_text` is pure spoken dialogue in {language}. DO NOT leave it empty if the character is speaking!\n"
         f"4. Make sure `visual_prompt` is pure physical description in ENGLISH "
-        f"with NO DIALOGUE text inside.\n"
+        f"with NO DIALOGUE text inside. Replace any dialogue in `visual_prompt` with silent actions.\n"
         f"5. Improve pacing (`duration_seconds`).\n"
         f"6. Improve camera usage — vary shot_type, movement, and angle "
-        f"narratively; match them to mood and narrative_phase.\n\n"
+        f"narratively; match them to mood and narrative_phase.\n"
+        f"7. You MUST ensure there are EXACTLY {typical_scenes} scenes in the final script. If the draft has fewer, EXPAND the story. If it has more, KEEP them or combine them to reach exactly {typical_scenes}.\n\n"
         f"{_VIDEO_RULES}\n\n"
         f"## OUTPUT FORMAT\n"
         f"Return ONLY the corrected JSON matching the supplied schema."
@@ -591,17 +608,18 @@ class ReviewScript:
         draft = _scenes_to_draft(script.scenes)
         draft_json = json.dumps({"title": script.title, "scenes": draft}, indent=2)
 
+        # Enforce the same minimum scene floor as GenerateScript — the reviewer
+        # must not shrink the script below the duration target.
+        min_scenes, typical_scenes = _scene_count_targets(
+            pod.config.duration_seconds, pod.config.max_clip_seconds
+        )
         prompt = (
             f"{_REVIEW_SYSTEM}\n\n"
             + _render_review_prompt(
                 draft_json=draft_json,
                 language=pod.config.language,
+                typical_scenes=typical_scenes,
             )
-        )
-        # Enforce the same minimum scene floor as GenerateScript — the reviewer
-        # must not shrink the script below the duration target.
-        min_scenes, _ = _scene_count_targets(
-            pod.config.duration_seconds, pod.config.max_clip_seconds
         )
         review_schema = copy.deepcopy(_SCENE_SCHEMA)
         review_schema["properties"]["scenes"]["minItems"] = min_scenes
@@ -609,9 +627,9 @@ class ReviewScript:
             prompt, response_schema=review_schema, temperature=0.4,
         )
         try:
-            data = json.loads(raw)
+            data = json.loads(_clean_json(raw))
         except json.JSONDecodeError as exc:
-            raise ProviderError(f"LLM returned invalid JSON: {exc}") from exc
+            raise ProviderError(f"LLM returned invalid JSON. Snippet: {raw[:100]}... Error: {exc}") from exc
 
         reviewed_scenes = [
             _to_scene(i, s)
