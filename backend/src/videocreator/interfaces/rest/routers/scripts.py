@@ -48,10 +48,19 @@ async def list_scripts(
 async def generate_script(
     pod_id: str, body: GenerateScriptRequest, uc: UseCasesDep, user_id: UserIdDep,
 ) -> ScriptResponse:
-    draft_script = await uc.scripts.generate.execute(
+    # Two-pass pipeline: separate creative writing from technical formatting so
+    # dialogue quality isn't sacrificed to the JSON/camera/duration rules.
+    # 1. Creative pass — a rich prose story with real dialogue (no JSON/camera).
+    narrative = await uc.scripts.write_story.execute(
         pod_id=PodId(pod_id), topic_id=TopicId(body.topic_id), requester_id=user_id,
     )
-    # Automatically run the review pass (as it was in the legacy pipeline)
+    # 2. Director pass — storyboard that narrative into JSON scenes, preserving
+    #    its dialogue. (Narrative lives only in memory — no DB schema change.)
+    draft_script = await uc.scripts.generate.execute(
+        pod_id=PodId(pod_id), topic_id=TopicId(body.topic_id), requester_id=user_id,
+        story_narrative=narrative,
+    )
+    # 3. Review pass — enforce video rules and upgrade any weak dialogue.
     reviewed_script = await uc.scripts.review.execute(
         pod_id=PodId(pod_id), script_id=draft_script.id, requester_id=user_id,
     )

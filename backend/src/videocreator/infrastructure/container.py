@@ -67,6 +67,7 @@ from videocreator.application.use_cases.scripts import (
     GenerateScript,
     ListScripts,
     ReviewScript,
+    WriteStory,
 )
 from videocreator.application.use_cases.secrets import (
     DeleteProviderKey,
@@ -728,6 +729,9 @@ class _TopicUseCases:
 
 class _ScriptUseCases:
     def __init__(self, c: Container) -> None:
+        self.write_story = WriteStory(
+            c.pod_repo(), c.topic_repo(), c.character_repo(), c.llm(),
+        )
         self.generate = GenerateScript(
             c.pod_repo(), c.topic_repo(), c.script_repo(), c.character_repo(), c.llm(),
         )

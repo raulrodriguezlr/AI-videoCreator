@@ -110,6 +110,84 @@ golden_hour | soft_diffused | dramatic_shadows | bright_daylight | moonlit
 """
 
 # ---------------------------------------------------------------------------
+# Dialogue & story quality — the rules that stop the LLM writing "¡Gol!"/"¡Sí!"
+# placeholder dialogue and wasting scenes on greetings/farewells. Injected into
+# BOTH the storyteller (creative) and director (formatting) passes.
+# ---------------------------------------------------------------------------
+_DIALOGUE_QUALITY = """\
+## DIALOGUE & STORY QUALITY (CRITICAL — THIS IS THE PRIORITY)
+The spoken dialogue is the heart of the episode. Weak dialogue ruins it.
+- FORBIDDEN: empty filler or one-word exclamations as a whole line — e.g. \
+'¡Sí!', '¡Pum!', '¡Gol!', '¡Vamos!', '¡Ay!', '¡Guau!', '¡Lo logré!'. Every line \
+must carry meaning, teach something, or move the story.
+- Characters must actually CONVERSE and develop: ask real questions, explain \
+ideas in their own voice, react with specific feelings, reference what just \
+happened. Show curiosity and personality.
+- NARRATIVE WEIGHT (mandatory): ~10% hook/intro, ~70% development + conflict \
+(the real substance — explore the topic deeply, the characters struggle, \
+discover, learn), ~20% climax + resolution.
+- GREETINGS/FAREWELLS: at most ONE intro/greeting beat and at most ONE farewell \
+beat. NEVER spend several scenes on 'hola' or 'adiós/hasta la próxima'.
+- There MUST be a real obstacle, mystery, or question driving the middle — not a \
+flat list of facts or actions.
+- Age-appropriate but never dumbed-down: warm, witty, curious, specific.
+"""
+
+# ---------------------------------------------------------------------------
+# Storyteller pass — pure creative writing, NO json/camera/durations. Produces a
+# rich narrative with real dialogue that the director pass then formats.
+# ---------------------------------------------------------------------------
+_STORYTELLER_SYSTEM = (
+    "You are a master storyteller and screenwriter for children's animated "
+    "series, in the tradition of Pixar and Studio Ghibli. You write warm, witty, "
+    "emotionally rich stories with memorable dialogue and real dramatic stakes."
+)
+
+
+def _render_storyteller_prompt(
+    *, series_name: str, language: str, target_duration_s: int,
+    topic_title: str, topic_description: str | None,
+    series_context: str | None, characters: list[Character],
+    episode_memory: str | None = None,
+) -> str:
+    """Prompt for the creative pass — prose story only, no technical formatting."""
+    ctx = series_context.strip() if series_context else "(no extra context)"
+    desc = topic_description.strip() if topic_description else "(no description)"
+    char_block = _format_characters(characters)
+    memory = (episode_memory or "").strip()
+    memory_block = (
+        f"\n## PREVIOUS EPISODES (for continuity — reference when natural)\n{memory}\n"
+        if memory else ""
+    )
+    # Rough word budget: spoken pace ~2.2 words/s of video → enough story to fill it.
+    word_target = max(180, int(target_duration_s * 2.2))
+    return (
+        f"{_STORYTELLER_SYSTEM}\n\n"
+        f"Write the script for one episode of '{series_name}', a children's "
+        f"series. Write it as a STORY (prose + dialogue) in {language} — NOT as "
+        f"JSON, with NO camera directions, NO scene numbers, and NO durations. "
+        f"Pure storytelling.\n\n"
+        f"## SERIES CONTEXT\n{ctx}\n"
+        f"{memory_block}\n"
+        f"## CHARACTERS\n{char_block}\n\n"
+        f"## TOPIC OF THIS EPISODE\n{topic_title}\n{desc}\n\n"
+        f"## STRUCTURE (3 acts)\n"
+        f"- Act 1 (~10%): a short, fresh hook that drops us into the topic. ONE "
+        f"greeting at most.\n"
+        f"- Act 2 (~70%): the heart. The characters explore the topic in DEPTH "
+        f"through real dialogue and a genuine obstacle/mystery/challenge. They "
+        f"ask questions, reason, struggle, and learn. This is where the value is.\n"
+        f"- Act 3 (~20%): a satisfying climax and resolution. ONE farewell at most.\n\n"
+        f"{_DIALOGUE_QUALITY}\n\n"
+        f"## LENGTH\n"
+        f"Aim for roughly {word_target} words of spoken dialogue/narration so it "
+        f"can fill about {target_duration_s} seconds of video. Favour substance "
+        f"in Act 2 over a long intro or outro.\n\n"
+        f"Write the full story now, with the characters' lines clearly attributed."
+    )
+
+
+# ---------------------------------------------------------------------------
 # JSON schema the LLM must fill — matches the legacy output_format
 # ---------------------------------------------------------------------------
 _SCENE_SCHEMA: dict[str, Any] = {
@@ -283,12 +361,17 @@ def _render_script_prompt(
     episode_memory: str | None = None,
     max_clip_seconds: int = 8,
     interactive_questions: int = 0,
+    story_narrative: str | None = None,
 ) -> str:
     """Build the full script-generation prompt with video rules and camera vocabulary.
 
     This restores the legacy 5-layer camera pipeline: the video rules inject the
     closed camera vocabulary, the schema enforces it, and the prompt tells the LLM
     to use it narratively.
+
+    When ``story_narrative`` is supplied (the storyteller pass ran first), the
+    prompt switches from *inventing* a story to *adapting* the given one into
+    scenes — preserving its rich dialogue instead of regenerating shallow lines.
     """
     ctx = series_context.strip() if series_context else "(no extra context)"
     desc = topic_description.strip() if topic_description else "(no description)"
@@ -308,16 +391,39 @@ def _render_script_prompt(
             "This is the first episode of the series. No prior history.\n"
         )
 
+    if story_narrative and story_narrative.strip():
+        role = (
+            f"You are the technical director for '{series_name}'. You are handed a "
+            f"FINISHED story and must storyboard it into a strict JSON cinematic "
+            f"script ready for Generative AI video models."
+        )
+        story_block = (
+            "\n## SOURCE STORY — ADAPT THIS, DO NOT INVENT A NEW ONE\n"
+            f"{story_narrative.strip()}\n"
+            "Convert the story above into the scene JSON. PRESERVE its dialogue as "
+            "`audio_text` (you may split one long line across consecutive scenes, "
+            "but NEVER replace it with empty exclamations or simplify it). Keep its "
+            "narrative weight: do not collapse the middle (Act 2) and do not expand "
+            "the greeting or farewell.\n"
+        )
+    else:
+        role = (
+            f"You are the head director and screenwriter for '{series_name}', "
+            f"with Pixar/Disney cinematic experience. Generate a strict JSON "
+            f"cinematic script ready for Generative AI video models."
+        )
+        story_block = ""
+
     return (
-        f"You are the head director and screenwriter for '{series_name}', "
-        f"with Pixar/Disney cinematic experience. Generate a strict JSON "
-        f"cinematic script ready for Generative AI video models.\n"
+        f"{role}\n"
         f"Provide physical visual prompts in ENGLISH and audio dialogues in "
         f"{language}.\n\n"
         f"## SERIES CONTEXT\n{ctx}\n"
         f"{memory_block}\n"
-        f"## CHARACTERS\n{char_block}\n\n"
+        f"## CHARACTERS\n{char_block}\n"
+        f"{story_block}\n"
         f"## TOPIC\n{topic_title}\n{desc}\n\n"
+        f"{_DIALOGUE_QUALITY}\n"
         f"## ART STYLE\n{style}\n"
         f"Every visual_prompt MUST start with this art style prefix.\n\n"
         f"## DURATION (STRICT — NON-NEGOTIABLE)\n"
@@ -393,6 +499,48 @@ def _to_scene(idx: int, raw: dict[str, Any]) -> Scene:
 
 
 @dataclass(frozen=True, slots=True)
+class WriteStory:
+    """Creative pass — write a rich prose story with real dialogue.
+
+    This is step 1 of the two-pass pipeline. It frees the LLM from JSON/camera/
+    duration constraints so it focuses purely on a good story and deep dialogue;
+    `GenerateScript` then storyboards the result into scenes. Returns plain text.
+    """
+
+    pod_repo: PodRepository
+    topic_repo: TopicRepository
+    character_repo: CharacterRepository
+    llm: LLMPort
+
+    async def execute(
+        self, *, pod_id: PodId, topic_id: TopicId, requester_id: UserId,
+    ) -> str:
+        pod = await self.pod_repo.get(pod_id)
+        if pod is None:
+            raise PodNotFound(f"pod {pod_id} not found")
+        if not pod.is_owned_by(requester_id):
+            raise ForbiddenError("pod is owned by a different user")
+        topic = await self.topic_repo.get(topic_id)
+        if topic is None or topic.pod_id != pod_id:
+            raise PodNotFound(f"topic {topic_id} not found in pod {pod_id}")
+
+        characters = await self.character_repo.list_for_pod(pod_id)
+        prompt = _render_storyteller_prompt(
+            series_name=pod.config.series_name,
+            language=pod.config.language,
+            target_duration_s=pod.config.duration_seconds,
+            topic_title=topic.title,
+            topic_description=topic.description,
+            series_context=pod.config.series_context,
+            characters=characters,
+            episode_memory=pod.config.universe_memory,
+        )
+        # No response_schema: we want free prose, not JSON. Higher temperature
+        # for creativity. Returned verbatim and fed into GenerateScript.
+        return await self.llm.complete(prompt, temperature=0.9)
+
+
+@dataclass(frozen=True, slots=True)
 class GenerateScript:
     pod_repo: PodRepository
     topic_repo: TopicRepository
@@ -402,6 +550,7 @@ class GenerateScript:
 
     async def execute(
         self, *, pod_id: PodId, topic_id: TopicId, requester_id: UserId,
+        story_narrative: str | None = None,
     ) -> Script:
         pod = await self.pod_repo.get(pod_id)
         if pod is None:
@@ -426,6 +575,7 @@ class GenerateScript:
             episode_memory=pod.config.universe_memory,
             max_clip_seconds=pod.config.max_clip_seconds,
             interactive_questions=pod.config.interactive_questions,
+            story_narrative=story_narrative,
         )
         # Enforce the minimum scene count at the schema level too — Gemini honours
         # `minItems`, so this is a hard floor on top of the prompt's instruction.
@@ -548,7 +698,11 @@ def _render_review_prompt(*, draft_json: str, language: str, typical_scenes: int
         f"5. Improve pacing (`duration_seconds`).\n"
         f"6. Improve camera usage — vary shot_type, movement, and angle "
         f"narratively; match them to mood and narrative_phase.\n"
-        f"7. You MUST ensure there are EXACTLY {typical_scenes} scenes in the final script. If the draft has fewer, EXPAND the story. If it has more, KEEP them or combine them to reach exactly {typical_scenes}.\n\n"
+        f"7. You MUST ensure there are EXACTLY {typical_scenes} scenes in the final script. If the draft has fewer, EXPAND the story. If it has more, KEEP them or combine them to reach exactly {typical_scenes}.\n"
+        f"8. UPGRADE weak dialogue: replace any empty exclamation-only `audio_text` "
+        f"('¡Sí!', '¡Pum!', '¡Gol!'…) with a real, meaningful line. Collapse extra "
+        f"greeting/farewell scenes so at most ONE of each remains.\n\n"
+        f"{_DIALOGUE_QUALITY}\n\n"
         f"{_VIDEO_RULES}\n\n"
         f"## OUTPUT FORMAT\n"
         f"Return ONLY the corrected JSON matching the supplied schema."
@@ -646,4 +800,4 @@ class ReviewScript:
         return await self.script_repo.save(updated)
 
 
-__all__ = ["DeleteScript", "GenerateScript", "ListScripts", "ReviewScript"]
+__all__ = ["DeleteScript", "GenerateScript", "ListScripts", "ReviewScript", "WriteStory"]
