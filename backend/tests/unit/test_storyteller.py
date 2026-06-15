@@ -13,7 +13,9 @@ from videocreator.application.use_cases.scripts import (
     GenerateScript,
     WriteStory,
     _DIALOGUE_QUALITY,
+    _style_label,
 )
+from videocreator.domain.value_objects import StyleProfile
 from videocreator.domain.entities import LOCAL_USER_ID, Character, Pod, PodConfig, Topic
 from videocreator.shared.ids import new_character_id, new_pod_id, new_topic_id
 
@@ -111,6 +113,26 @@ async def test_generate_adapts_supplied_narrative() -> None:
     assert "ADAPT THIS" in prompt                    # director mode, not invent
     assert "technical director" in prompt
     assert _DIALOGUE_QUALITY.split("\n", 1)[0] in prompt  # quality rules carried
+
+
+def test_style_label_uses_profile_so_dropdown_changes_visuals() -> None:
+    # Changing the style_profile must change the effective style even if the
+    # free-text art_style is empty (the reported bug).
+    assert "photorealistic" in _style_label(StyleProfile.PHOTOREAL_DOC, None)
+    assert "anime" in _style_label(StyleProfile.ANIME_2D, "")
+    # free-text detail is appended, not replaced
+    label = _style_label(StyleProfile.CINEMATIC_3D, "noir, neon rain")
+    assert "cinematic 3D" in label and "noir, neon rain" in label
+
+
+async def test_generate_uses_style_profile_in_prompt() -> None:
+    pod, topic, char = _fixture()
+    pod.config.style_profile = StyleProfile.PHOTOREAL_DOC
+    llm = _FakeLLM(json.dumps({"title": "T", "scenes": []}))
+    uc = GenerateScript(_PodRepo(pod), _TopicRepo(topic), _ScriptRepo(),
+                        _CharRepo([char]), llm)  # type: ignore[arg-type]
+    await uc.execute(pod_id=pod.id, topic_id=topic.id, requester_id=LOCAL_USER_ID)
+    assert "photorealistic" in llm.calls[0]["prompt"]
 
 
 async def test_generate_without_narrative_keeps_inventor_role() -> None:

@@ -50,8 +50,15 @@ def get_provider(pod_config_path: str):
         return ArtlistProvider(pod_config_path)
     elif provider == "elevenlabs_studio":
         return ElevenLabsStudioProvider(pod_config_path)
+    elif provider == "higgsfield":
+        # SDK-bridge: episodes render via the Higgsfield CLI adapter (Kling, etc.),
+        # same models Memes/Director already use. Spends Plus subscription credits.
+        from videocreator.infrastructure.engine.providers.higgsfield_engine_provider import (
+            HiggsfieldEngineProvider,
+        )
+        return HiggsfieldEngineProvider(pod_config_path)
     else:
         raise ValueError(
             f"VIDEO_PROVIDER '{provider}' no reconocido. Opciones: 'veo', "
-            "'ltx_desktop', 'ltx_comfyui', 'artlist', 'elevenlabs_studio'"
+            "'ltx_desktop', 'ltx_comfyui', 'artlist', 'elevenlabs_studio', 'higgsfield'"
         )

@@ -1,0 +1,482 @@
+{
+  "id": "scr_01KV5TM0AJE65TPHASY679",
+  "pod_id": "pod_01KSSGCSRMGXJ8TFFNWAT2",
+  "topic_id": "top_01KV5S26VZG1K34SJVA57F",
+  "version": 2,
+  "title": "El Encuentro con el Pequeño Dragón",
+  "summary": "Tico, a curious red squirrel, encounters Sirocco, a lost green dragon who is searching for a blue diamond. Tico helps Sirocco navigate the forest and overcome obstacles to return home.",
+  "moral": "Ser amable y cuidadoso con los demás puede llevarnos a grandes aventuras.",
+  "ambient_audio_prompt": "soft orchestral adventure music with gentle woodwinds, warm and uplifting",
+  "scenes": [
+    {
+      "id": "scn_01KV5TNZC0ENCZ0KZ1VKFT",
+      "index": 0,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico the red squirrel is sitting on his favorite tree branch, looking peaceful and relaxed.",
+      "audio_text": "¡Hola amigos! Soy Tico y hoy van a conocer la aventura más emocionante que jamás habría vivido. ¿Están listos para un nuevo viaje?",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "wide",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico the red squirrel is sitting on his favorite tree branch, looking peaceful and relaxed.",
+        "audio_text": "¡Hola amigos! Soy Tico y hoy van a conocer la aventura más emocionante que jamás habría vivido. ¿Están listos para un nuevo viaje?",
+        "camera": {
+          "shot_type": "wide",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "joyful",
+        "lighting": "golden_hour",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0TNQPY3F7NCN3",
+      "index": 1,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. A small green shadow flies into the scene and falls to the ground with a soft thud.",
+      "audio_text": "¡Oye! ¿Eres tú? Pareces estar en apuros...",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "medium",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. A small green shadow flies into the scene and falls to the ground with a soft thud.",
+        "audio_text": "¡Oye! ¿Eres tú? Pareces estar en apuros...",
+        "camera": {
+          "shot_type": "medium",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "tense",
+        "lighting": "soft_diffused",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0SHNKZ22AGGXE",
+      "index": 2,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. A small green dragon appears from under the leaves, looking frightened and disoriented.",
+      "audio_text": "¿Dónde estoy?",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "close-up",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. A small green dragon appears from under the leaves, looking frightened and disoriented.",
+        "audio_text": "¿Dónde estoy?",
+        "camera": {
+          "shot_type": "close-up",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "tense",
+        "lighting": "soft_diffused",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC02DTAETR1C5PT",
+      "index": 3,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico approaches the small green dragon and looks concerned.",
+      "audio_text": "No te preocupes. Estás en el bosque cerca de mi hogar. Tu nombre es... ",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "close-up",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico approaches the small green dragon and looks concerned.",
+        "audio_text": "No te preocupes. Estás en el bosque cerca de mi hogar. Tu nombre es... ",
+        "camera": {
+          "shot_type": "close-up",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "calm",
+        "lighting": "soft_diffused",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC044P5W03EGHN9",
+      "index": 4,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. The small green dragon introduces itself as Sirocco and explains it got lost while chasing a blue diamond.",
+      "audio_text": "Soy Sirocco. Mi casa está en la montaña cercana, pero me perdí al perseguir un brillante diamante azul que vi en el cielo.",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "close-up",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. The small green dragon introduces itself as Sirocco and explains it got lost while chasing a blue diamond.",
+        "audio_text": "Soy Sirocco. Mi casa está en la montaña cercana, pero me perdí al perseguir un brillante diamante azul que vi en el cielo.",
+        "camera": {
+          "shot_type": "close-up",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "calm",
+        "lighting": "soft_diffused",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0ECJEKCG3M93Y",
+      "index": 5,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco start their journey through the trees.",
+      "audio_text": "¿Un diamante azul? Eso suena emocionante. Vamos a buscarte un camino de vuelta.",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "medium",
+      "camera_movement": "tracking",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco start their journey through the trees.",
+        "audio_text": "¿Un diamante azul? Eso suena emocionante. Vamos a buscarte un camino de vuelta.",
+        "camera": {
+          "shot_type": "medium",
+          "movement": "tracking",
+          "angle": "eye_level"
+        },
+        "mood": "exciting",
+        "lighting": "bright_daylight",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0RAS0QKQ0Q50D",
+      "index": 6,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco face a wide river that blocks their path.",
+      "audio_text": "¡Mira! El río está muy fuerte. ¿Cómo vamos a cruzarlo?",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "wide",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco face a wide river that blocks their path.",
+        "audio_text": "¡Mira! El río está muy fuerte. ¿Cómo vamos a cruzarlo?",
+        "camera": {
+          "shot_type": "wide",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "tense",
+        "lighting": "soft_diffused",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC02C8H422YX7N0",
+      "index": 7,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Sirocco looks anxious and unsure how to cross the river.",
+      "audio_text": "No sé, pero debo encontrar mi camino...",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "close-up",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Sirocco looks anxious and unsure how to cross the river.",
+        "audio_text": "No sé, pero debo encontrar mi camino...",
+        "camera": {
+          "shot_type": "close-up",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "tense",
+        "lighting": "soft_diffused",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0A11EC3TAWD2M",
+      "index": 8,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico thinks of a solution and suggests they build a raft.",
+      "audio_text": "Si sigues triste y asustado, jamás lo lograrás. Vamos a pensar en un plan.",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "close-up",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico thinks of a solution and suggests they build a raft.",
+        "audio_text": "Si sigues triste y asustado, jamás lo lograrás. Vamos a pensar en un plan.",
+        "camera": {
+          "shot_type": "close-up",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "calm",
+        "lighting": "soft_diffused",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0MX4TP50B8TRM",
+      "index": 9,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco work together to build a raft using tree branches.",
+      "audio_text": "¡No sabía que los roedores podían ser tan buenos haciendo barcos!",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "medium",
+      "camera_movement": "tracking",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco work together to build a raft using tree branches.",
+        "audio_text": "¡No sabía que los roedores podían ser tan buenos haciendo barcos!",
+        "camera": {
+          "shot_type": "medium",
+          "movement": "tracking",
+          "angle": "eye_level"
+        },
+        "mood": "joyful",
+        "lighting": "golden_hour",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC01FKSA8JNTYKD",
+      "index": 10,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico compliments Sirocco for his skills.",
+      "audio_text": "Bueno, somos muy creativos. Pero tú también eres increíble con tus alas y tu calor.",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "close-up",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico compliments Sirocco for his skills.",
+        "audio_text": "Bueno, somos muy creativos. Pero tú también eres increíble con tus alas y tu calor.",
+        "camera": {
+          "shot_type": "close-up",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "joyful",
+        "lighting": "golden_hour",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0NW8Y0XM1A4VK",
+      "index": 11,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco successfully cross the river on their raft.",
+      "audio_text": "¡Es mi diamante! Pero no puedo alcanzarlo...",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "wide",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco successfully cross the river on their raft.",
+        "audio_text": "¡Es mi diamante! Pero no puedo alcanzarlo...",
+        "camera": {
+          "shot_type": "wide",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "tense",
+        "lighting": "soft_diffused",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0QPQAKNMM8DYM",
+      "index": 12,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Sirocco sees a blue diamond at the top of a mountain.",
+      "audio_text": "No te preocupes, amigo. Podemos hacerlo juntos.",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "close-up",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Sirocco sees a blue diamond at the top of a mountain.",
+        "audio_text": "No te preocupes, amigo. Podemos hacerlo juntos.",
+        "camera": {
+          "shot_type": "close-up",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "calm",
+        "lighting": "soft_diffused",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0CP1NV1TMS48Z",
+      "index": 13,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico uses a rope to help Sirocco reach the diamond.",
+      "audio_text": "¡Gracias por ayudarme!",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "medium",
+      "camera_movement": "tracking",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico uses a rope to help Sirocco reach the diamond.",
+        "audio_text": "¡Gracias por ayudarme!",
+        "camera": {
+          "shot_type": "medium",
+          "movement": "tracking",
+          "angle": "eye_level"
+        },
+        "mood": "triumphant",
+        "lighting": "bright_daylight",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0SPZJYXZ1HQGM",
+      "index": 14,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco celebrate their success.",
+      "audio_text": "Eso es lo que hacen los amigos. Y tú también me ayudas a mí, enseñándome cosas nuevas.",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "close-up",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco celebrate their success.",
+        "audio_text": "Eso es lo que hacen los amigos. Y tú también me ayudas a mí, enseñándome cosas nuevas.",
+        "camera": {
+          "shot_type": "close-up",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "joyful",
+        "lighting": "golden_hour",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC03WZ2W15XZ0EC",
+      "index": 15,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Sirocco returns to his home in the mountain.",
+      "audio_text": "Y así amigos, aprendí que ser amable y cuidadoso con los demás puede llevarnos a grandes aventuras. ¿Cuáles son tus mejores experiencias de ayudar a alguien?",
+      "transition": "cut",
+      "duration_s": 5.0,
+      "camera_shot": "wide",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Sirocco returns to his home in the mountain.",
+        "audio_text": "Y así amigos, aprendí que ser amable y cuidadoso con los demás puede llevarnos a grandes aventuras. ¿Cuáles son tus mejores experiencias de ayudar a alguien?",
+        "camera": {
+          "shot_type": "wide",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "warm",
+        "lighting": "golden_hour",
+        "transition_to_next": "cut",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC0N61ZBSM9EVSZ",
+      "index": 16,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco wave goodbye to each other from a distance.",
+      "audio_text": "¡Hasta pronto!",
+      "transition": "scene_change",
+      "duration_s": 5.0,
+      "camera_shot": "wide",
+      "camera_movement": "static",
+      "camera_angle": "eye_level",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. Tico and Sirocco wave goodbye to each other from a distance.",
+        "audio_text": "¡Hasta pronto!",
+        "camera": {
+          "shot_type": "wide",
+          "movement": "static",
+          "angle": "eye_level"
+        },
+        "mood": "warm",
+        "lighting": "golden_hour",
+        "transition_to_next": "scene_change",
+        "duration_seconds": 5
+      }
+    },
+    {
+      "id": "scn_01KV5TNZC06GFX9AWFYE9Z",
+      "index": 17,
+      "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. The camera pans over the magical forest as night falls.",
+      "audio_text": "¡Qué aventura!",
+      "transition": "scene_change",
+      "duration_s": 5.0,
+      "camera_shot": "aerial",
+      "camera_movement": "pan_right",
+      "camera_angle": "bird_eye",
+      "clip_storage_key": null,
+      "rendered": false,
+      "raw": {
+        "visual_prompt": "3D Disney/Pixar style, magical forest setting with vibrant colors, warm cinematic lighting. The camera pans over the magical forest as night falls.",
+        "audio_text": "¡Qué aventura!",
+        "camera": {
+          "shot_type": "aerial",
+          "movement": "pan_right",
+          "angle": "bird_eye"
+        },
+        "mood": "warm",
+        "lighting": "moonlit",
+        "transition_to_next": "scene_change",
+        "duration_seconds": 5
+      }
+    }
+  ],
+  "reviewed": true,
+  "created_at": "2026-06-15T14:22:56.850627Z"
+}

@@ -159,7 +159,7 @@ class BaseVideoProvider(ABC):
         clips: List[VideoClip] = self._restore_completed_clips(resume_from, progress_manager)
         rate_limited = False
         first_error: Exception | None = None
-        context_mgr = SceneContextManager(episode_dir or clips_dir, pod_config=self.config)
+        context_mgr = SceneContextManager(episode_dir or clips_dir, pod_config=getattr(self, "config", {}))
 
         for i, scene in enumerate(scenes):
             self._current_scene_index = i
@@ -294,7 +294,7 @@ class BaseVideoProvider(ABC):
     def _collect_reference_images(self, episode_dir, script, scenes):
         """Veo refs: a dynamic anchor image if enabled, else static character refs."""
         ref_images = []
-        consistency_cfg = self.config.get("consistency", {})
+        consistency_cfg = getattr(self, "config", {}).get("consistency", {})
         if consistency_cfg.get("generate_anchor_images", False) and episode_dir:
             anchor_path = self._generate_anchor_image(episode_dir, script, scenes)
             if anchor_path:

@@ -67,7 +67,15 @@ class ElevenLabsProvider:
     def _get_character_config(self, character_name: str) -> Tuple[str, Dict[str, Any]]:
         """Retrieve voice_id and specific settings for a character."""
         name_key = character_name.lower()
-        voice_id = self.voice_map.get(name_key, ELEVENLABS_DEFAULT_VOICE_ID)
+        
+        if name_key in self.voice_map:
+            voice_id = self.voice_map[name_key]
+        elif name_key in ("narrador", "narrator"):
+            voice_id = ELEVENLABS_DEFAULT_VOICE_ID
+        else:
+            # Fallback for unregistered characters: young adult neutral voice (Antoni)
+            voice_id = "ErXwobaYiN019PkySvjV"
+            
         char_settings = self.voice_settings_map.get(name_key, {})
         return voice_id, char_settings
 

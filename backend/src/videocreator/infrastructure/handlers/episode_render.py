@@ -226,6 +226,10 @@ def _run_engine_sync(
             engine_vars.LTX_DESKTOP_MODEL = model
         elif provider_name == "artlist":
             engine_vars.ARTLIST_MODEL = model
+        elif provider_name == "higgsfield":
+            # Friendly manifest id (e.g. "kling-3.0") → resolved to a cli_type by
+            # the SDK adapter. Defaults to Kling v3.0 when unset.
+            engine_vars.HIGGSFIELD_MODEL = model
         # ltx_comfyui uses a fixed checkpoint (LTX_CHECKPOINT) — no per-render model.
 
     from videocreator.infrastructure.engine.engines.video_engine import VideoEngine

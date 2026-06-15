@@ -180,7 +180,9 @@ class ArtlistProvider(_HttpCloudVideoProvider):
         body: dict[str, Any] = {"model": self._model, "prompt": prompt, "duration_seconds": duration}
         if negative:
             body["negative_prompt"] = negative
-        if reference_images:
+        # Kling uses reference_image_keys as literal first frames (Image-to-Video), causing morphing when used for character consistency.
+        # Veo correctly uses them as character reference styles.
+        if reference_images and "kling" not in self._model.lower():
             body["reference_image_keys"] = list(reference_images)
         if image_seed:
             body["seed_image"] = image_seed

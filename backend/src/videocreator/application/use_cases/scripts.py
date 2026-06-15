@@ -55,9 +55,10 @@ _VIDEO_RULES = """\
 ## VIDEO PRODUCTION RULES (MANDATORY)
 
 ### TRANSITIONS (transition_to_next)
-- **continue** — Fluid static continuation. ONLY for prolonging static dialogue \
-or a slow pan over an empty landscape. visual_prompt MUST be exactly the same as \
-the previous scene. If there is physical movement, pose change, or new objects, \
+- **continue** — Fluid static continuation. Use this MANDATORILY when splitting \
+a long dialogue across multiple scenes to fit the duration. The visual_prompt \
+MUST be exactly the same as the previous scene so the generator seamlessly \
+extends the clip. If there is physical movement, pose change, or new objects, \
 use 'cut'.
 - **cut** — Small cut. Change of angle/shot within the same scene. Action or \
 dialogue continues from another viewpoint. This is the MAIN transition to use.
@@ -78,8 +79,8 @@ FORBIDDEN transition value: 'extend'.
 - When a character speaks, prefer 'close-up' or 'medium' shots.
 
 ### VISUAL CONTINUITY
-- ALWAYS describe the full physical appearance of characters in every \
-visual_prompt (clothing, colors, accessories).
+- ALWAYS describe the full physical appearance of ALL characters and entities in EVERY \
+visual_prompt (clothing, colors, species, accessories). If there is a secondary character or creature (like an animal, monster, or friends), describe them explicitly in EVERY scene they appear so they don't change appearance or turn into humans. For established characters, you MUST strictly follow their provided [look: ...] description. If their look description does not mention specific clothing, DO NOT invent clothing for them.
 - ABSOLUTELY PROHIBITED to include text, subtitles, watermarks, or any \
 written content in visual_prompt. Always append: 'absolutely no text, \
 no subtitles, no letters, no watermarks, no written words'.
@@ -105,8 +106,11 @@ golden_hour | soft_diffused | dramatic_shadows | bright_daylight | moonlit
 
 ### PACING GUIDELINES
 - 4-5 seconds: Fast cuts, reactions, visual transitions.
-- 6-7 seconds: Short dialogue, simple action, exploration.
+- 6-7 seconds: Short dialogue (1-2 sentences), simple action, exploration.
 - 8 seconds: Establishing scenes, emotional climax, important moments.
+- IF a character speaks a lot of text, DO NOT cram it into one scene. \
+Instead, SPLIT the dialogue across 2 or 3 consecutive scenes and use the \
+'continue' transition between them to create one long synthetic clip.
 """
 
 # ---------------------------------------------------------------------------
@@ -149,6 +153,7 @@ def _render_storyteller_prompt(
     topic_title: str, topic_description: str | None,
     series_context: str | None, characters: list[Character],
     episode_memory: str | None = None,
+    interactive_questions: int = 0,
 ) -> str:
     """Prompt for the creative pass — prose story only, no technical formatting."""
     ctx = series_context.strip() if series_context else "(no extra context)"
@@ -173,11 +178,14 @@ def _render_storyteller_prompt(
         f"## TOPIC OF THIS EPISODE\n{topic_title}\n{desc}\n\n"
         f"## STRUCTURE (3 acts)\n"
         f"- Act 1 (~10%): a short, fresh hook that drops us into the topic. ONE "
-        f"greeting at most.\n"
+        f"greeting at most (if the main character usually introduces themselves, e.g. 'Hola amigos, soy...', keep that personality!).\n"
         f"- Act 2 (~70%): the heart. The characters explore the topic in DEPTH "
         f"through real dialogue and a genuine obstacle/mystery/challenge. They "
         f"ask questions, reason, struggle, and learn. This is where the value is.\n"
         f"- Act 3 (~20%): a satisfying climax and resolution. ONE farewell at most.\n\n"
+        f"## SHOW FORMAT & FOURTH WALL\n"
+        f"The characters in this show often speak directly to the viewers (breaking the fourth wall). They should explicitly welcome the audience at the start (e.g. '¡Hola amigos! Soy [Name]...') and say goodbye at the end. The dialogue must feel like they are taking the audience on a journey with them.\n"
+        f"{_interactive_block(interactive_questions)}\n"
         f"{_DIALOGUE_QUALITY}\n\n"
         f"## LENGTH\n"
         f"Aim for roughly {word_target} words of spoken dialogue/narration so it "
@@ -222,7 +230,10 @@ _SCENE_SCHEMA: dict[str, Any] = {
                         "description": "The exact spoken dialogue/narration for "
                         "this scene, in the target language. Never empty.",
                     },
-                    "character": {"type": "string"},
+                    "character": {
+                        "type": "string",
+                        "description": "The exact name of the character speaking this line. If it is general narration not tied to a specific character, use 'Narrador'.",
+                    },
                     "voice_direction": {"type": "string"},
                     "camera": {
                         "type": "object",
@@ -274,7 +285,7 @@ _SCENE_SCHEMA: dict[str, Any] = {
                     "duration_seconds": {"type": "number"},
                 },
                 "required": [
-                    "visual_prompt", "audio_text", "camera",
+                    "visual_prompt", "audio_text", "character", "camera",
                     "mood", "lighting", "transition_to_next",
                     "duration_seconds",
                 ],
@@ -302,6 +313,30 @@ def _format_characters(characters: list[Character]) -> str:
             parts.append(f"[look: {c.look_description}]")
         lines.append(" ".join(parts))
     return "\n".join(lines)
+
+
+#: StyleProfile (the pod-settings dropdown) → a visual-style description for the
+#: script's visual_prompts. Without this, changing the dropdown did nothing —
+#: the script only read the free-text `art_style`, so it kept the old look.
+_STYLE_DESCRIPTIONS = {
+    "cinematic_3d": "cinematic 3D animation, Pixar/Disney quality",
+    "anime_2d": "2D anime style",
+    "stock_montage": "realistic live-action stock-footage montage",
+    "talking_head_avatar": "talking-head avatar presenter style",
+    "photoreal_doc": "photorealistic documentary style",
+    "kids_3d": "kid-friendly colorful 3D animation",
+}
+
+
+def _style_label(style_profile: object, art_style: str | None) -> str:
+    """Effective visual style: the pod's `style_profile` (so changing the dropdown
+    actually changes the visuals) plus any free-text `art_style` detail."""
+    key = getattr(style_profile, "value", style_profile) or "cinematic_3d"
+    base = _STYLE_DESCRIPTIONS.get(str(key), "3D animation")
+    extra = (art_style or "").strip()
+    if extra and extra.lower() not in base.lower():
+        return f"{base} — {extra}"
+    return base
 
 
 def _clean_json(raw: str) -> str:
@@ -405,6 +440,7 @@ def _render_script_prompt(
             "but NEVER replace it with empty exclamations or simplify it). Keep its "
             "narrative weight: do not collapse the middle (Act 2) and do not expand "
             "the greeting or farewell.\n"
+            "CRITICAL FOR VISUALS: Since you don't have to invent the story, focus your effort on making the `visual_prompt` extremely detailed. Explicitly describe the physical appearance of ALL entities (including new creatures, animals, or friends) in EVERY scene they appear to ensure visual consistency.\n"
         )
     else:
         role = (
@@ -429,7 +465,8 @@ def _render_script_prompt(
         f"## DURATION (STRICT — NON-NEGOTIABLE)\n"
         f"- The episode MUST total AT LEAST {target_duration_s} seconds of video.\n"
         f"- You MUST generate around {typical_scenes} scenes. Do not generate significantly fewer or many more.\n"
-        f"- Each scene should be 4-{max_clip_seconds} seconds long.\n"
+        f"- Each scene should be between 4 and {max_clip_seconds} seconds long.\n"
+        f"- VARY the `duration_seconds` narratively! Do NOT make every scene the exact same length (e.g. don't make them all 5). Use shorter times (4 or 5) for quick dialogue/action and longer times (7 or 8) for establishing/complex shots. The value MUST be a single number.\n"
         f"- The SUM of every scene's `duration_seconds` MUST be >= {target_duration_s}.\n"
         f"- No single scene may exceed {max_clip_seconds} seconds.\n"
         f"- A script that does not reach {target_duration_s}s is INVALID. Do NOT compress the story into a handful of long scenes — tell it across EXACTLY {typical_scenes} short, dynamic scenes.\n"
@@ -534,6 +571,7 @@ class WriteStory:
             series_context=pod.config.series_context,
             characters=characters,
             episode_memory=pod.config.universe_memory,
+            interactive_questions=pod.config.interactive_questions,
         )
         # No response_schema: we want free prose, not JSON. Higher temperature
         # for creativity. Returned verbatim and fed into GenerateScript.
@@ -570,7 +608,7 @@ class GenerateScript:
             topic_title=topic.title,
             topic_description=topic.description,
             series_context=pod.config.series_context,
-            art_style=pod.config.art_style,
+            art_style=_style_label(pod.config.style_profile, pod.config.art_style),
             characters=characters,
             episode_memory=pod.config.universe_memory,
             max_clip_seconds=pod.config.max_clip_seconds,
@@ -695,7 +733,7 @@ def _render_review_prompt(*, draft_json: str, language: str, typical_scenes: int
         f"3. Make sure `audio_text` is pure spoken dialogue in {language}. DO NOT leave it empty if the character is speaking!\n"
         f"4. Make sure `visual_prompt` is pure physical description in ENGLISH "
         f"with NO DIALOGUE text inside. Replace any dialogue in `visual_prompt` with silent actions.\n"
-        f"5. Improve pacing (`duration_seconds`).\n"
+        f"5. Improve pacing (`duration_seconds`). VARY the durations narratively (e.g. 4 or 5 for dialogue/action, 7 or 8 for establishing shots). Do NOT leave every scene exactly the same length. The value MUST be a single number.\n"
         f"6. Improve camera usage — vary shot_type, movement, and angle "
         f"narratively; match them to mood and narrative_phase.\n"
         f"7. You MUST ensure there are EXACTLY {typical_scenes} scenes in the final script. If the draft has fewer, EXPAND the story. If it has more, KEEP them or combine them to reach exactly {typical_scenes}.\n"

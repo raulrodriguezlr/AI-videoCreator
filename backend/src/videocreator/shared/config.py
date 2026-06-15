@@ -176,7 +176,7 @@ class Settings(BaseSettings):
     ltx_fps: int = 24
     ltx_width: int = 768
     ltx_height: int = 512
-    elevenlabs_default_voice_id: str = "pNInz6obbf5cNed9uQcd"
+    elevenlabs_default_voice_id: str = "pNInz6obpgDQGcFmaJgB"
 
     # --- logging ---
     log_level: str = "INFO"

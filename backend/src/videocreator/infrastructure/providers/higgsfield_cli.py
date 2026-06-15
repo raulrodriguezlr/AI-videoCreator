@@ -77,14 +77,23 @@ async def _run(args: list[str]) -> tuple[str, str, int]:
 
     Raises FileNotFoundError if the binary cannot be found — callers handle it.
     """
-    proc = await asyncio.create_subprocess_exec(
-        *args,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    out, err = await proc.communicate()
-    return (out.decode("utf-8", "replace"), err.decode("utf-8", "replace"),
-            proc.returncode or 0)
+    import subprocess
+    try:
+        proc = await asyncio.to_thread(
+            subprocess.run,
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            text=False, # We decode it manually below
+        )
+        return (
+            proc.stdout.decode("utf-8", "replace"),
+            proc.stderr.decode("utf-8", "replace"),
+            proc.returncode
+        )
+    except FileNotFoundError:
+        raise
 
 
 async def account_balance(settings: Settings, *, runner: Any = None) -> dict[str, Any]:

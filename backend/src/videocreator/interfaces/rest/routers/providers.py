@@ -53,12 +53,47 @@ _PROVIDER_LABELS: dict[str, str] = {
     "ltx_comfyui": "LTX ComfyUI (LoRAs, consistencia)",
     "artlist": "Artlist",
     "elevenlabs_studio": "ElevenLabs Studio",
+    "higgsfield": "Higgsfield (Plus · Kling, Wan, Veo…)",
 }
+
+#: SDK providers that can also render EPISODES through the legacy engine bridge
+#: (HiggsfieldEngineProvider). Memes/Director already reach them via the DAG.
+_SDK_VIDEO_PROVIDERS = ("higgsfield",)
+_SDK_VIDEO_CAPS = ("text_to_video", "image_to_video")
+
+
+def _sdk_video_entries(container: ContainerDep) -> list[ProviderCatalogEntry]:
+    """Catalog entries for SDK video providers usable in episode rendering.
+
+    Models are the manifest ids that carry a `cli_type` (i.e. actually runnable
+    through the `hf` CLI) and declare a video capability — e.g. `kling-3.0`.
+    """
+    out: list[ProviderCatalogEntry] = []
+    try:
+        registry = container.provider_registry()
+    except Exception:  # registry off (no pyyaml) — just skip
+        return out
+    for name in _SDK_VIDEO_PROVIDERS:
+        loaded = registry.get(name)
+        if loaded is None:
+            continue
+        models = [
+            m.id for m in loaded.manifest.models
+            if getattr(m, "cli_type", "")
+            and any(c in m.capabilities for c in _SDK_VIDEO_CAPS)
+        ]
+        out.append(ProviderCatalogEntry(
+            name=name, label=_PROVIDER_LABELS.get(name, name),
+            available=bool(container.settings.higgsfield_cli_path),
+            message="Requiere `hf auth login` (gasta créditos Plus de la suscripción).",
+            status_detail=None, models=models,
+        ))
+    return out
 
 
 @router.get("", response_model=list[str], summary="List known video providers")
 async def list_providers(container: ContainerDep) -> list[str]:
-    return [*container.KNOWN_VIDEO_PROVIDERS, *_ENGINE_PROVIDER_NAMES]
+    return [*container.KNOWN_VIDEO_PROVIDERS, *_ENGINE_PROVIDER_NAMES, *_SDK_VIDEO_PROVIDERS]
 
 
 async def _provider_models(name: str, container: ContainerDep) -> list[str]:
@@ -195,6 +230,7 @@ async def providers_catalog(container: ContainerDep) -> list[ProviderCatalogEntr
             models=await _provider_models(name, container),
         ))
     entries.extend(await _engine_entries(container))
+    entries.extend(_sdk_video_entries(container))
     return entries
 
 
