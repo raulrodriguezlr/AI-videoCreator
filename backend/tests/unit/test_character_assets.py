@@ -179,10 +179,10 @@ async def test_remove_detaches_and_deletes_from_storage() -> None:
 class _FakeAnchor:
     def __init__(self, result: AnchorResult) -> None:
         self.result = result
-        self.calls: list[tuple[str, list[str]]] = []
+        self.calls: list[tuple[str, list[object]]] = []
 
-    async def create_element(self, *, name: str, image_urls: list[str]) -> AnchorResult:
-        self.calls.append((name, image_urls))
+    async def create_soul(self, *, name: str, image_paths: list[object]) -> AnchorResult:
+        self.calls.append((name, image_paths))
         return self.result
 
 
@@ -190,15 +190,15 @@ async def test_anchor_persists_ref_id_when_synced() -> None:
     pods, chars, char = _fixture()
     char.reference_image_keys.append("references/a/b/x.png")
     storage = _FakeStorage()
-    anchor = _FakeAnchor(AnchorResult("elem_123", "element", True, "anchored"))
+    anchor = _FakeAnchor(AnchorResult("soul_123", "soul", True, "training"))
     uc = SyncCharacterAnchor(pods, chars, storage, anchor)  # type: ignore[arg-type]
 
     result_char, res = await uc.execute(character_id=char.id, requester_id=LOCAL_USER_ID)
 
     assert res.synced is True
-    assert result_char.higgsfield_ref_id == "elem_123"
-    assert result_char.higgsfield_ref_kind == "element"
-    assert chars.store[char.id].higgsfield_ref_id == "elem_123"  # persisted
+    assert result_char.higgsfield_ref_id == "soul_123"
+    assert result_char.higgsfield_ref_kind == "soul"
+    assert chars.store[char.id].higgsfield_ref_id == "soul_123"  # persisted
     assert anchor.calls[0][0] == "Tico"  # the character name was anchored
 
 

@@ -310,7 +310,7 @@ class RemoveCharacterReference:
 
 @dataclass(frozen=True, slots=True)
 class SyncCharacterAnchor:
-    """Bind a local character to a reusable Higgsfield identity (an Element).
+    """Bind a local character to a reusable Higgsfield **Soul** identity.
 
     Fail-soft: the anchor client returns an `AnchorResult` describing what
     happened (synced or why not) rather than raising, so an un-verified/unset
@@ -329,11 +329,11 @@ class SyncCharacterAnchor:
         character = await _owned_character(
             self.char_repo, self.pod_repo, character_id, requester_id,
         )
-        urls: list[str] = []
+        paths = []
         for ref in character.reference_image_keys:
             bucket, _, key = ref.partition("/")
-            urls.append(await self.storage.url_for(bucket, key))
-        result = await self.anchor.create_element(name=character.name, image_urls=urls)
+            paths.append(await self.storage.open_path(bucket, key))
+        result = await self.anchor.create_soul(name=character.name, image_paths=paths)
         if result.synced and result.ref_id:
             character.higgsfield_ref_id = result.ref_id
             character.higgsfield_ref_kind = result.kind

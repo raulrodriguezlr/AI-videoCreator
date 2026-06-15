@@ -671,8 +671,8 @@ function CharacterAssetsModal({ podId, character, onClose }: {
             : <span className="dim" style={{ fontSize: 11.5 }}>sin anclar</span>}
         </div>
         <p className="dim" style={{ fontSize: 12 }}>
-          Reutiliza el mismo personaje en Higgsfield (un «element») a partir de sus
-          imágenes de referencia.
+          Entrena un «Soul» de Higgsfield (identidad reutilizable, ~10 min) a partir
+          de sus imágenes de referencia. Necesita 3 o más imágenes.
         </p>
         <div className="btn-row">
           <Button variant="default" loading={anchorM.isPending}
