@@ -20,6 +20,7 @@ from videocreator.domain.services.provider_advisor import (
     ModelOption,
     recommend_models,
 )
+from videocreator.infrastructure.providers.higgsfield_cli import account_balance
 from videocreator.infrastructure.system.model_catalog import detect_vram_gb, recommend
 from videocreator.infrastructure.system.ollama_admin import is_valid_model_name
 from videocreator.interfaces.rest.deps import ContainerDep, SettingsDep
@@ -307,6 +308,14 @@ async def copyright_screen(
 async def reload_sdk_providers(container: ContainerDep) -> dict:
     count = container.provider_registry().reload()
     return {"loaded": count, "providers": container.provider_registry().provider_ids}
+
+
+@router.get(
+    "/higgsfield/balance",
+    summary="Higgsfield Plus subscription credit balance (via `hf account status --json`)",
+)
+async def higgsfield_balance(settings: SettingsDep) -> dict:
+    return await account_balance(settings)
 
 
 __all__ = ["router"]
