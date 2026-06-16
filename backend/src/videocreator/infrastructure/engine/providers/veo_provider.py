@@ -53,6 +53,12 @@ class VeoProvider(BaseVideoProvider):
 
     def __init__(self, pod_config_path: str):
         super().__init__(pod_config_path)
+        # Read the model LIVE (not the import-time constant): the render handler
+        # sets `variables.VEO_MODEL` from the episode's chosen model just before
+        # building this provider, so a module-level `VEO_MODEL` would ignore the
+        # user's selection (e.g. picking "veo-3-fast" still ran 3.1-preview).
+        from videocreator.infrastructure.engine import variables as _vars
+        self.model = _vars.VEO_MODEL
         self.config = load_json(pod_config_path)
         self.pod_dir = os.path.dirname(pod_config_path)
         self.output_dir = os.path.join(self.pod_dir, "output")
@@ -120,7 +126,7 @@ class VeoProvider(BaseVideoProvider):
 
         # Base parameters
         gen_params = {
-            "model": VEO_MODEL,
+            "model": self.model,
             "prompt": prompt,
             "config": config,
         }
@@ -164,7 +170,7 @@ class VeoProvider(BaseVideoProvider):
         Generate a single video clip using Veo 3.1 text-to-video.
         Uses referenceImages for character consistency if provided.
         """
-        log.info("veo.generate_scene", prompt=prompt[:80], model=VEO_MODEL, duration_s=duration, resolution=VEO_RESOLUTION)
+        log.info("veo.generate_scene", prompt=prompt[:80], model=self.model, duration_s=duration, resolution=VEO_RESOLUTION)
 
         gen_params = self._build_gen_params(
             prompt=prompt,
@@ -298,7 +304,7 @@ class VeoProvider(BaseVideoProvider):
                     log.info("veo.scene_ready_rotated_key", scene=scene_num, path=clip.file_path)
                     if progress_manager:
                         progress_manager.mark_scene_completed(
-                            scene_index=i, clip_path=clip.file_path, model_used=VEO_MODEL,
+                            scene_index=i, clip_path=clip.file_path, model_used=self.model,
                         )
                     return {"clip": clip}
                 except Exception as retry_e:
@@ -321,7 +327,7 @@ class VeoProvider(BaseVideoProvider):
         self.key_manager.record_success()
 
     def _model_label(self) -> str:
-        return VEO_MODEL
+        return self.model
 
     # ==========================================
     # INTERNAL HELPER METHODS
@@ -367,7 +373,7 @@ class VeoProvider(BaseVideoProvider):
                 )
             raise RuntimeError(
                 "Backend response did not contain 'generated_videos'. "
-                f"Modelo: {VEO_MODEL} (Gemini API usa ids '-preview'; "
+                f"Modelo: {self.model} (Gemini API usa ids '-preview'; "
                 f"Vertex usa '-001' — VEO_MODEL/VERTEX_VEO_MODEL en .env). "
                 f"Respuesta: {operation.response!r}"[:500]
             )

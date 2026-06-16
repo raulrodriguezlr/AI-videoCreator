@@ -216,23 +216,10 @@ def _run_engine_sync(
     Imported lazily so the FastAPI app keeps booting even if the engine has
     heavy/optional deps (cv2, providers, …).
     """
-    # The engine reads provider/model from module globals — set them so the
-    # user's choice takes effect, then build the engine.
-    from videocreator.infrastructure.engine import variables as engine_vars
-    engine_vars.VIDEO_PROVIDER = provider_name
-    if model:
-        if provider_name == "veo":
-            engine_vars.VEO_MODEL = model
-        elif provider_name in ("ltx", "ltx_desktop"):
-            # The chosen LTX-Desktop pipeline id (e.g. "fast"/"pro").
-            engine_vars.LTX_DESKTOP_MODEL = model
-        elif provider_name == "artlist":
-            engine_vars.ARTLIST_MODEL = model
-        elif provider_name == "higgsfield":
-            # Friendly manifest id (e.g. "kling-3.0") → resolved to a cli_type by
-            # the SDK adapter. Defaults to Kling v3.0 when unset.
-            engine_vars.HIGGSFIELD_MODEL = model
-        # ltx_comfyui uses a fixed checkpoint (LTX_CHECKPOINT) — no per-render model.
+    # The engine reads provider/model from module globals — set them (one place:
+    # _set_engine_provider_vars, shared with regen/redub) so the user's choice
+    # actually takes effect, then build the engine.
+    _set_engine_provider_vars(provider_name, model)
 
     from videocreator.infrastructure.engine.engines.video_engine import VideoEngine
     from videocreator.infrastructure.engine.utils.progress_manager import ProgressManager
@@ -307,6 +294,8 @@ def _set_engine_provider_vars(provider_name: str, model: str | None) -> None:
         return
     if provider_name == "veo":
         engine_vars.VEO_MODEL = model
+    elif provider_name == "veo_vertex":
+        engine_vars.VERTEX_VEO_MODEL = model
     elif provider_name in ("ltx", "ltx_desktop"):
         engine_vars.LTX_DESKTOP_MODEL = model
     elif provider_name == "artlist":

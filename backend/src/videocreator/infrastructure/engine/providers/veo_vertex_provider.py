@@ -138,8 +138,11 @@ class VeoVertexProvider(BaseVideoProvider):
         
         # Vertex AI only serves GA `-001` ids — explicit setting, never derived
         # from the Gemini-API id by string surgery (the two catalogs differ).
+        # The per-episode selection (set by the render handler in
+        # `variables.VERTEX_VEO_MODEL`) wins; otherwise the config default.
         from videocreator.shared.config import get_settings
-        vertex_model = get_settings().vertex_veo_model
+        from videocreator.infrastructure.engine import variables as _vars
+        vertex_model = getattr(_vars, "VERTEX_VEO_MODEL", None) or get_settings().vertex_veo_model
 
         # Base parameters
         gen_params = {

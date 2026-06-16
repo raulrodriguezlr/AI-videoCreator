@@ -230,26 +230,33 @@ class BaseVideoProvider(ABC):
                 progress_manager.mark_episode_failed(f"No se generó ningún clip: {detail}")
             raise RuntimeError(f"No se generó ningún clip: {detail}")
 
+        # Partial render (a scene was filtered/failed or we hit a rate limit): do
+        # NOT present it as a finished episode. Mark it resumable and raise so the
+        # caller flags the episode FAILED — the per-scene progress is saved, so
+        # 'Continuar' (resume) picks up from the last good scene instead of leaving
+        # a half-episode that looks done.
+        if len(clips) < len(scenes):
+            reason = ("rate limit" if rate_limited
+                      else str(first_error) if first_error else "una escena falló/fue filtrada")
+            log.warning("scene_builder.partial", provider=self.LOG_TAG,
+                        clips=len(clips), total=len(scenes), reason=reason)
+            if progress_manager:
+                progress_manager.mark_episode_failed(
+                    f"render incompleto: {len(clips)}/{len(scenes)} escenas ({reason})"
+                )
+            raise RuntimeError(
+                f"render incompleto: {len(clips)}/{len(scenes)} escenas ({reason}). "
+                "Usa 'Continuar' para reanudar desde la última escena buena."
+            )
+
         final_native_path, final_dubbed_path = self._assemble_finals(clips, output_path)
-
         if progress_manager:
-            if rate_limited:
-                log.warning("scene_builder.paused_rate_limit", provider=self.LOG_TAG)
-            elif len(clips) >= len(scenes):
-                progress_manager.mark_episode_completed(final_native_path)
-            else:
-                log.warning("scene_builder.partial", provider=self.LOG_TAG, clips=len(clips), total=len(scenes))
-
-        status = "PARCIAL" if len(clips) < len(scenes) else "COMPLETO"
+            progress_manager.mark_episode_completed(final_native_path)
         log.info(
-            "scene_builder.done",
-            provider=self.LOG_TAG,
-            status=status,
-            rate_limited=rate_limited,
+            "scene_builder.done", provider=self.LOG_TAG, status="COMPLETO",
             native=final_native_path,
             dubbed=final_dubbed_path if final_dubbed_path != final_native_path else None,
-            clips=len(clips),
-            total=len(scenes),
+            clips=len(clips), total=len(scenes),
         )
         return final_dubbed_path
 
