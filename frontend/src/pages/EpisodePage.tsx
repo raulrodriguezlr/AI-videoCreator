@@ -124,6 +124,13 @@ function RenderConfig({ podId, episodeId, detail, providers, episodeState, onSav
     onSuccess: (r) => { toast.ok("Render encolado", `Job ${r.job_id.slice(0, 12)}…`); onRendered(); },
     onError: (e) => { toast.err("No se pudo encolar", (e as Error).message); setIsRendering(false); },
   });
+  // Resume an interrupted render: continues from the last completed scene
+  // (clips already on disk are kept; the engine seeds the next scene i2v).
+  const resumeRender = useMutation({
+    mutationFn: () => api.post<{ job_id: string }>(`/pods/${podId}/episodes/${episodeId}/render?resume=true`),
+    onSuccess: (r) => { toast.ok("Render reanudado", `Job ${r.job_id.slice(0, 12)}…`); onRendered(); },
+    onError: (e) => toast.err("No se pudo reanudar", (e as Error).message),
+  });
 
   /**
    * Save current provider/model/title first, then trigger the render.
@@ -181,6 +188,12 @@ function RenderConfig({ podId, episodeId, detail, providers, episodeState, onSav
           <Button variant="ghost" size="sm" loading={save.isPending && !isRendering} onClick={() => save.mutate()}>
             Guardar
           </Button>
+          {episodeState === "failed" && (
+            <Button variant="default" size="sm" loading={resumeRender.isPending}
+              onClick={() => resumeRender.mutate()} title="Continuar desde la última escena buena">
+              <IcRocket /> Continuar
+            </Button>
+          )}
           <Button variant="mint" size="sm" loading={isRendering} onClick={handleRender}>
             <IcRocket /> {episodeState === "ready" ? "Re-renderizar" : "Renderizar"}
           </Button>

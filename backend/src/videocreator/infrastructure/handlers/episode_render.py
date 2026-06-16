@@ -207,7 +207,7 @@ def _ensure_engine_workspace(
 def _run_engine_sync(
     *, pod_config_path: Path, episode_dir: Path, script_dict: dict[str, Any],
     output_path: Path, provider_name: str = "veo", model: str | None = None,
-    progress_callback = None,
+    progress_callback = None, resume: bool = False,
 ) -> Path:
     """Invoke the render engine's `VideoEngine.generate(...)` synchronously.
 
@@ -233,6 +233,23 @@ def _run_engine_sync(
         # ltx_comfyui uses a fixed checkpoint (LTX_CHECKPOINT) — no per-render model.
 
     from videocreator.infrastructure.engine.engines.video_engine import VideoEngine
+    from videocreator.infrastructure.engine.utils.progress_manager import ProgressManager
+
+    # Progress tracking makes renders RESUMABLE: every finished clip is recorded
+    # in episode_dir/progress.json, so a crashed/cancelled render can continue
+    # from the last good scene (the engine seeds it i2v from that clip's last
+    # frame). On a fresh render we (re)create the progress file; on resume we read
+    # the saved resume index and keep the clips already on disk.
+    pm = ProgressManager(str(episode_dir))
+    resume_from = 0
+    if resume and pm.load_progress():
+        resume_from = pm.get_resume_index()
+        log.info("episode_render.resume", episode_dir=str(episode_dir), resume_from=resume_from)
+    else:
+        pm.create_progress(
+            Path(episode_dir).name, script_dict.get("title", ""),
+            script_dict, len(script_dict.get("scenes", [])),
+        )
 
     # The render engine print()s emoji-rich progress. On a non-UTF-8 console
     # (Windows cp1252) that raises UnicodeEncodeError mid-render, so we tee its
@@ -250,6 +267,8 @@ def _run_engine_sync(
                 script_dict,
                 output_path=str(output_path),
                 episode_dir=str(episode_dir),
+                resume_from=resume_from,
+                progress_manager=pm,
             )
     except Exception as exc:
         tail = buffer.getvalue()[-1500:]
@@ -314,6 +333,34 @@ async def _store_render_output(
     return f"{STORAGE_BUCKET}/{final_key}", (f"{STORAGE_BUCKET}/{dub_key}" if dub_key else None)
 
 
+async def _sync_intermediate_clips(
+    episode_id: str, episode_dir: Path, storage: StoragePort,
+) -> None:
+    """Periodically sync generated clips to storage during render."""
+    from videocreator.infrastructure.filesystem.pod_importer import _MEDIA_INGEST_EXTS
+    
+    try:
+        while True:
+            await asyncio.sleep(5)
+            if not episode_dir.exists():
+                continue
+            existing = set(await storage.list_keys(STORAGE_BUCKET, prefix=f"{episode_id}/"))
+            for path in episode_dir.rglob("*"):
+                if not path.is_file() or path.suffix.lower() not in _MEDIA_INGEST_EXTS:
+                    continue
+                rel = path.relative_to(episode_dir)
+                if len(rel.parts) == 1:
+                    continue
+                key = f"{episode_id}/{rel.as_posix()}"
+                if key not in existing:
+                    try:
+                        await storage.put(STORAGE_BUCKET, key, path.read_bytes())
+                    except Exception:
+                        pass
+    except asyncio.CancelledError:
+        pass
+
+
 class EpisodeRenderHandler:
     """Concrete handler for `JobKind.GENERATE_EPISODE`.
 
@@ -358,10 +405,15 @@ class EpisodeRenderHandler:
         episode.state = EpisodeState.RENDERING
         await self._episodes.save(episode)
 
+        # Resume = continue an interrupted render from the last good scene
+        # (its clips persist in the workspace; only set when the caller asks).
+        resume = bool(job.payload.get("resume"))
+
         try:
-            await ctx.progress(0.15, f"rendering via {provider_name}")
+            verb = "resuming" if resume else "rendering"
+            await ctx.progress(0.15, f"{verb} via {provider_name}")
             final_key = await self._render_with_engine(
-                pod, script, episode, ctx, name=provider_name,
+                pod, script, episode, ctx, name=provider_name, resume=resume,
             )
         except Exception as exc:
             episode.state = EpisodeState.FAILED
@@ -411,7 +463,8 @@ class EpisodeRenderHandler:
     # If it fails, the episode fails immediately with the real error.
 
     async def _render_with_engine(
-        self, pod: Pod, script: Script, episode: Episode, ctx: JobContext, *, name: str,
+        self, pod: Pod, script: Script, episode: Episode, ctx: JobContext, *,
+        name: str, resume: bool = False,
     ) -> str:
         """Fallback path: drive the original `src.engines.video_engine`.
 
@@ -439,6 +492,7 @@ class EpisodeRenderHandler:
             # Scale the 0.0-1.0 engine progress into the 0.15-0.90 window
             asyncio.run_coroutine_threadsafe(ctx.progress(0.15 + (pct * 0.75), msg), loop)
 
+        sync_task = asyncio.create_task(_sync_intermediate_clips(episode.id, episode_dir, self._storage))
         try:
             mp4_path = await asyncio.to_thread(
                 _run_engine_sync,
@@ -449,11 +503,18 @@ class EpisodeRenderHandler:
                 provider_name=name,
                 model=episode.video_model,
                 progress_callback=_on_progress,
+                resume=resume,
             )
         except Exception as exc:
             raise ProviderError(
                 f"video engine failed: {exc}\n{traceback.format_exc(limit=3)}"
             ) from exc
+        finally:
+            sync_task.cancel()
+            try:
+                await sync_task
+            except asyncio.CancelledError:
+                pass
 
         await ctx.progress(0.90, "ingesting render output into storage")
         final_key, dub_key = await _store_render_output(

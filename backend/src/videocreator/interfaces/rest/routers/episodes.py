@@ -178,10 +178,15 @@ async def list_episode_media(
 )
 async def enqueue_render(
     pod_id: str, episode_id: str, uc: UseCasesDep, user_id: UserIdDep,
+    resume: bool = False,
 ) -> EnqueueRenderResponse:
+    """Render the episode. `resume=true` continues an interrupted render from the
+    last completed scene instead of starting over (clips already on disk are kept,
+    and the engine seeds the next scene i2v from the last good frame)."""
     del pod_id
     job_id = await uc.episodes.enqueue_render.execute(
         episode_id=EpisodeId(episode_id), requester_id=user_id,
+        extra_payload={"resume": True} if resume else None,
     )
     return EnqueueRenderResponse(job_id=job_id)
 
