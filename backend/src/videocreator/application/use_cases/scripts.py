@@ -35,6 +35,7 @@ from videocreator.shared.errors import (
     PodNotFound,
     ProviderError,
     ScriptNotFound,
+    ValidationError,
 )
 from videocreator.shared.ids import (
     PodId,
@@ -840,4 +841,42 @@ class ReviewScript:
         return await self.script_repo.save(updated)
 
 
-__all__ = ["DeleteScript", "GenerateScript", "ListScripts", "ReviewScript", "WriteStory"]
+@dataclass(frozen=True, slots=True)
+class UpdateScriptScene:
+    """Edit one scene's visual_prompt / audio_text before re-rendering it.
+
+    Updates both the typed Scene field AND the engine-shaped `raw` dict (the
+    render reads `raw`), so a subsequent render uses the new prompt/dialogue.
+    """
+
+    pod_repo: PodRepository
+    script_repo: ScriptRepository
+
+    async def execute(
+        self, *, script_id: ScriptId, scene_index: int, requester_id: UserId,
+        visual_prompt: str | None = None, audio_text: str | None = None,
+    ) -> Script:
+        script = await self.script_repo.get(script_id)
+        if script is None:
+            raise ScriptNotFound(f"script {script_id} not found")
+        pod = await self.pod_repo.get(script.pod_id)
+        if pod is None or not pod.is_owned_by(requester_id):
+            raise ForbiddenError("script belongs to a pod owned by a different user")
+        if not 0 <= scene_index < len(script.scenes):
+            raise ValidationError(
+                f"scene_index {scene_index} out of range (0..{len(script.scenes) - 1})"
+            )
+        scene = script.scenes[scene_index]
+        if visual_prompt is not None:
+            scene.visual_prompt = visual_prompt
+            scene.raw["visual_prompt"] = visual_prompt
+        if audio_text is not None:
+            scene.audio_text = audio_text
+            scene.raw["audio_text"] = audio_text
+        return await self.script_repo.save(script)
+
+
+__all__ = [
+    "DeleteScript", "GenerateScript", "ListScripts", "ReviewScript",
+    "UpdateScriptScene", "WriteStory",
+]

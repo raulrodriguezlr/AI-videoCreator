@@ -139,7 +139,7 @@
 
 | # | Pendiente | Severidad | Detalle |
 |---|---|---|---|
-| 1 | **Convergencia engine → SDK** | 🔴 | `infrastructure/engine/` (`VideoEngine`) sigue renderizando episodios completos; el SDK/DAG cubre Director, Memes y Recreations. Convergencia gradual A PROPÓSITO (episodios dependen de `VideoEngine`). `veo_vertex` y `ltx` (engine) no son manifests SDK todavía. |
+| 1 | **Convergencia engine → SDK** | 🟠 | Higgsfield YA es usable desde el engine legacy (`HiggsfieldEngineProvider` bridge → episodios pueden renderizar con Kling, etc.). Falta la **migración COMPLETA**: que los episodios rendericen por el DAG/`CapabilityExecutor` en vez del `VideoEngine` legacy, eliminando el doble camino. Es un **rewrite gordo** (hay que llevar al DAG el scene-builder: dubbing, concat, resume, last-frame-i2v, continuidad SceneContext) — apuntado como opción futura, NO urgente. `veo_vertex` y `ltx` (engine) tampoco son manifests SDK aún. |
 | 2 | **Scheduler sin cablear** | 🟠 | `BrainScheduler` (APScheduler) existe; `daily_briefing`/`rebenchmark` no se registran en el lifespan de FastAPI. |
 | 3 | **Auto-benchmark on install** | 🟡 | harness listo, falta encolar automáticamente al `registry.discover()`. |
 | 4 | **Proxy workflow** | 🟡 | `PROXY_WORKFLOW_ENABLED=False`, parked (§9.4). |

@@ -183,6 +183,13 @@ class GenerateScriptRequest(BaseModel):
     topic_id: str
 
 
+class UpdateSceneRequest(BaseModel):
+    """Edit one scene's prompt/dialogue before re-rendering it."""
+    model_config = ConfigDict(extra="forbid")
+    visual_prompt: str | None = Field(default=None, max_length=4000)
+    audio_text: str | None = Field(default=None, max_length=2000)
+
+
 class SceneResponse(BaseModel):
     id: str
     index: int
@@ -922,6 +929,7 @@ __all__ = [
     "EpisodeResponse",
     "GenerateReferenceImageRequest",
     "GenerateScriptRequest",
+    "UpdateSceneRequest",
     "GenerateSeoRequest",
     "GenerateTopicsRequest",
     "HealthResponse",

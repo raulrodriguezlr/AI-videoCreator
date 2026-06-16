@@ -10,6 +10,7 @@ from videocreator.interfaces.rest.schemas import (
     RewriteHookRequest,
     SceneResponse,
     ScriptResponse,
+    UpdateSceneRequest,
 )
 from videocreator.shared.ids import PodId, ScriptId, TopicId
 
@@ -39,6 +40,22 @@ async def list_scripts(
 ) -> list[ScriptResponse]:
     scripts = await uc.scripts.list.execute(pod_id=PodId(pod_id), requester_id=user_id)
     return [_to_response(s) for s in scripts]
+
+
+@router.patch(
+    "/{script_id}/scenes/{index}", response_model=ScriptResponse,
+    summary="Edit one scene's visual prompt / dialogue (before re-rendering it)",
+)
+async def update_scene(
+    pod_id: str, script_id: str, index: int, body: UpdateSceneRequest,
+    uc: UseCasesDep, user_id: UserIdDep,
+) -> ScriptResponse:
+    del pod_id
+    script = await uc.scripts.update_scene.execute(
+        script_id=ScriptId(script_id), scene_index=index, requester_id=user_id,
+        visual_prompt=body.visual_prompt, audio_text=body.audio_text,
+    )
+    return _to_response(script)
 
 
 @router.post(

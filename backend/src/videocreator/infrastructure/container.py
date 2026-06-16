@@ -67,6 +67,7 @@ from videocreator.application.use_cases.scripts import (
     GenerateScript,
     ListScripts,
     ReviewScript,
+    UpdateScriptScene,
     WriteStory,
 )
 from videocreator.application.use_cases.secrets import (
@@ -737,6 +738,7 @@ class _ScriptUseCases:
         )
         self.list = ListScripts(c.pod_repo(), c.script_repo())
         self.review = ReviewScript(c.pod_repo(), c.script_repo(), c.llm())
+        self.update_scene = UpdateScriptScene(c.pod_repo(), c.script_repo())
         self.rewrite_hook = HookRewriteUseCase(c.llm(), c.script_repo())
         self.delete = DeleteScript(c.pod_repo(), c.script_repo(), c.episode_repo())
 

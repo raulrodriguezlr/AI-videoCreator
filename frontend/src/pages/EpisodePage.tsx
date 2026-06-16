@@ -83,7 +83,7 @@ export function EpisodePage() {
             onRendered={() => nav("/jobs")}
           />
           {seo && <SeoPanel seo={seo} />}
-          {script && <ScriptPanel script={script} />}
+          {script && <ScriptPanel script={script} episodeId={episodeId} />}
         </div>
       </div>
     </div>
@@ -218,7 +218,7 @@ function SeoPanel({ seo }: { seo: SeoMetadata }) {
 }
 
 // ---------------------------------------------------------------- Script panel
-function ScriptPanel({ script }: { script: Script }) {
+function ScriptPanel({ script, episodeId }: { script: Script; episodeId: string }) {
   const [open, setOpen] = useState(false);
   const shown = open ? script.scenes : script.scenes.slice(0, 3);
   return (
@@ -232,11 +232,7 @@ function ScriptPanel({ script }: { script: Script }) {
           </div>
         )}
         {shown.map((s) => (
-          <div key={s.id} className="scene">
-            <span className="ix">ESCENA {String(s.index + 1).padStart(2, "0")} · {s.duration_s}s</span>
-            <div className="vp">{s.visual_prompt}</div>
-            {s.audio_text && <div className="at">{s.audio_text}</div>}
-          </div>
+          <SceneRow key={s.id} podId={script.pod_id} scriptId={script.id} episodeId={episodeId} scene={s} />
         ))}
         {script.scenes.length > 3 && (
           <Button variant="ghost" size="sm" onClick={() => setOpen(!open)}>
@@ -244,6 +240,56 @@ function ScriptPanel({ script }: { script: Script }) {
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+// One scene row: read-only, with an inline editor to fix the visual prompt /
+// dialogue before re-rendering (the render reads the edited values).
+function SceneRow({ podId, scriptId, episodeId, scene }: {
+  podId: string; scriptId: string; episodeId: string;
+  scene: { id: string; index: number; visual_prompt: string; audio_text: string | null; duration_s: number };
+}) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [editing, setEditing] = useState(false);
+  const [vp, setVp] = useState(scene.visual_prompt);
+  const [at, setAt] = useState(scene.audio_text ?? "");
+  const save = useMutation({
+    mutationFn: () => api.patch(`/pods/${podId}/scripts/${scriptId}/scenes/${scene.index}`, {
+      visual_prompt: vp, audio_text: at || null,
+    }),
+    onSuccess: () => {
+      toast.ok("Escena actualizada", "Re-renderiza para aplicar el nuevo prompt");
+      setEditing(false);
+      qc.invalidateQueries({ queryKey: ["episode-detail", episodeId] });
+    },
+    onError: (e) => toast.err("No se pudo guardar", (e as Error).message),
+  });
+
+  if (editing) {
+    return (
+      <div className="scene" style={{ display: "grid", gap: 6 }}>
+        <span className="ix">ESCENA {String(scene.index + 1).padStart(2, "0")} · editar</span>
+        <textarea className="input mono" rows={3} value={vp}
+          placeholder="Visual prompt (inglés)" onChange={(e) => setVp(e.target.value)} />
+        <textarea className="input" rows={2} value={at}
+          placeholder="Diálogo (audio_text)" onChange={(e) => setAt(e.target.value)} />
+        <div className="btn-row">
+          <Button variant="primary" size="sm" loading={save.isPending} onClick={() => save.mutate()}>Guardar</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setVp(scene.visual_prompt); setAt(scene.audio_text ?? ""); setEditing(false); }}>Cancelar</Button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="scene">
+      <div className="between">
+        <span className="ix">ESCENA {String(scene.index + 1).padStart(2, "0")} · {scene.duration_s}s</span>
+        <Button variant="ghost" size="sm" onClick={() => setEditing(true)} title="Editar prompt / diálogo"><IcEdit width={13} height={13} /></Button>
+      </div>
+      <div className="vp">{scene.visual_prompt}</div>
+      {scene.audio_text && <div className="at">{scene.audio_text}</div>}
     </div>
   );
 }
