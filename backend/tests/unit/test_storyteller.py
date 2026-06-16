@@ -13,6 +13,8 @@ from videocreator.application.use_cases.scripts import (
     GenerateScript,
     WriteStory,
     _DIALOGUE_QUALITY,
+    _format_characters,
+    _role_group,
     _style_label,
 )
 from videocreator.domain.value_objects import StyleProfile
@@ -113,6 +115,36 @@ async def test_generate_adapts_supplied_narrative() -> None:
     assert "ADAPT THIS" in prompt                    # director mode, not invent
     assert "technical director" in prompt
     assert _DIALOGUE_QUALITY.split("\n", 1)[0] in prompt  # quality rules carried
+
+
+def test_characters_grouped_by_role_and_registered_only() -> None:
+    pid = new_pod_id()
+
+    def C(name, role):
+        return Character(id=new_character_id(), pod_id=pid, name=name, role=role)
+
+    assert _role_group("protagonist") == "protagonist"
+    assert _role_group("supporting") == "secondary"
+    assert _role_group("antagonist") == "antagonist"
+
+    out = _format_characters([C("Tico", "protagonist"), C("Mara", "secondary"),
+                              C("Lobo", "antagonist")])
+    assert "NEVER invent" in out                      # registered-only rule
+    assert "ALWAYS present" in out                    # protagonist anchors
+    assert "only if they fit this episode" in out     # secondaries optional
+    assert "Tico" in out and "Mara" in out and "Lobo" in out
+
+
+def test_no_explicit_protagonist_promotes_first() -> None:
+    # Legacy data: every character defaults to "supporting" → the first becomes
+    # the de-facto lead so the story still has an anchor.
+    pid = new_pod_id()
+    out = _format_characters([
+        Character(id=new_character_id(), pod_id=pid, name="Pina", role="supporting"),
+        Character(id=new_character_id(), pod_id=pid, name="Otro", role="supporting"),
+    ])
+    proto_block = out.split("always present:", 1)[1].split("SECONDARY")[0]
+    assert "Pina" in proto_block and "Otro" not in proto_block
 
 
 def test_style_label_uses_profile_so_dropdown_changes_visuals() -> None:

@@ -299,23 +299,74 @@ _SCENE_SCHEMA: dict[str, Any] = {
 }
 
 
+#: Free-text role values that map to each narrative role group.
+_PROTAGONIST_ROLES = {"protagonist", "protagonista", "principal", "lead", "main", "hero"}
+_ANTAGONIST_ROLES = {"antagonist", "antagonista", "villain", "villano"}
+
+
+def _role_group(role: str | None) -> str:
+    r = (role or "").strip().lower()
+    if r in _PROTAGONIST_ROLES:
+        return "protagonist"
+    if r in _ANTAGONIST_ROLES:
+        return "antagonist"
+    return "secondary"
+
+
 def _format_characters(characters: list[Character]) -> str:
-    """Format character info for the LLM prompt so it can assign `character` fields."""
+    """Format the registered cast for the LLM, grouped by role.
+
+    Hard rule: the writer uses ONLY these characters. The protagonist anchors
+    every episode; secondary/antagonist characters appear ONLY when they serve
+    the story — the LLM decides which (if any), they do NOT all show up at once.
+    This stops the generator inventing un-registered recurring characters (kids,
+    a dragon, "friends") that have no reference image and break visual continuity.
+    """
     if not characters:
-        return "(no characters defined — use 'Narrator' as the default character)"
-    lines: list[str] = [
-        "CRITICAL INSTRUCTION: You MUST use the EXACT character names provided below. DO NOT add surnames, real-world identities, or auto-complete their names (e.g., if the name is 'Cristiano', DO NOT write 'Cristiano Ronaldo')."
-    ]
+        return ("(no characters registered — tell the story with a single warm "
+                "narrator/host; do NOT invent named characters)")
+
+    groups: dict[str, list[Character]] = {"protagonist": [], "secondary": [], "antagonist": []}
     for c in characters:
+        groups[_role_group(c.role)].append(c)
+    if not groups["protagonist"]:
+        # No explicit lead set — promote the first character so the story still
+        # has an anchor (e.g. legacy characters all default to "supporting").
+        first = characters[0]
+        groups[_role_group(first.role)].remove(first)
+        groups["protagonist"].append(first)
+
+    def _line(c: Character) -> str:
         parts = [f"- **{c.name}**"]
-        if c.role:
-            parts.append(f"(role: {c.role})")
         if c.personality:
             parts.append(f"— {c.personality}")
         if c.look_description:
             parts.append(f"[look: {c.look_description}]")
-        lines.append(" ".join(parts))
-    return "\n".join(lines)
+        return " ".join(parts)
+
+    out: list[str] = [
+        "## CAST — use ONLY these characters (NEVER invent new named ones)",
+        "RULES:",
+        "- Use the EXACT names below. Never add surnames or real-world identities "
+        "(if a name is 'Cristiano', never write 'Cristiano Ronaldo').",
+        "- The PROTAGONIST(S) drive every episode and are ALWAYS present.",
+        "- SECONDARY / ANTAGONIST characters appear ONLY when they genuinely serve "
+        "THIS episode. YOU decide which (if any) show up — do NOT force them all in; "
+        "an episode may star the protagonist alone.",
+        "- You MUST NOT introduce new recurring named characters not listed here. An "
+        "incidental, silent background creature (a passing blue bird, a fish) is fine, "
+        "but never a named character with dialogue or a recurring presence.",
+    ]
+    if groups["protagonist"]:
+        out.append("\nPROTAGONIST(S) — always present:")
+        out += [_line(c) for c in groups["protagonist"]]
+    if groups["secondary"]:
+        out.append("\nSECONDARY — optional, include only if they fit this episode:")
+        out += [_line(c) for c in groups["secondary"]]
+    if groups["antagonist"]:
+        out.append("\nANTAGONIST(S) — optional, only if this episode needs their conflict:")
+        out += [_line(c) for c in groups["antagonist"]]
+    return "\n".join(out)
 
 
 #: StyleProfile (the pod-settings dropdown) → a visual-style description for the

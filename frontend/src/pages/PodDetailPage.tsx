@@ -413,19 +413,26 @@ function CharactersTab({ podId, q }: { podId: string; q: UseQueryResult<Characte
   const toast = useToast();
   const [assetsFor, setAssetsFor] = useState<Character | null>(null);
   const [editing, setEditing] = useState<Character | null>(null);
+  const [creating, setCreating] = useState(false);
   const del = useMutation({
     mutationFn: (id: string) => api.delete(`/pods/${podId}/characters/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["chars", podId] }); toast.ok("Personaje borrado"); },
     onError: (e) => toast.err("No se pudo borrar", (e as Error).message),
   });
   if (q.isLoading) return <Loading />;
-  if (!q.data?.length) return <Empty emoji="🧑‍🎤" title="Sin personajes">El asistente de pods puede proponer un reparto.</Empty>;
 
   // Keep the open modal in sync with refreshed query data.
-  const live = assetsFor && q.data.find((c) => c.id === assetsFor.id);
+  const live = assetsFor && q.data?.find((c) => c.id === assetsFor.id);
 
   return (
     <>
+      <div className="between" style={{ marginBottom: 12 }}>
+        <span className="eyebrow">Reparto</span>
+        <Button size="sm" variant="primary" onClick={() => setCreating(true)}><IcWand /> Nuevo personaje</Button>
+      </div>
+      {!q.data?.length ? (
+        <Empty emoji="🧑‍🎤" title="Sin personajes">Crea el reparto: marca a tu protagonista y añade secundarios o antagonistas.</Empty>
+      ) : (
       <div className="grid cols">
         {q.data.map((c) => (
           <div key={c.id} className="card card-pad stack">
@@ -458,13 +465,59 @@ function CharactersTab({ podId, q }: { podId: string; q: UseQueryResult<Characte
           </div>
         ))}
       </div>
+      )}
 
       {live && (
         <CharacterAssetsModal podId={podId} character={live} onClose={() => setAssetsFor(null)} />
       )}
       {editing && <EditCharacterModal podId={podId} character={editing} onClose={() => setEditing(null)}
         onSaved={() => { qc.invalidateQueries({ queryKey: ["chars", podId] }); setEditing(null); }} />}
+      {creating && <CreateCharacterModal podId={podId} onClose={() => setCreating(false)}
+        onSaved={() => { qc.invalidateQueries({ queryKey: ["chars", podId] }); setCreating(false); }} />}
     </>
+  );
+}
+
+const ROLE_OPTIONS: { value: string; label: string }[] = [
+  { value: "protagonist", label: "Protagonista (siempre sale)" },
+  { value: "secondary", label: "Secundario (sale a veces)" },
+  { value: "antagonist", label: "Antagonista" },
+];
+
+// Create a new character in the pod. Role drives the script generator: the
+// protagonist anchors every episode; secondary/antagonist appear only when the
+// LLM decides they fit. Voice/reference images are assigned later (edit/assets).
+function CreateCharacterModal({ podId, onClose, onSaved }: {
+  podId: string; onClose: () => void; onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("secondary");
+  const [personality, setPersonality] = useState("");
+  const [look, setLook] = useState("");
+  const create = useMutation({
+    mutationFn: () => api.post<Character>(`/pods/${podId}/characters`, {
+      name, role, personality: personality || null, look_description: look || null,
+    }),
+    onSuccess: () => { toast.ok("Personaje creado"); onSaved(); },
+    onError: (e) => toast.err("No se pudo crear", (e as Error).message),
+  });
+  return (
+    <Modal title="Nuevo personaje" onClose={onClose} footer={<>
+      <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+      <Button variant="primary" loading={create.isPending} disabled={!name.trim()} onClick={() => create.mutate()}>Crear</Button>
+    </>}>
+      <div className="row">
+        <Field label="Nombre"><input className="input" value={name} autoFocus onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Rol">
+          <select className="select" value={role} onChange={(e) => setRole(e.target.value)}>
+            {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </Field>
+      </div>
+      <Field label="Personalidad"><textarea className="textarea" value={personality} placeholder="curioso, valiente, aprende de sus errores…" onChange={(e) => setPersonality(e.target.value)} /></Field>
+      <Field label="Aspecto (look)"><textarea className="textarea" value={look} placeholder="ardilla naranja, casco espacial plateado…" onChange={(e) => setLook(e.target.value)} /></Field>
+    </Modal>
   );
 }
 
@@ -499,7 +552,12 @@ function EditCharacterModal({ podId, character, onClose, onSaved }: {
     </>}>
       <div className="row">
         <Field label="Nombre"><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></Field>
-        <Field label="Rol"><input className="input" value={role} onChange={(e) => setRole(e.target.value)} /></Field>
+        <Field label="Rol">
+          <select className="select" value={ROLE_OPTIONS.some((r) => r.value === role) ? role : "secondary"}
+            onChange={(e) => setRole(e.target.value)}>
+            {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </Field>
       </div>
       <Field label="Personalidad"><textarea className="textarea" value={personality} onChange={(e) => setPersonality(e.target.value)} /></Field>
       <Field label="Aspecto (look)"><textarea className="textarea" value={look} onChange={(e) => setLook(e.target.value)} /></Field>
