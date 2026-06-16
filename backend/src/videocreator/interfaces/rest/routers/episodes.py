@@ -211,4 +211,40 @@ async def regenerate_scene(
     return EnqueueRenderResponse(job_id=job_id)
 
 
+@router.post(
+    "/{episode_id}/scenes/{index}/redub", response_model=EnqueueRenderResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Re-dub one scene's audio and recompile the final video",
+)
+async def redub_scene(
+    pod_id: str, episode_id: str, index: int, uc: UseCasesDep, user_id: UserIdDep,
+) -> EnqueueRenderResponse:
+    """Re-run the TTS dubbing for scene `index` (e.g. after changing its voice or
+    dialogue) without regenerating the video, then recompile the dubbed final."""
+    del pod_id
+    job_id = await uc.episodes.enqueue_render.execute(
+        episode_id=EpisodeId(episode_id), requester_id=user_id,
+        extra_payload={"redub_scene": index},
+    )
+    return EnqueueRenderResponse(job_id=job_id)
+
+
+@router.post(
+    "/{episode_id}/redub", response_model=EnqueueRenderResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Re-dub every scene and recompile the dubbed final video",
+)
+async def redub_all(
+    pod_id: str, episode_id: str, uc: UseCasesDep, user_id: UserIdDep,
+) -> EnqueueRenderResponse:
+    """Re-dub all clips (replacing existing dubs) and recompile a single dubbed
+    final that replaces the episode's dubbed video."""
+    del pod_id
+    job_id = await uc.episodes.enqueue_render.execute(
+        episode_id=EpisodeId(episode_id), requester_id=user_id,
+        extra_payload={"redub_all": True},
+    )
+    return EnqueueRenderResponse(job_id=job_id)
+
+
 __all__ = ["router"]

@@ -131,6 +131,12 @@ function RenderConfig({ podId, episodeId, detail, providers, episodeState, onSav
     onSuccess: (r) => { toast.ok("Render reanudado", `Job ${r.job_id.slice(0, 12)}…`); onRendered(); },
     onError: (e) => toast.err("No se pudo reanudar", (e as Error).message),
   });
+  // Re-dub EVERY clip (replace existing dubs) and recompile the dubbed final.
+  const redubAll = useMutation({
+    mutationFn: () => api.post<{ job_id: string }>(`/pods/${podId}/episodes/${episodeId}/redub`),
+    onSuccess: (r) => { toast.ok("Redoblando episodio", `Job ${r.job_id.slice(0, 12)}…`); onRendered(); },
+    onError: (e) => toast.err("No se pudo redoblar", (e as Error).message),
+  });
 
   /**
    * Save current provider/model/title first, then trigger the render.
@@ -188,6 +194,12 @@ function RenderConfig({ podId, episodeId, detail, providers, episodeState, onSav
           <Button variant="ghost" size="sm" loading={save.isPending && !isRendering} onClick={() => save.mutate()}>
             Guardar
           </Button>
+          {episodeState === "ready" && (
+            <Button variant="default" size="sm" loading={redubAll.isPending}
+              onClick={() => redubAll.mutate()} title="Redoblar todos los clips y recompilar">
+              🎙 Redoblar todo
+            </Button>
+          )}
           {episodeState === "failed" && (
             <Button variant="default" size="sm" loading={resumeRender.isPending}
               onClick={() => resumeRender.mutate()} title="Continuar desde la última escena buena">
@@ -273,6 +285,13 @@ function SceneRow({ podId, scriptId, episodeId, scene }: {
     onSuccess: (r) => toast.ok("Regenerando escena", `Job ${r.job_id.slice(0, 12)}… · recompila el vídeo al acabar`),
     onError: (e) => toast.err("No se pudo regenerar", (e as Error).message),
   });
+  // Re-dub ONLY this scene's audio (no video regen) and recompile.
+  const redub = useMutation({
+    mutationFn: () => api.post<{ job_id: string }>(
+      `/pods/${podId}/episodes/${episodeId}/scenes/${scene.index}/redub`),
+    onSuccess: (r) => toast.ok("Redoblando escena", `Job ${r.job_id.slice(0, 12)}…`),
+    onError: (e) => toast.err("No se pudo redoblar", (e as Error).message),
+  });
 
   if (editing) {
     return (
@@ -295,6 +314,7 @@ function SceneRow({ podId, scriptId, episodeId, scene }: {
         <span className="ix">ESCENA {String(scene.index + 1).padStart(2, "0")} · {scene.duration_s}s</span>
         <div className="btn-row" style={{ gap: 4 }}>
           <Button variant="ghost" size="sm" onClick={() => setEditing(true)} title="Editar prompt / diálogo"><IcEdit width={13} height={13} /></Button>
+          <Button variant="ghost" size="sm" loading={redub.isPending} onClick={() => redub.mutate()} title="Redoblar solo el audio de esta escena">🎙</Button>
           <Button variant="ghost" size="sm" loading={regen.isPending} onClick={() => regen.mutate()} title="Regenerar solo este clip y recompilar"><IcRocket width={13} height={13} /></Button>
         </div>
       </div>

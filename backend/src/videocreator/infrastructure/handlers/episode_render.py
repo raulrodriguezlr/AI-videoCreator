@@ -14,6 +14,7 @@ event loop stays responsive.
 from __future__ import annotations
 
 import asyncio
+import functools
 import io
 import json
 import os
@@ -277,6 +278,76 @@ def _run_engine_sync(
     return Path(result)
 
 
+def _collect_disk_clips(clips_dir: str, scenes: list[dict[str, Any]]) -> list:
+    """Build the ordered VideoClip list from clips on disk (prefer each dub).
+
+    Clip naming is ``clip_{index+1:02d}.mp4`` (+ ``_dubbed`` for the dub), as
+    written by ``generate_scene`` / ``_apply_dubbing``.
+    """
+    from videocreator.infrastructure.engine.providers.base_provider import VideoClip
+    out: list = []
+    for i, sc in enumerate(scenes):
+        n = f"{i + 1:02d}"
+        native = os.path.join(clips_dir, f"clip_{n}.mp4")
+        if not os.path.exists(native):
+            continue
+        vc = VideoClip(file_path=native, duration=float(sc.get("duration_seconds", 5)))
+        dub = os.path.join(clips_dir, f"clip_{n}_dubbed.mp4")
+        if os.path.exists(dub):
+            vc.dubbed_path = dub
+        out.append(vc)
+    return out
+
+
+def _set_engine_provider_vars(provider_name: str, model: str | None) -> None:
+    """Set the module globals the engine reads to pick provider + model."""
+    from videocreator.infrastructure.engine import variables as engine_vars
+    engine_vars.VIDEO_PROVIDER = provider_name
+    if not model:
+        return
+    if provider_name == "veo":
+        engine_vars.VEO_MODEL = model
+    elif provider_name in ("ltx", "ltx_desktop"):
+        engine_vars.LTX_DESKTOP_MODEL = model
+    elif provider_name == "artlist":
+        engine_vars.ARTLIST_MODEL = model
+    elif provider_name == "higgsfield":
+        engine_vars.HIGGSFIELD_MODEL = model
+
+
+def _redub_sync(
+    *, pod_config_path: Path, episode_dir: Path, script_dict: dict[str, Any],
+    output_path: Path, provider_name: str = "veo", model: str | None = None,
+    scene_index: int | None = None,
+) -> Path:
+    """Re-dub one scene (or all when `scene_index` is None) and recompile.
+
+    Re-runs the TTS dubbing (`_apply_dubbing`) over existing clips — no video is
+    regenerated — then concats the native + dubbed finals. Returns the dubbed
+    final. The workspace must already hold the clips (rehydrated by the caller).
+    """
+    _set_engine_provider_vars(provider_name, model)
+    from videocreator.infrastructure.engine.providers import get_provider
+    from videocreator.infrastructure.engine.providers.base_provider import VideoClip
+
+    provider = get_provider(str(pod_config_path))
+    scenes = script_dict.get("scenes", [])
+    clips_dir = os.path.join(str(episode_dir), "clips")
+    targets = [scene_index] if scene_index is not None else list(range(len(scenes)))
+    for i in targets:
+        if not 0 <= i < len(scenes):
+            continue
+        clip_path = os.path.join(clips_dir, f"clip_{i + 1:02d}.mp4")
+        if not os.path.exists(clip_path):
+            continue
+        clip = VideoClip(file_path=clip_path,
+                         duration=float(scenes[i].get("duration_seconds", 5)))
+        provider._apply_dubbing(clip, scenes[i], clips_dir, f"{i + 1:02d}")
+    all_clips = _collect_disk_clips(clips_dir, scenes)
+    _native, dubbed = provider._assemble_finals(all_clips, str(output_path))
+    return Path(dubbed)
+
+
 def _regen_scene_sync(
     *, pod_config_path: Path, episode_dir: Path, script_dict: dict[str, Any],
     output_path: Path, provider_name: str = "veo", model: str | None = None,
@@ -291,18 +362,7 @@ def _regen_scene_sync(
     thread; the workspace must already hold the other clips (rehydrated from
     storage by the caller).
     """
-    from videocreator.infrastructure.engine import variables as engine_vars
-    engine_vars.VIDEO_PROVIDER = provider_name
-    if model:
-        if provider_name == "veo":
-            engine_vars.VEO_MODEL = model
-        elif provider_name in ("ltx", "ltx_desktop"):
-            engine_vars.LTX_DESKTOP_MODEL = model
-        elif provider_name == "artlist":
-            engine_vars.ARTLIST_MODEL = model
-        elif provider_name == "higgsfield":
-            engine_vars.HIGGSFIELD_MODEL = model
-
+    _set_engine_provider_vars(provider_name, model)
     from videocreator.infrastructure.engine.providers import get_provider
     from videocreator.infrastructure.engine.providers.base_provider import VideoClip
     from videocreator.infrastructure.engine.utils.scene_context import SceneContextManager
@@ -350,17 +410,7 @@ def _regen_scene_sync(
     provider._apply_dubbing(clip, scene, clips_dir, f"{scene_index + 1:02d}")
 
     # Recompile the finals from every clip on disk (prefer each clip's dub).
-    all_clips: list = []
-    for i, sc in enumerate(scenes):
-        n = f"{i + 1:02d}"
-        native = os.path.join(clips_dir, f"clip_{n}.mp4")
-        if not os.path.exists(native):
-            continue
-        vc = VideoClip(file_path=native, duration=float(sc.get("duration_seconds", 5)))
-        dub = os.path.join(clips_dir, f"clip_{n}_dubbed.mp4")
-        if os.path.exists(dub):
-            vc.dubbed_path = dub
-        all_clips.append(vc)
+    all_clips = _collect_disk_clips(clips_dir, scenes)
     _native, dubbed = provider._assemble_finals(all_clips, str(output_path))
     return Path(dubbed)
 
@@ -499,6 +549,9 @@ class EpisodeRenderHandler:
         resume = bool(job.payload.get("resume"))
         # Regen = redo a single scene's clip, keeping the others, then recompile.
         regen_scene = job.payload.get("regen_scene")
+        # Redub = re-run TTS dubbing over existing clips (one scene or all).
+        redub_scene = job.payload.get("redub_scene")
+        redub_all = bool(job.payload.get("redub_all"))
 
         try:
             if regen_scene is not None:
@@ -506,6 +559,11 @@ class EpisodeRenderHandler:
                 final_key = await self._regenerate_one_scene(
                     pod, script, episode, ctx,
                     name=provider_name, scene_index=int(regen_scene),
+                )
+            elif redub_all or redub_scene is not None:
+                final_key = await self._redub_episode(
+                    pod, script, episode, ctx, name=provider_name,
+                    scene_index=None if redub_all else int(redub_scene),
                 )
             else:
                 verb = "resuming" if resume else "rendering"
@@ -648,15 +706,16 @@ class EpisodeRenderHandler:
         log.info("episode_render.rehydrated", episode_id=episode.id, files=restored)
         return restored
 
-    async def _regenerate_one_scene(
+    async def _post_render_op(
         self, pod: Pod, script: Script, episode: Episode, ctx: JobContext, *,
-        name: str, scene_index: int,
+        sync_fn, label: str, provider_name: str, refresh_clip_index: int | None = None,
     ) -> str:
-        """Redo a single scene's clip (keeping the rest) and recompile the finals.
+        """Shared scaffold for in-place episode edits (regen scene / redub).
 
-        Rehydrates the previous clips from storage, regenerates scene ``scene_index``
-        with the (possibly edited) prompt via the selected provider, re-dubs it,
-        recompiles, and re-stores — replacing the episode's final video.
+        Build the workspace, rehydrate the prior clips from storage, run `sync_fn`
+        in a worker thread to produce a fresh dubbed final, then re-store and clean
+        up. `refresh_clip_index` drops one clip's storage keys so it re-uploads.
+        Returns the new `final_video_key`.
         """
         await ctx.progress(0.15, "preparing engine workspace")
         characters = await self._characters.list_for_pod(PodId(pod.id))
@@ -669,31 +728,37 @@ class EpisodeRenderHandler:
             characters=characters, char_refs=char_refs,
         )
         await ctx.progress(0.25, "restoring previous clips")
-        await self._rehydrate_episode_dir(episode, episode_dir)
+        restored = await self._rehydrate_episode_dir(episode, episode_dir)
+        if restored == 0:
+            raise ProviderError(
+                "no previous clips found for this episode — render it first"
+            )
         output_path = episode_dir / f"{episode_filename(episode.title)}.mp4"
 
-        await ctx.progress(0.35, f"regenerating scene {scene_index + 1} via {name}")
+        await ctx.progress(0.35, label)
         try:
             mp4_path = await asyncio.to_thread(
-                _regen_scene_sync,
+                sync_fn,
                 pod_config_path=pod_config_path, episode_dir=episode_dir,
                 script_dict=script_dict, output_path=output_path,
-                provider_name=name, model=episode.video_model, scene_index=scene_index,
+                provider_name=provider_name, model=episode.video_model,
             )
         except Exception as exc:
             raise ProviderError(
-                f"scene {scene_index + 1} regen failed: {exc}\n{traceback.format_exc(limit=3)}"
+                f"{label} failed: {exc}\n{traceback.format_exc(limit=3)}"
             ) from exc
 
-        await ctx.progress(0.90, "storing regenerated video")
-        # The per-scene store skips keys that already exist, so drop the changed
-        # clip's keys first to force a fresh upload (finals are put-overwritten).
-        n = f"{scene_index + 1:02d}"
-        for k in (f"{episode.id}/clips/clip_{n}.mp4", f"{episode.id}/clips/clip_{n}_dubbed.mp4"):
-            try:
-                await self._storage.delete(STORAGE_BUCKET, k)
-            except Exception:  # noqa: BLE001 — best-effort; missing key is fine
-                pass
+        await ctx.progress(0.90, "storing")
+        if refresh_clip_index is not None:
+            # The per-scene store skips existing keys — drop the changed clip's so
+            # it re-uploads (finals are put-overwritten by title key).
+            n = f"{refresh_clip_index + 1:02d}"
+            for k in (f"{episode.id}/clips/clip_{n}.mp4",
+                      f"{episode.id}/clips/clip_{n}_dubbed.mp4"):
+                try:
+                    await self._storage.delete(STORAGE_BUCKET, k)
+                except Exception:  # noqa: BLE001 — best-effort; missing key is fine
+                    pass
         final_key, dub_key = await _store_render_output(
             episode, episode_dir, mp4_path, self._storage
         )
@@ -705,6 +770,31 @@ class EpisodeRenderHandler:
         if dub_key:
             episode.dubbed_video_key = dub_key
         return final_key
+
+    async def _regenerate_one_scene(
+        self, pod: Pod, script: Script, episode: Episode, ctx: JobContext, *,
+        name: str, scene_index: int,
+    ) -> str:
+        """Redo one scene's clip (keep the rest), re-dub it, recompile, re-store."""
+        return await self._post_render_op(
+            pod, script, episode, ctx,
+            sync_fn=functools.partial(_regen_scene_sync, scene_index=scene_index),
+            label=f"regenerating scene {scene_index + 1} via {name}",
+            provider_name=name, refresh_clip_index=scene_index,
+        )
+
+    async def _redub_episode(
+        self, pod: Pod, script: Script, episode: Episode, ctx: JobContext, *,
+        name: str, scene_index: int | None,
+    ) -> str:
+        """Re-dub one scene (or all when `scene_index` is None) and recompile."""
+        what = f"scene {scene_index + 1}" if scene_index is not None else "all scenes"
+        return await self._post_render_op(
+            pod, script, episode, ctx,
+            sync_fn=functools.partial(_redub_sync, scene_index=scene_index),
+            label=f"re-dubbing {what}",
+            provider_name=name, refresh_clip_index=scene_index,
+        )
 
     async def _materialize_character_refs(
         self, characters: list[Character], workspace: Path,
