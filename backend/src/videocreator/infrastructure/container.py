@@ -758,7 +758,7 @@ class _EpisodeUseCases:
             c.media_library(),
         )
         self.update = UpdateEpisode(c.pod_repo(), c.episode_repo())
-        self.delete = DeleteEpisode(c.pod_repo(), c.episode_repo())
+        self.delete = DeleteEpisode(c.pod_repo(), c.episode_repo(), c.storage())
 
 
 class _ShortsUseCases:
