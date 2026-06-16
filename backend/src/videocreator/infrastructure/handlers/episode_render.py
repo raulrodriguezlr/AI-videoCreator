@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -276,6 +277,94 @@ def _run_engine_sync(
     return Path(result)
 
 
+def _regen_scene_sync(
+    *, pod_config_path: Path, episode_dir: Path, script_dict: dict[str, Any],
+    output_path: Path, provider_name: str = "veo", model: str | None = None,
+    scene_index: int,
+) -> Path:
+    """Regenerate ONE scene's clip (keeping the rest) and recompile the finals.
+
+    Mirrors the legacy SceneRegenerator: rebuild the cinematographic prompt with
+    the prior scenes' continuity, regen ``clip_NN`` (i2v-bridged off the previous
+    clip's last frame), re-dub it, then concat ALL clips into the native + dubbed
+    finals. Returns the dubbed final (or native when undubbed). Runs in a worker
+    thread; the workspace must already hold the other clips (rehydrated from
+    storage by the caller).
+    """
+    from videocreator.infrastructure.engine import variables as engine_vars
+    engine_vars.VIDEO_PROVIDER = provider_name
+    if model:
+        if provider_name == "veo":
+            engine_vars.VEO_MODEL = model
+        elif provider_name in ("ltx", "ltx_desktop"):
+            engine_vars.LTX_DESKTOP_MODEL = model
+        elif provider_name == "artlist":
+            engine_vars.ARTLIST_MODEL = model
+        elif provider_name == "higgsfield":
+            engine_vars.HIGGSFIELD_MODEL = model
+
+    from videocreator.infrastructure.engine.providers import get_provider
+    from videocreator.infrastructure.engine.providers.base_provider import VideoClip
+    from videocreator.infrastructure.engine.utils.scene_context import SceneContextManager
+
+    provider = get_provider(str(pod_config_path))
+    scenes = script_dict.get("scenes", [])
+    if not 0 <= scene_index < len(scenes):
+        raise ValueError(f"scene_index {scene_index} out of range (0..{len(scenes) - 1})")
+    scene = scenes[scene_index]
+    clips_dir = os.path.join(str(episode_dir), "clips")
+    os.makedirs(clips_dir, exist_ok=True)
+
+    # Replay prior scenes so the regenerated prompt keeps visual continuity.
+    context_mgr = SceneContextManager(str(episode_dir), pod_config=getattr(provider, "config", {}))
+    for prev in range(scene_index):
+        context_mgr.update_after_scene(
+            prev, scenes[prev], scenes[prev].get("transition_to_next", "cut")
+        )
+    incoming = (scenes[scene_index - 1].get("transition_to_next", "cut")
+                if scene_index > 0 else "scene_change")
+    prompt = provider._build_cinematographic_prompt(
+        scene, scene.get("narrative_phase", ""),
+        incoming_transition=incoming,
+        continuity_context=context_mgr.get_continuity_context(incoming),
+    )
+    ref_images = provider._collect_reference_images(str(episode_dir), script_dict, scenes)
+    # Seed the i2v bridge from the previous clip's last frame (clip naming is
+    # clip_{index+1:02d}.mp4, set by generate_scene).
+    prev_clips: list = []
+    if scene_index > 0:
+        prev_path = os.path.join(clips_dir, f"clip_{scene_index:02d}.mp4")
+        if os.path.exists(prev_path):
+            prev_clips.append(VideoClip(
+                file_path=prev_path,
+                duration=float(scenes[scene_index - 1].get("duration_seconds", 5)),
+            ))
+    clip = provider._generate_clip(
+        scene=scene, i=scene_index, clips=prev_clips,
+        transition=scene.get("transition_to_next", "cut"), prompt=prompt,
+        scene_duration=int(scene.get("duration_seconds", 5)), ref_images=ref_images,
+        negative=scene.get("negative_prompt"),
+        narrative_phase=scene.get("narrative_phase", ""), clips_dir=clips_dir,
+        incoming_transition=incoming, is_resume_bridge=True,
+    )
+    provider._apply_dubbing(clip, scene, clips_dir, f"{scene_index + 1:02d}")
+
+    # Recompile the finals from every clip on disk (prefer each clip's dub).
+    all_clips: list = []
+    for i, sc in enumerate(scenes):
+        n = f"{i + 1:02d}"
+        native = os.path.join(clips_dir, f"clip_{n}.mp4")
+        if not os.path.exists(native):
+            continue
+        vc = VideoClip(file_path=native, duration=float(sc.get("duration_seconds", 5)))
+        dub = os.path.join(clips_dir, f"clip_{n}_dubbed.mp4")
+        if os.path.exists(dub):
+            vc.dubbed_path = dub
+        all_clips.append(vc)
+    _native, dubbed = provider._assemble_finals(all_clips, str(output_path))
+    return Path(dubbed)
+
+
 async def _store_render_output(
     episode: Episode, episode_dir: Path, engine_output: Path, storage: StoragePort,
 ) -> tuple[str, str | None]:
@@ -408,13 +497,22 @@ class EpisodeRenderHandler:
         # Resume = continue an interrupted render from the last good scene
         # (its clips persist in the workspace; only set when the caller asks).
         resume = bool(job.payload.get("resume"))
+        # Regen = redo a single scene's clip, keeping the others, then recompile.
+        regen_scene = job.payload.get("regen_scene")
 
         try:
-            verb = "resuming" if resume else "rendering"
-            await ctx.progress(0.15, f"{verb} via {provider_name}")
-            final_key = await self._render_with_engine(
-                pod, script, episode, ctx, name=provider_name, resume=resume,
-            )
+            if regen_scene is not None:
+                await ctx.progress(0.10, f"regenerating scene {int(regen_scene) + 1}")
+                final_key = await self._regenerate_one_scene(
+                    pod, script, episode, ctx,
+                    name=provider_name, scene_index=int(regen_scene),
+                )
+            else:
+                verb = "resuming" if resume else "rendering"
+                await ctx.progress(0.15, f"{verb} via {provider_name}")
+                final_key = await self._render_with_engine(
+                    pod, script, episode, ctx, name=provider_name, resume=resume,
+                )
         except Exception as exc:
             episode.state = EpisodeState.FAILED
             await self._episodes.save(episode)
@@ -526,6 +624,84 @@ class EpisodeRenderHandler:
         except Exception as e:
             log.warning("episode_render.cleanup_failed", episode_id=episode.id, error=str(e))
         
+        if dub_key:
+            episode.dubbed_video_key = dub_key
+        return final_key
+
+    async def _rehydrate_episode_dir(self, episode: Episode, episode_dir: Path) -> int:
+        """Download a prior render's per-scene artifacts (clips/audio/frames) from
+        storage back into the workspace, so a single-scene regen can reuse them.
+
+        Root-level finals are skipped (they're rebuilt). Returns the file count.
+        """
+        prefix = f"{episode.id}/"
+        keys = await self._storage.list_keys(STORAGE_BUCKET, prefix=prefix)
+        restored = 0
+        for key in keys:
+            rel = key[len(prefix):]
+            if "/" not in rel:  # a root-level final — rebuilt, don't restore
+                continue
+            dest = episode_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(await self._storage.get(STORAGE_BUCKET, key))
+            restored += 1
+        log.info("episode_render.rehydrated", episode_id=episode.id, files=restored)
+        return restored
+
+    async def _regenerate_one_scene(
+        self, pod: Pod, script: Script, episode: Episode, ctx: JobContext, *,
+        name: str, scene_index: int,
+    ) -> str:
+        """Redo a single scene's clip (keeping the rest) and recompile the finals.
+
+        Rehydrates the previous clips from storage, regenerates scene ``scene_index``
+        with the (possibly edited) prompt via the selected provider, re-dubs it,
+        recompiles, and re-stores — replacing the episode's final video.
+        """
+        await ctx.progress(0.15, "preparing engine workspace")
+        characters = await self._characters.list_for_pod(PodId(pod.id))
+        workspace = self._settings.var_dir / "render" / pod.name
+        char_refs = await self._materialize_character_refs(characters, workspace)
+        script_dict = _engine_script_dict(episode, script, self._settings)
+        pod_config_path, episode_dir = await asyncio.to_thread(
+            _ensure_engine_workspace,
+            pod=pod, script_dict=script_dict, episode=episode, settings=self._settings,
+            characters=characters, char_refs=char_refs,
+        )
+        await ctx.progress(0.25, "restoring previous clips")
+        await self._rehydrate_episode_dir(episode, episode_dir)
+        output_path = episode_dir / f"{episode_filename(episode.title)}.mp4"
+
+        await ctx.progress(0.35, f"regenerating scene {scene_index + 1} via {name}")
+        try:
+            mp4_path = await asyncio.to_thread(
+                _regen_scene_sync,
+                pod_config_path=pod_config_path, episode_dir=episode_dir,
+                script_dict=script_dict, output_path=output_path,
+                provider_name=name, model=episode.video_model, scene_index=scene_index,
+            )
+        except Exception as exc:
+            raise ProviderError(
+                f"scene {scene_index + 1} regen failed: {exc}\n{traceback.format_exc(limit=3)}"
+            ) from exc
+
+        await ctx.progress(0.90, "storing regenerated video")
+        # The per-scene store skips keys that already exist, so drop the changed
+        # clip's keys first to force a fresh upload (finals are put-overwritten).
+        n = f"{scene_index + 1:02d}"
+        for k in (f"{episode.id}/clips/clip_{n}.mp4", f"{episode.id}/clips/clip_{n}_dubbed.mp4"):
+            try:
+                await self._storage.delete(STORAGE_BUCKET, k)
+            except Exception:  # noqa: BLE001 — best-effort; missing key is fine
+                pass
+        final_key, dub_key = await _store_render_output(
+            episode, episode_dir, mp4_path, self._storage
+        )
+        import shutil
+        try:
+            await asyncio.to_thread(shutil.rmtree, episode_dir, ignore_errors=True)
+        except Exception as e:
+            log.warning("episode_render.cleanup_failed", episode_id=episode.id, error=str(e))
         if dub_key:
             episode.dubbed_video_key = dub_key
         return final_key

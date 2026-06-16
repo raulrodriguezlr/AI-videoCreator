@@ -260,11 +260,18 @@ function SceneRow({ podId, scriptId, episodeId, scene }: {
       visual_prompt: vp, audio_text: at || null,
     }),
     onSuccess: () => {
-      toast.ok("Escena actualizada", "Re-renderiza para aplicar el nuevo prompt");
+      toast.ok("Escena actualizada", "Pulsa Regenerar para rehacer solo este clip");
       setEditing(false);
       qc.invalidateQueries({ queryKey: ["episode-detail", episodeId] });
     },
     onError: (e) => toast.err("No se pudo guardar", (e as Error).message),
+  });
+  // Redo ONLY this scene's clip (keep the rest) and recompile the final video.
+  const regen = useMutation({
+    mutationFn: () => api.post<{ job_id: string }>(
+      `/pods/${podId}/episodes/${episodeId}/scenes/${scene.index}/regenerate`),
+    onSuccess: (r) => toast.ok("Regenerando escena", `Job ${r.job_id.slice(0, 12)}… · recompila el vídeo al acabar`),
+    onError: (e) => toast.err("No se pudo regenerar", (e as Error).message),
   });
 
   if (editing) {
@@ -286,7 +293,10 @@ function SceneRow({ podId, scriptId, episodeId, scene }: {
     <div className="scene">
       <div className="between">
         <span className="ix">ESCENA {String(scene.index + 1).padStart(2, "0")} · {scene.duration_s}s</span>
-        <Button variant="ghost" size="sm" onClick={() => setEditing(true)} title="Editar prompt / diálogo"><IcEdit width={13} height={13} /></Button>
+        <div className="btn-row" style={{ gap: 4 }}>
+          <Button variant="ghost" size="sm" onClick={() => setEditing(true)} title="Editar prompt / diálogo"><IcEdit width={13} height={13} /></Button>
+          <Button variant="ghost" size="sm" loading={regen.isPending} onClick={() => regen.mutate()} title="Regenerar solo este clip y recompilar"><IcRocket width={13} height={13} /></Button>
+        </div>
       </div>
       <div className="vp">{scene.visual_prompt}</div>
       {scene.audio_text && <div className="at">{scene.audio_text}</div>}

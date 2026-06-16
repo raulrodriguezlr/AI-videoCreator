@@ -191,4 +191,24 @@ async def enqueue_render(
     return EnqueueRenderResponse(job_id=job_id)
 
 
+@router.post(
+    "/{episode_id}/scenes/{index}/regenerate",
+    response_model=EnqueueRenderResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Regenerate one scene's clip (keep the rest) and recompile the final",
+)
+async def regenerate_scene(
+    pod_id: str, episode_id: str, index: int, uc: UseCasesDep, user_id: UserIdDep,
+) -> EnqueueRenderResponse:
+    """Redo only scene `index` of an already-rendered episode (e.g. you don't like
+    how it turned out) using the current — possibly edited — prompt, then re-dub
+    that scene and recompile the final video. The other clips are kept."""
+    del pod_id
+    job_id = await uc.episodes.enqueue_render.execute(
+        episode_id=EpisodeId(episode_id), requester_id=user_id,
+        extra_payload={"regen_scene": index},
+    )
+    return EnqueueRenderResponse(job_id=job_id)
+
+
 __all__ = ["router"]
