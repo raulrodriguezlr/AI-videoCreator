@@ -184,8 +184,14 @@ class DeleteTopic:
     topic_repo: TopicRepository
 
     async def execute(self, *, topic_id: TopicId, requester_id: UserId) -> None:
-        await _owned_topic(self.topic_repo, self.pod_repo, topic_id, requester_id)
+        topic = await _owned_topic(self.topic_repo, self.pod_repo, topic_id, requester_id)
         await self.topic_repo.delete(topic_id)
+        # Best-effort: drop a matching universe_memory line (a script title often
+        # defaults to its topic title).
+        from videocreator.application.use_cases.scripts import _strip_universe_memory
+        pod = await self.pod_repo.get(topic.pod_id)
+        if pod is not None:
+            await _strip_universe_memory(self.pod_repo, pod, topic.title)
 
 
 __all__ = ["DeleteTopic", "GenerateTopics", "ListTopics", "UpdateTopic"]

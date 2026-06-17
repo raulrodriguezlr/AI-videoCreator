@@ -766,6 +766,24 @@ class DeleteScript:
             )
 
         await self.script_repo.delete(script_id)
+        # Also drop this script's line from the pod's universe_memory (added by
+        # GenerateScript as `- "<title>": ...`) so deleted content stops leaking
+        # into future scripts' continuity context.
+        await _strip_universe_memory(self.pod_repo, pod, script.title)
+
+
+async def _strip_universe_memory(pod_repo, pod, title: str | None) -> None:
+    """Remove the `- "<title>": …` entry (added per generated script) from the
+    pod's universe_memory. No-op when nothing matches."""
+    mem = pod.config.universe_memory or ""
+    if not (mem and title):
+        return
+    kept = [l for l in mem.splitlines() if not l.lstrip().startswith(f'- "{title}"')]
+    new_mem = "\n".join(kept)
+    if new_mem != mem:
+        await pod_repo.save(pod.model_copy(
+            update={"config": pod.config.model_copy(update={"universe_memory": new_mem})}
+        ))
 
 
 _REVIEW_SYSTEM = (
