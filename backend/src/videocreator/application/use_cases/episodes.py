@@ -230,9 +230,38 @@ class DeleteEpisode:
             pass
 
 
+@dataclass(frozen=True, slots=True)
+class DeleteEpisodeMedia:
+    """Delete one media artifact (e.g. a single scene clip) from the object store.
+
+    The media library keys every artifact ``episodes/<id>/<rel>`` (a clip is
+    ``clips/clip_NN.mp4``). This removes just that object — the finished final is
+    untouched, so to drop a clip from the deliverable the user joins the rest
+    afterwards (`join_clips`). `rel` is the asset's ``name`` from `/media`.
+    """
+
+    pod_repo: PodRepository
+    episode_repo: EpisodeRepository
+    storage: StoragePort
+
+    async def execute(self, *, episode_id: EpisodeId, rel: str, requester_id: UserId) -> None:
+        episode = await self.episode_repo.get(episode_id)
+        if episode is None:
+            raise EpisodeNotFound(f"episode {episode_id} not found")
+        pod = await self.pod_repo.get(episode.pod_id)
+        if pod is None or not pod.is_owned_by(requester_id):
+            raise ForbiddenError("episode is owned by a different user")
+        # Reject traversal / absolute paths — the key must stay inside this episode.
+        clean = rel.strip().lstrip("/")
+        if not clean or ".." in clean.split("/"):
+            raise InvalidScript(f"invalid media path: {rel!r}")
+        await self.storage.delete("episodes", f"{episode_id}/{clean}")
+
+
 __all__ = [
     "CreateEpisodeFromScript",
     "DeleteEpisode",
+    "DeleteEpisodeMedia",
     "EnqueueEpisodeRender",
     "EpisodeDetail",
     "GetEpisode",

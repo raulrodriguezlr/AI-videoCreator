@@ -439,6 +439,47 @@ def _regen_scene_sync(
     return Path(dubbed)
 
 
+def _join_clips_sync(
+    *, pod_config_path: Path, episode_dir: Path, script_dict: dict[str, Any],
+    output_path: Path, provider_name: str = "veo", model: str | None = None,
+    indices: list[int] | None = None,
+) -> Path:
+    """Recompile the finals from a chosen subset of the clips on disk.
+
+    `indices` are 0-based scene indices to keep, in order; falsy = keep them all.
+    No video or dubbing is regenerated — only the native + dubbed finals are
+    re-concatenated from the surviving clips. Returns the dubbed final (or the
+    native when none of the kept clips were dubbed). Runs in a worker thread; the
+    workspace must already hold the clips (rehydrated from storage by the caller).
+    """
+    _set_engine_provider_vars(provider_name, model)
+    from videocreator.infrastructure.engine.providers import get_provider
+    from videocreator.infrastructure.engine.providers.base_provider import VideoClip
+
+    scenes = script_dict.get("scenes", [])
+    clips_dir = os.path.join(str(episode_dir), "clips")
+    keep = set(indices) if indices else None
+    clips: list = []
+    for i, sc in enumerate(scenes):
+        if keep is not None and i not in keep:
+            continue
+        n = f"{i + 1:02d}"
+        native = os.path.join(clips_dir, f"clip_{n}.mp4")
+        if not os.path.exists(native):
+            continue
+        vc = VideoClip(file_path=native, duration=float(sc.get("duration_seconds", 5)))
+        dub = os.path.join(clips_dir, f"clip_{n}_dubbed.mp4")
+        if os.path.exists(dub):
+            vc.dubbed_path = dub
+        clips.append(vc)
+    if not clips:
+        raise ValueError("no clips available to join for the requested selection")
+
+    provider = get_provider(str(pod_config_path))
+    _native, dubbed = provider._assemble_finals(clips, str(output_path))
+    return Path(dubbed)
+
+
 async def _store_render_output(
     episode: Episode, episode_dir: Path, engine_output: Path, storage: StoragePort,
 ) -> tuple[str, str | None]:
@@ -576,6 +617,8 @@ class EpisodeRenderHandler:
         # Redub = re-run TTS dubbing over existing clips (one scene or all).
         redub_scene = job.payload.get("redub_scene")
         redub_all = bool(job.payload.get("redub_all"))
+        # Join = recompile the finals from a chosen subset of clips (no regen).
+        join_clips = job.payload.get("join_clips")
 
         try:
             if regen_scene is not None:
@@ -583,6 +626,11 @@ class EpisodeRenderHandler:
                 final_key = await self._regenerate_one_scene(
                     pod, script, episode, ctx,
                     name=provider_name, scene_index=int(regen_scene),
+                )
+            elif join_clips is not None:
+                final_key = await self._join_episode_clips(
+                    pod, script, episode, ctx, name=provider_name,
+                    indices=[int(i) for i in join_clips],
                 )
             elif redub_all or redub_scene is not None:
                 final_key = await self._redub_episode(
@@ -818,6 +866,19 @@ class EpisodeRenderHandler:
             sync_fn=functools.partial(_redub_sync, scene_index=scene_index),
             label=f"re-dubbing {what}",
             provider_name=name, refresh_clip_index=scene_index,
+        )
+
+    async def _join_episode_clips(
+        self, pod: Pod, script: Script, episode: Episode, ctx: JobContext, *,
+        name: str, indices: list[int],
+    ) -> str:
+        """Recompile the finals from a chosen subset of clips (no regen/redub)."""
+        what = f"{len(indices)} selected clips" if indices else "all clips"
+        return await self._post_render_op(
+            pod, script, episode, ctx,
+            sync_fn=functools.partial(_join_clips_sync, indices=indices),
+            label=f"joining {what}",
+            provider_name=name,
         )
 
     async def _materialize_character_refs(

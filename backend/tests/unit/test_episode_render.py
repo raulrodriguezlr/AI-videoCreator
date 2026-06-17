@@ -384,7 +384,7 @@ async def test_handler_uses_episode_override_provider(tmp_path: Path) -> None:
     )
 
     seen: dict[str, str] = {}
-    async def _capture(pod, script, episode, ctx, *, name):
+    async def _capture(pod, script, episode, ctx, *, name, resume=False):
         seen["name"] = name
         return "episodes/ep_1/Ep_1.mp4"
 
@@ -403,7 +403,7 @@ async def test_handler_uses_router_primary_without_override(tmp_path: Path) -> N
     )
 
     seen: dict[str, str] = {}
-    async def _capture(pod, script, episode, ctx, *, name):
+    async def _capture(pod, script, episode, ctx, *, name, resume=False):
         seen["name"] = name
         return "episodes/ep_1/Ep_1.mp4"
 

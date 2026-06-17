@@ -259,6 +259,17 @@ class UpdateEpisodeRequest(BaseModel):
     video_model: str | None = None
 
 
+class JoinClipsRequest(BaseModel):
+    """Recompile the episode final from a chosen subset of scene clips.
+
+    `indices` are 0-based scene indices to KEEP, in order. Empty/omitted = join
+    every clip on disk (rebuild the full final)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    indices: list[int] = Field(default_factory=list)
+
+
 class MediaAssetResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -16,6 +16,7 @@ from videocreator.interfaces.rest.schemas import (
     EnqueueRenderResponse,
     EpisodeDetailResponse,
     EpisodeResponse,
+    JoinClipsRequest,
     MediaAssetResponse,
     SceneResponse,
     ScriptResponse,
@@ -169,6 +170,42 @@ async def list_episode_media(
     )
     assets = await container.media_library().list_for_episode(episode)
     return [MediaAssetResponse(**a.model_dump()) for a in assets]
+
+
+@router.delete(
+    "/{episode_id}/media/{key:path}", status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete one media artifact (e.g. a single scene clip) from storage",
+)
+async def delete_episode_media(
+    pod_id: str, episode_id: str, key: str, uc: UseCasesDep, user_id: UserIdDep,
+) -> None:
+    """Remove a single artifact by its `name` (rel path from `/media`, e.g.
+    ``clips/clip_03.mp4``). The compiled final is untouched — join the remaining
+    clips afterwards to drop it from the deliverable too."""
+    del pod_id
+    await uc.episodes.delete_media.execute(
+        episode_id=EpisodeId(episode_id), rel=key, requester_id=user_id,
+    )
+
+
+@router.post(
+    "/{episode_id}/join", response_model=EnqueueRenderResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Recompile the final from a chosen subset of scene clips",
+)
+async def join_clips(
+    pod_id: str, episode_id: str, body: JoinClipsRequest,
+    uc: UseCasesDep, user_id: UserIdDep,
+) -> EnqueueRenderResponse:
+    """Rebuild the episode's native + dubbed final from the selected clips only
+    (e.g. all-except-one). Clips on disk are kept, so it's reversible — join them
+    all again to restore the full cut."""
+    del pod_id
+    job_id = await uc.episodes.enqueue_render.execute(
+        episode_id=EpisodeId(episode_id), requester_id=user_id,
+        extra_payload={"join_clips": body.indices},
+    )
+    return EnqueueRenderResponse(job_id=job_id)
 
 
 @router.post(

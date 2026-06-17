@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api, getTemplate, startRun,
-  type EpisodeDetail, type ProviderCatalogEntry, type Script, type SeoMetadata,
+  type EpisodeDetail, type MediaAsset, type ProviderCatalogEntry, type Script, type SeoMetadata,
 } from "../api/client";
 import { MediaViewer } from "../components/MediaViewer";
 import {
@@ -42,6 +42,17 @@ export function EpisodePage() {
     onError: (e) => toast.err("No se pudo iniciar", (e as Error).message),
   });
 
+  // Delete one media artifact (a single clip/frame/audio) from storage.
+  const deleteMedia = useMutation({
+    mutationFn: (asset: MediaAsset) =>
+      api.delete(`/pods/${podId}/episodes/${episodeId}/media/${asset.name}`),
+    onSuccess: () => {
+      toast.ok("Archivo eliminado");
+      qc.invalidateQueries({ queryKey: ["episode-detail", episodeId] });
+    },
+    onError: (e) => toast.err("No se pudo eliminar", (e as Error).message),
+  });
+
   if (detail.isLoading) return <div className="page"><Loading /></div>;
   if (detail.isError || !detail.data) return <div className="page"><ErrorState error={detail.error} /></div>;
 
@@ -70,7 +81,7 @@ export function EpisodePage() {
       </div>
 
       <div className="viewer">
-        <div><MediaViewer media={media} /></div>
+        <div><MediaViewer media={media} onDelete={(a) => deleteMedia.mutate(a)} /></div>
         <div className="stack">
           {/* RenderConfig owns the render button — it saves then renders atomically */}
           <RenderConfig
@@ -82,6 +93,12 @@ export function EpisodePage() {
             onSaved={() => qc.invalidateQueries({ queryKey: ["episode-detail", episodeId] })}
             onRendered={() => nav("/jobs")}
           />
+          {episode.state === "ready" && script && (
+            <JoinClipsPanel
+              podId={podId} episodeId={episodeId} script={script}
+              onJoined={() => nav("/jobs")}
+            />
+          )}
           {seo && <SeoPanel seo={seo} />}
           {script && <ScriptPanel script={script} episodeId={episodeId} />}
         </div>
@@ -224,6 +241,64 @@ function SeoPanel({ seo }: { seo: SeoMetadata }) {
         {seo.selected_title && <div><div className="dim" style={{ fontSize: 11.5 }}>TÍTULO</div><div style={{ fontWeight: 600 }}>{seo.selected_title}</div></div>}
         {seo.description && <div><div className="dim" style={{ fontSize: 11.5 }}>DESCRIPCIÓN</div><p className="muted" style={{ fontSize: 13, whiteSpace: "pre-wrap", marginTop: 4 }}>{seo.description.slice(0, 400)}{seo.description.length > 400 ? "…" : ""}</p></div>}
         {seo.hashtags.length > 0 && <div className="tag-list">{seo.hashtags.map((h) => <Badge key={h} tone="accent">{h}</Badge>)}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Join clips
+// Recompile the final from a chosen subset of scene clips (e.g. all-except-one).
+// Clips on disk are kept, so it's reversible — re-check all and join again.
+function JoinClipsPanel({ podId, episodeId, script, onJoined }: {
+  podId: string; episodeId: string; script: Script; onJoined: () => void;
+}) {
+  const toast = useToast();
+  const [keep, setKeep] = useState<Set<number>>(() => new Set(script.scenes.map((s) => s.index)));
+  const join = useMutation({
+    mutationFn: () => api.post<{ job_id: string }>(`/pods/${podId}/episodes/${episodeId}/join`, {
+      indices: [...keep].sort((a, b) => a - b),
+    }),
+    onSuccess: (r) => { toast.ok("Recompilando vídeo", `Job ${r.job_id.slice(0, 12)}…`); onJoined(); },
+    onError: (e) => toast.err("No se pudo juntar", (e as Error).message),
+  });
+  const toggle = (ix: number) => setKeep((prev) => {
+    const next = new Set(prev);
+    if (next.has(ix)) next.delete(ix); else next.add(ix);
+    return next;
+  });
+  const nKeep = keep.size;
+  const total = script.scenes.length;
+  return (
+    <div className="card">
+      <div className="card-head between">
+        <h3>Juntar clips</h3>
+        <span className="dim mono" style={{ fontSize: 11 }}>{nKeep}/{total}</span>
+      </div>
+      <div className="card-pad stack">
+        <p className="dim" style={{ fontSize: 12, margin: 0 }}>
+          Desmarca las escenas que quieras quitar del vídeo final y recompila con el resto.
+        </p>
+        <div className="stack" style={{ gap: 4 }}>
+          {script.scenes.map((s) => (
+            <label key={s.id} className="row" style={{ gap: 8, alignItems: "center", cursor: "pointer" }}>
+              <input type="checkbox" checked={keep.has(s.index)} onChange={() => toggle(s.index)} />
+              <span className="ix">E{String(s.index + 1).padStart(2, "0")}</span>
+              <span className="dim" style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {s.audio_text || s.visual_prompt}
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="btn-row" style={{ justifyContent: "space-between" }}>
+          <Button variant="ghost" size="sm"
+            onClick={() => setKeep(new Set(script.scenes.map((s) => s.index)))}>
+            Todas
+          </Button>
+          <Button variant="mint" size="sm" loading={join.isPending}
+            disabled={nKeep === 0} onClick={() => join.mutate()}>
+            Juntar {nKeep} clip{nKeep === 1 ? "" : "s"}
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -9,7 +9,10 @@ const KIND_ICON = {
 
 type Filter = "all" | "video" | "image" | "audio" | "data";
 
-export function MediaViewer({ media }: { media: MediaAsset[] }) {
+export function MediaViewer({ media, onDelete }: {
+  media: MediaAsset[];
+  onDelete?: (asset: MediaAsset) => void;
+}) {
   const playable = useMemo(() => media.filter((m) => m.kind !== "data" && m.kind !== "subtitle"), [media]);
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<MediaAsset | null>(playable[0] ?? media[0] ?? null);
@@ -42,6 +45,17 @@ export function MediaViewer({ media }: { media: MediaAsset[] }) {
       </div>
 
       {cur && <Stage asset={cur} />}
+
+      {cur && onDelete && (
+        <div className="btn-row" style={{ justifyContent: "flex-end", marginTop: 8 }}>
+          <button className="btn ghost sm" title="Eliminar este archivo del almacenamiento"
+            onClick={() => {
+              if (confirm(`¿Eliminar "${cur.name}"? No se puede deshacer.`)) onDelete(cur);
+            }}>
+            🗑 Eliminar
+          </button>
+        </div>
+      )}
 
       <div className="media-strip" style={{ marginTop: 14 }}>
         {filtered.map((m) => (

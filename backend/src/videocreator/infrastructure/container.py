@@ -37,6 +37,7 @@ from videocreator.application.use_cases.characters import (
 from videocreator.application.use_cases.episodes import (
     CreateEpisodeFromScript,
     DeleteEpisode,
+    DeleteEpisodeMedia,
     EnqueueEpisodeRender,
     GetEpisode,
     GetEpisodeDetail,
@@ -759,6 +760,9 @@ class _EpisodeUseCases:
         )
         self.update = UpdateEpisode(c.pod_repo(), c.episode_repo())
         self.delete = DeleteEpisode(c.pod_repo(), c.episode_repo(), c.storage())
+        self.delete_media = DeleteEpisodeMedia(
+            c.pod_repo(), c.episode_repo(), c.storage(),
+        )
 
 
 class _ShortsUseCases:
