@@ -519,6 +519,13 @@ class BaseVideoProvider(ABC):
 
         # --- Step 5: Mix the final dubbing audio back into the video ---
         if final_audio_to_mix:
+            video_dur = AudioMixer.get_duration(clip.file_path)
+            audio_dur = AudioMixer.get_duration(final_audio_to_mix)
+            
+            if audio_dur > video_dur + 0.1:
+                log.info("dubbing.stretching_audio", audio_s=audio_dur, video_s=video_dur)
+                final_audio_to_mix = AudioMixer.time_stretch_audio(final_audio_to_mix, video_dur)
+
             mixed_path = clip.file_path.replace(".mp4", "_dubbed.mp4")
             final_clip_path = AudioMixer.mix_audio_to_video(
                 video_path=clip.file_path,
@@ -593,12 +600,14 @@ class BaseVideoProvider(ABC):
                     ]
                 else:
                     # El clip no tiene audio, inyectamos una pista de silencio AAC
+                    # Usamos -t <duracion> en lugar de -shortest para evitar desajustes de DTS en la concatenacion
+                    dur = AudioMixer.get_duration(p)
                     cmd = [
                         "ffmpeg", "-y",
                         "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
                         "-i", p,
                         "-map", "1:v", "-map", "0:a",
-                        "-c:v", "copy", "-c:a", "aac", "-shortest",
+                        "-c:v", "copy", "-c:a", "aac", "-t", str(dur),
                         norm_path
                     ]
                 
@@ -629,7 +638,7 @@ class BaseVideoProvider(ABC):
             log.info("concat.joining_clips")
             result = run_concat(normalized_paths, output_path)
 
-            if result.returncode != 0:
+            if result.returncode != 0 or "Error during demuxing" in result.stderr or "Impossible to open" in result.stderr:
                 log.warning("concat.ffmpeg_error", stderr=result.stderr[-500:])
                 log.info("concat.fallback_mode", msg="Attempting to identify and skip bad clips")
                 

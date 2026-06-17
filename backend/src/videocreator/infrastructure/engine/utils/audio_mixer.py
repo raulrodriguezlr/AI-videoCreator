@@ -64,6 +64,7 @@ class AudioMixer:
                 "-map", "[a]",
                 "-c:v", "copy",
                 "-c:a", "aac",
+                "-shortest",
                 output_path
             ]
 

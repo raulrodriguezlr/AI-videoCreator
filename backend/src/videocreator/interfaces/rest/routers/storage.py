@@ -31,7 +31,10 @@ async def get_object(bucket: str, key: str, container: ContainerDep) -> FileResp
     path = await storage.open_path(bucket, key)
     if not path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="object not found")
-    return FileResponse(path)
+    return FileResponse(
+        path,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 
 __all__ = ["router"]

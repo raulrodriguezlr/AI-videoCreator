@@ -115,9 +115,17 @@ class ElevenLabsProvider:
         if not text or not text.strip():
             return None
 
+        import hashlib
+        voice_id, char_settings = self._get_character_config(character_name)
+        hash_str = hashlib.md5(f"{text}_{voice_id}".encode('utf-8')).hexdigest()[:8]
+        base, ext = os.path.splitext(output_path)
+        actual_output_path = f"{base}_{hash_str}{ext}"
+
         prefix = "[ElevenLabs TTS]"
-        if self._check_cache(output_path, prefix):
-            return output_path
+        if self._check_cache(actual_output_path, prefix):
+            return actual_output_path
+            
+        output_path = actual_output_path
 
         if not ELEVENLABS_API_KEY:
             log.error("elevenlabs.tts_api_key_missing")
@@ -159,8 +167,17 @@ class ElevenLabsProvider:
             log.error("elevenlabs.sts_source_not_found", path=source_audio_path)
             return None
 
-        if self._check_cache(output_path, prefix):
-            return output_path
+        import hashlib
+        voice_id, char_settings = self._get_character_config(character_name)
+        stat = os.stat(source_audio_path)
+        hash_str = hashlib.md5(f"{stat.st_size}_{stat.st_mtime}_{voice_id}".encode('utf-8')).hexdigest()[:8]
+        base, ext = os.path.splitext(output_path)
+        actual_output_path = f"{base}_{hash_str}{ext}"
+
+        if self._check_cache(actual_output_path, prefix):
+            return actual_output_path
+            
+        output_path = actual_output_path
 
         if not ELEVENLABS_API_KEY:
             log.error("elevenlabs.sts_api_key_missing")

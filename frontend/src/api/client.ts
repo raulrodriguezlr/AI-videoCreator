@@ -62,7 +62,10 @@ export const api = {
   upload,
 };
 
-export const mediaUrl = (path: string) => `${BASE_URL}${path.replace(/^\/api\/v1/, "")}`;
+export const mediaUrl = (path: string, bust?: string | number | null) => {
+  const base = `${BASE_URL}${path.replace(/^\/api\/v1/, "")}`;
+  return bust ? `${base}?v=${bust}` : base;
+};
 
 // ---------------------------------------------------------------------------
 // Types â€” hand-written; mirror the backend Pydantic schemas.

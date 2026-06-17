@@ -47,7 +47,7 @@ export function MediaViewer({ media }: { media: MediaAsset[] }) {
         {filtered.map((m) => (
           <button key={m.url} className={`thumb-btn ${cur?.url === m.url ? "sel" : ""}`}
             onClick={() => setSelected(m)} title={m.name}>
-            {m.kind === "image" && <img src={mediaUrl(m.url)} alt={m.name} loading="lazy" />}
+            {m.kind === "image" && <img src={mediaUrl(m.url, m.size_bytes)} alt={m.name} loading="lazy" />}
             {m.kind === "video" && <span className="ic"><IcFilm /></span>}
             {m.kind === "audio" && <span className="ic"><IcMusic /></span>}
             {(m.kind === "data" || m.kind === "subtitle") && <span className="ic"><IcFile /></span>}
@@ -60,7 +60,7 @@ export function MediaViewer({ media }: { media: MediaAsset[] }) {
 }
 
 function Stage({ asset }: { asset: MediaAsset }) {
-  const url = mediaUrl(asset.url);
+  const url = mediaUrl(asset.url, asset.size_bytes);
   return (
     <div className="stage">
       {asset.kind === "video" && <video src={url} controls preload="metadata" key={url} />}

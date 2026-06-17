@@ -119,6 +119,24 @@ def _engine_script_dict(episode: Episode, script: Script, settings: Settings) ->
             except json.JSONDecodeError:
                 data = None
             if isinstance(data, dict) and data.get("scenes"):
+                # Merge user edits from the UI (db script) into the original engine script
+                db_scenes = {s.index: s for s in script.scenes}
+                for i, scene_data in enumerate(data["scenes"]):
+                    if i in db_scenes:
+                        db_s = db_scenes[i]
+                        scene_data["visual_prompt"] = db_s.visual_prompt
+                        scene_data["audio_text"] = db_s.audio_text or ""
+                        scene_data["duration_seconds"] = db_s.duration_s
+                        scene_data["transition_to_next"] = db_s.transition
+                        
+                        if "camera" not in scene_data:
+                            scene_data["camera"] = {}
+                        scene_data["camera"]["shot_type"] = db_s.camera_shot
+                        scene_data["camera"]["movement"] = db_s.camera_movement
+                        scene_data["camera"]["angle"] = db_s.camera_angle
+                
+                data["title"] = script.title
+                data["summary"] = script.summary or ""
                 return data
     return _script_to_engine_dict(script)
 
@@ -329,6 +347,14 @@ def _redub_sync(
         clip_path = os.path.join(clips_dir, f"clip_{i + 1:02d}.mp4")
         if not os.path.exists(clip_path):
             continue
+            
+        old_dubbed = os.path.join(clips_dir, f"clip_{i + 1:02d}_dubbed.mp4")
+        if os.path.exists(old_dubbed):
+            try:
+                os.remove(old_dubbed)
+            except OSError:
+                pass
+                
         clip = VideoClip(file_path=clip_path,
                          duration=float(scenes[i].get("duration_seconds", 5)))
         provider._apply_dubbing(clip, scenes[i], clips_dir, f"{i + 1:02d}")
@@ -363,6 +389,15 @@ def _regen_scene_sync(
     scene = scenes[scene_index]
     clips_dir = os.path.join(str(episode_dir), "clips")
     os.makedirs(clips_dir, exist_ok=True)
+
+    # Delete old clips so they aren't reused if generation or dubbing fails/is skipped
+    old_base = os.path.join(clips_dir, f"clip_{scene_index + 1:02d}")
+    for ext in [".mp4", "_dubbed.mp4"]:
+        if os.path.exists(old_base + ext):
+            try:
+                os.remove(old_base + ext)
+            except OSError:
+                pass
 
     # Replay prior scenes so the regenerated prompt keeps visual continuity.
     context_mgr = SceneContextManager(str(episode_dir), pod_config=getattr(provider, "config", {}))
