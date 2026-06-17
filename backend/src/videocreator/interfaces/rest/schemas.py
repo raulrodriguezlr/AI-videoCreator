@@ -16,7 +16,9 @@ from videocreator.domain.value_objects import (
     ContentType,
     EpisodeState,
     JobState,
+    NarrationStyle,
     ProviderPreferences,
+    SettingMode,
     StyleProfile,
     TopicStatus,
     VoiceSettings,
@@ -41,6 +43,9 @@ class PodConfigPayload(BaseModel):
     max_clip_seconds: int = 8
     # Direct-to-audience questions to weave into dialogue, 0 = none (regression #1).
     interactive_questions: int = 0
+    # Narrative voice + setting framing (wizard) the script generator honors.
+    narration_style: NarrationStyle = NarrationStyle.FOURTH_WALL
+    setting_mode: SettingMode = SettingMode.IN_SCENE
     provider_preferences: ProviderPreferences = Field(default_factory=ProviderPreferences)
     series_context: str | None = None
     # Auto-maintained narrative memory — summaries of past episodes. Editable.
@@ -370,6 +375,9 @@ class DraftPodBlueprintRequest(BaseModel):
     content_type: ContentType = ContentType.STORY
     # Optional override; when None the content type's default mode is used.
     character_mode: CharacterMode | None = None
+    # Wizard follow-up answers — how the show talks to the viewer + where it narrates.
+    narration_style: NarrationStyle = NarrationStyle.FOURTH_WALL
+    setting_mode: SettingMode = SettingMode.IN_SCENE
 
 
 class SeriesBiblePayload(BaseModel):
@@ -408,6 +416,8 @@ class PodBlueprintPayload(BaseModel):
     duration_seconds: int = 120
     max_clip_seconds: int = 8
     interactive_questions: int = 0
+    narration_style: NarrationStyle = NarrationStyle.FOURTH_WALL
+    setting_mode: SettingMode = SettingMode.IN_SCENE
 
 
 class CreatePodFromBlueprintRequest(BaseModel):

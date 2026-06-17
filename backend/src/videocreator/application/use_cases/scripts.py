@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from videocreator.domain.entities import Character, Scene, Script
+from videocreator.domain.value_objects import NarrationStyle, SettingMode
 from videocreator.domain.ports import (
     CharacterRepository,
     EpisodeRepository,
@@ -157,6 +158,8 @@ def _render_storyteller_prompt(
     series_context: str | None, characters: list[Character],
     episode_memory: str | None = None,
     interactive_questions: int = 0,
+    narration_style: object = NarrationStyle.FOURTH_WALL,
+    setting_mode: object = SettingMode.IN_SCENE,
 ) -> str:
     """Prompt for the creative pass — prose story only, no technical formatting."""
     ctx = series_context.strip() if series_context else "(no extra context)"
@@ -186,8 +189,7 @@ def _render_storyteller_prompt(
         f"through real dialogue and a genuine obstacle/mystery/challenge. They "
         f"ask questions, reason, struggle, and learn. This is where the value is.\n"
         f"- Act 3 (~20%): a satisfying climax and resolution. ONE farewell at most.\n\n"
-        f"## SHOW FORMAT & FOURTH WALL\n"
-        f"The characters in this show often speak directly to the viewers (breaking the fourth wall). They should explicitly welcome the audience at the start (e.g. '¡Hola amigos! Soy [Name]...') and say goodbye at the end. The dialogue must feel like they are taking the audience on a journey with them.\n"
+        f"{_show_format_block(narration_style, setting_mode)}"
         f"{_interactive_block(interactive_questions)}\n"
         f"{_DIALOGUE_QUALITY}\n\n"
         f"## LENGTH\n"
@@ -442,6 +444,72 @@ def _interactive_block(count: int) -> str:
     )
 
 
+_NARRATION_BLOCKS: dict[NarrationStyle, str] = {
+    NarrationStyle.FOURTH_WALL: (
+        "NARRATIVE VOICE — FOURTH WALL (host speaks to the viewer):\n"
+        "- The protagonist/host talks DIRECTLY to the audience, Dora-the-Explorer "
+        "style. ONE warm welcome at the very start (e.g. '¡Hola amigos! Soy "
+        "[Name]...') and ONE goodbye at the end.\n"
+        "- The host TAKES THE AUDIENCE on the journey in first person — narrate the "
+        "topic to the viewer.\n"
+        "- Do NOT invent other characters (kids, students, sidekicks) whose only "
+        "job is to ask the host questions as a framing device. The host addresses "
+        "the viewer directly, not a group of on-screen listeners."
+    ),
+    NarrationStyle.IMMERSIVE: (
+        "NARRATIVE VOICE — IMMERSIVE (characters act among themselves):\n"
+        "- Characters live the story and converse with EACH OTHER. They do NOT look "
+        "at or address the camera/viewer. No 'hello audience', no direct questions "
+        "to the viewer.\n"
+        "- The viewer is an unseen observer of a self-contained world."
+    ),
+    NarrationStyle.VOICEOVER: (
+        "NARRATIVE VOICE — VOICEOVER (off-screen narrator):\n"
+        "- An off-screen narrator tells the story over the action. On-screen "
+        "characters act within the scene; the narrator guides the viewer and may "
+        "address them warmly, but the characters themselves do not break the 4th wall."
+    ),
+}
+
+_SETTING_BLOCKS: dict[SettingMode, str] = {
+    SettingMode.IN_SCENE: (
+        "SETTING — IN THE ACTION:\n"
+        "- Narrate FROM the real setting of the topic. If the episode is about space, "
+        "the host/characters are IN SPACE among the planets and stars — NEVER on "
+        "Earth in front of a blackboard or in a classroom merely talking about it.\n"
+        "- The narration happens inside the actual scenes, surrounded by the subject."
+    ),
+    SettingMode.FRAMING_DEVICE: (
+        "SETTING — HOST FRAME:\n"
+        "- A consistent host location frames the episode (e.g. a cozy studio or "
+        "classroom). Cut between that frame and vivid scenes of the topic itself."
+    ),
+}
+
+
+def _show_format_block(narration_style: object, setting_mode: object) -> str:
+    """Per-pod SHOW FORMAT rules (narrative voice + setting), chosen in the wizard.
+
+    Replaces the 4th-wall instruction that used to be hardcoded for every pod.
+    Accepts the enums or their string values; unknown values fall back to the
+    legacy defaults (4th-wall, in-scene)."""
+    def _coerce(enum_cls, val, default):  # type: ignore[no-untyped-def]
+        if isinstance(val, enum_cls):
+            return val
+        try:
+            return enum_cls(str(getattr(val, "value", val)))
+        except ValueError:
+            return default
+
+    ns = _coerce(NarrationStyle, narration_style, NarrationStyle.FOURTH_WALL)
+    sm = _coerce(SettingMode, setting_mode, SettingMode.IN_SCENE)
+    return (
+        "## SHOW FORMAT (apply consistently in EVERY episode)\n"
+        f"{_NARRATION_BLOCKS[ns]}\n\n"
+        f"{_SETTING_BLOCKS[sm]}\n"
+    )
+
+
 def _render_script_prompt(
     *, series_name: str, language: str, target_duration_s: int,
     topic_title: str, topic_description: str | None,
@@ -451,6 +519,8 @@ def _render_script_prompt(
     max_clip_seconds: int = 8,
     interactive_questions: int = 0,
     story_narrative: str | None = None,
+    narration_style: object = NarrationStyle.FOURTH_WALL,
+    setting_mode: object = SettingMode.IN_SCENE,
 ) -> str:
     """Build the full script-generation prompt with video rules and camera vocabulary.
 
@@ -511,6 +581,7 @@ def _render_script_prompt(
         f"## SERIES CONTEXT\n{ctx}\n"
         f"{memory_block}\n"
         f"## CHARACTERS\n{char_block}\n"
+        f"{_show_format_block(narration_style, setting_mode)}"
         f"{story_block}\n"
         f"## TOPIC\n{topic_title}\n{desc}\n\n"
         f"{_DIALOGUE_QUALITY}\n"
@@ -626,6 +697,8 @@ class WriteStory:
             characters=characters,
             episode_memory=pod.config.universe_memory,
             interactive_questions=pod.config.interactive_questions,
+            narration_style=pod.config.narration_style,
+            setting_mode=pod.config.setting_mode,
         )
         # No response_schema: we want free prose, not JSON. Higher temperature
         # for creativity. Returned verbatim and fed into GenerateScript.
@@ -668,6 +741,8 @@ class GenerateScript:
             max_clip_seconds=pod.config.max_clip_seconds,
             interactive_questions=pod.config.interactive_questions,
             story_narrative=story_narrative,
+            narration_style=pod.config.narration_style,
+            setting_mode=pod.config.setting_mode,
         )
         # Enforce the minimum scene count at the schema level too — Gemini honours
         # `minItems`, so this is a hard floor on top of the prompt's instruction.

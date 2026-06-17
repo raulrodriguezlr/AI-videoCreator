@@ -41,6 +41,8 @@ def _to_blueprint_payload(bp: PodBlueprint) -> PodBlueprintPayload:
         duration_seconds=bp.duration_seconds,
         max_clip_seconds=bp.max_clip_seconds,
         interactive_questions=bp.interactive_questions,
+        narration_style=bp.narration_style,
+        setting_mode=bp.setting_mode,
     )
 
 
@@ -59,6 +61,8 @@ def _to_domain_blueprint(payload: PodBlueprintPayload) -> PodBlueprint:
         duration_seconds=payload.duration_seconds,
         max_clip_seconds=payload.max_clip_seconds,
         interactive_questions=payload.interactive_questions,
+        narration_style=payload.narration_style,
+        setting_mode=payload.setting_mode,
     )
 
 
@@ -102,6 +106,8 @@ async def draft_pod_blueprint(
         topic_count=body.topic_count,
         content_type=body.content_type,
         character_mode=body.character_mode,
+        narration_style=body.narration_style,
+        setting_mode=body.setting_mode,
     )
     return _to_blueprint_payload(blueprint)
 

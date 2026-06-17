@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type ContentType, type Pod, type PodBlueprint } from "../api/client";
+import {
+  api, type ContentType, type NarrationStyle, type Pod, type PodBlueprint,
+  type SettingMode,
+} from "../api/client";
 import { Badge, Button, Field, useToast } from "../ui/primitives";
 import { IcSparkles, IcWand } from "../ui/icons";
 import { prettyStyle } from "./PodsListPage";
@@ -17,6 +20,18 @@ const CONTENT_TYPES: { value: ContentType; label: string; hint: string }[] = [
   { value: "other", label: "Otro (descríbelo abajo)", hint: "Concepto personalizado; la IA infiere el formato" },
 ];
 
+// Wizard follow-up questions → pod rules the script generator honors. These fix
+// the "Piña narrates from Earth with a blackboard / invented kids ask her" bug.
+const NARRATION_STYLES: { value: NarrationStyle; label: string; hint: string }[] = [
+  { value: "fourth_wall", label: "Presentador (rompe la 4ª pared)", hint: "El protagonista habla al público, estilo Dora/Tico/Piña" },
+  { value: "immersive", label: "Inmersivo (personajes entre sí)", hint: "Los personajes actúan entre ellos, no miran a cámara" },
+  { value: "voiceover", label: "Voz en off (narrador)", hint: "Un narrador fuera de escena cuenta la historia" },
+];
+const SETTING_MODES: { value: SettingMode; label: string; hint: string }[] = [
+  { value: "in_scene", label: "En la acción (p.ej. en el espacio)", hint: "Narra DENTRO del escenario real, no en la Tierra con pizarra" },
+  { value: "framing_device", label: "Plató/aula (marco fijo)", hint: "Un set fijo enmarca el episodio y se intercala con el tema" },
+];
+
 export function CreatePodPage() {
   const nav = useNavigate();
   const qc = useQueryClient();
@@ -27,6 +42,8 @@ export function CreatePodPage() {
   const [contentType, setContentType] = useState<ContentType>("story");
   const [chars, setChars] = useState(3);
   const [topics, setTopics] = useState(5);
+  const [narrationStyle, setNarrationStyle] = useState<NarrationStyle>("fourth_wall");
+  const [settingMode, setSettingMode] = useState<SettingMode>("in_scene");
   const [blueprint, setBlueprint] = useState<PodBlueprint | null>(null);
   const [name, setName] = useState("");
 
@@ -43,6 +60,7 @@ export function CreatePodPage() {
     mutationFn: () => api.post<PodBlueprint>("/wizard/pods/draft", {
       idea, language, character_count: chars, topic_count: topics,
       content_type: contentType,
+      narration_style: narrationStyle, setting_mode: settingMode,
     }),
     onSuccess: (bp) => { setBlueprint(bp); setName(bp.series_name); toast.ok("Blueprint generado", "Revísalo y crea el pod"); },
     onError: (e) => toast.err("No se pudo generar", (e as Error).message),
@@ -80,6 +98,18 @@ export function CreatePodPage() {
           )}
           <Field label="Nº temas"><input className="input" type="number" min={1} max={20} value={topics} onChange={(e) => setTopics(Number(e.target.value))} /></Field>
         </div>
+        <div className="row">
+          <Field label="¿Cómo se dirige al público?" hint={NARRATION_STYLES.find((n) => n.value === narrationStyle)!.hint}>
+            <select className="select" value={narrationStyle} onChange={(e) => setNarrationStyle(e.target.value as NarrationStyle)}>
+              {NARRATION_STYLES.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}
+            </select>
+          </Field>
+          <Field label="¿Dónde transcurre la narración?" hint={SETTING_MODES.find((s) => s.value === settingMode)!.hint}>
+            <select className="select" value={settingMode} onChange={(e) => setSettingMode(e.target.value as SettingMode)}>
+              {SETTING_MODES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </Field>
+        </div>
         <div className="btn-row">
           <Button variant="ghost" loading={enhance.isPending} disabled={idea.trim().length < 3} onClick={() => enhance.mutate()}>
             <IcSparkles /> Mejorar idea
@@ -104,6 +134,20 @@ export function CreatePodPage() {
             <Badge>{blueprint.bible.genre}</Badge>
             <Badge>{blueprint.bible.audience}</Badge>
             <Badge>{blueprint.duration_seconds}s/episodio</Badge>
+          </div>
+          <div className="row">
+            <Field label="¿Cómo se dirige al público?">
+              <select className="select" value={blueprint.narration_style}
+                onChange={(e) => setBlueprint({ ...blueprint, narration_style: e.target.value as NarrationStyle })}>
+                {NARRATION_STYLES.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}
+              </select>
+            </Field>
+            <Field label="¿Dónde transcurre la narración?">
+              <select className="select" value={blueprint.setting_mode}
+                onChange={(e) => setBlueprint({ ...blueprint, setting_mode: e.target.value as SettingMode })}>
+                {SETTING_MODES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </Field>
           </div>
           {blueprint.characters.length > 0 && (
             <div>

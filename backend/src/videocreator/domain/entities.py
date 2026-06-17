@@ -17,7 +17,9 @@ from videocreator.domain.value_objects import (
     EpisodeState,
     JobKind,
     JobState,
+    NarrationStyle,
     ProviderPreferences,
+    SettingMode,
     StyleProfile,
     TopicStatus,
     TransitionType,
@@ -87,6 +89,13 @@ class PodConfig(BaseModel):
     # dialogue (0 = none). Kids/educational pods set this >0 to address the
     # viewer ("¿Qué creéis que pasará?"); restores legacy behavior (regression #1).
     interactive_questions: int = 0
+    # How the show addresses the viewer (4th-wall host / immersive / voiceover)
+    # and where it narrates (in the action's setting vs. a host framing device).
+    # Chosen in the wizard; the script generator honors them instead of forcing
+    # 4th-wall on every pod. Defaults match the legacy behavior AND the Tico/Piña
+    # presenter format, so existing pods are corrected on load with no migration.
+    narration_style: NarrationStyle = NarrationStyle.FOURTH_WALL
+    setting_mode: SettingMode = SettingMode.IN_SCENE
     provider_preferences: ProviderPreferences = Field(default_factory=ProviderPreferences)
     series_context: str | None = None
     # Accumulated narrative memory — summaries of past episodes injected into

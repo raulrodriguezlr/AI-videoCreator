@@ -96,6 +96,8 @@ export interface PodConfigPayload {
   duration_seconds: number;
   max_clip_seconds: number;
   interactive_questions: number;
+  narration_style: NarrationStyle;
+  setting_mode: SettingMode;
   provider_preferences: ProviderPreferences;
   series_context: string | null;
   universe_memory: string | null;
@@ -106,6 +108,8 @@ export type ContentType =
   | "story" | "meme" | "scene_recreation" | "educational" | "other";
 export type CharacterMode =
   | "reference" | "optional" | "none" | "narrator_pip" | "scene_native";
+export type NarrationStyle = "fourth_wall" | "immersive" | "voiceover";
+export type SettingMode = "in_scene" | "framing_device";
 
 export interface Pod {
   id: string;
@@ -410,6 +414,8 @@ export interface PodBlueprint {
   duration_seconds: number;
   max_clip_seconds: number;
   interactive_questions: number;
+  narration_style: NarrationStyle;
+  setting_mode: SettingMode;
 }
 
 // ---------------------------------------------------------------------------

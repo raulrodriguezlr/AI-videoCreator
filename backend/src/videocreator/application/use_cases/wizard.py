@@ -29,8 +29,10 @@ from videocreator.domain.value_objects import (
     CharacterBlueprint,
     CharacterMode,
     ContentType,
+    NarrationStyle,
     PodBlueprint,
     SeriesBible,
+    SettingMode,
     StyleProfile,
     TopicStatus,
     content_profile,
@@ -260,6 +262,8 @@ class DraftPodBlueprint:
         topic_count: int = 5,
         content_type: ContentType = ContentType.STORY,
         character_mode: CharacterMode | None = None,
+        narration_style: NarrationStyle = NarrationStyle.FOURTH_WALL,
+        setting_mode: SettingMode = SettingMode.IN_SCENE,
     ) -> PodBlueprint:
         if not idea.strip():
             raise ValidationError("idea must not be empty")
@@ -314,6 +318,8 @@ class DraftPodBlueprint:
             max_clip_seconds=profile.default_max_clip_s,
             # Kids-ish stories invite audience questions; other formats default off.
             interactive_questions=2 if content_type == ContentType.STORY else 0,
+            narration_style=narration_style,
+            setting_mode=setting_mode,
         )
 
 
@@ -344,6 +350,8 @@ class CreatePodFromBlueprint:
             duration_seconds=blueprint.duration_seconds,
             max_clip_seconds=blueprint.max_clip_seconds,
             interactive_questions=blueprint.interactive_questions,
+            narration_style=blueprint.narration_style,
+            setting_mode=blueprint.setting_mode,
         )
         pod = await self.pod_repo.save(
             Pod(id=new_pod_id(), owner_id=owner_id, name=name, config=config)

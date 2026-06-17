@@ -460,6 +460,27 @@ class CharacterMode(str, Enum):
     SCENE_NATIVE = "scene_native"  # characters come from the source video (V2V)
 
 
+class NarrationStyle(str, Enum):
+    """HOW the episode addresses the viewer — the show's narrative voice.
+
+    Set in the wizard and honored by the script generator so a pod's episodes
+    keep a consistent format (e.g. a 4th-wall host vs. characters acting among
+    themselves). Drove a real bug: the generator used to FORCE 4th-wall on every
+    pod, so hosts like Piña got framed by invented kids asking questions.
+    """
+
+    FOURTH_WALL = "fourth_wall"  # host/presenter talks straight to the viewer (Dora/Tico/Piña)
+    IMMERSIVE = "immersive"      # characters act & converse among themselves, never to camera
+    VOICEOVER = "voiceover"      # an off-screen narrator tells the story over the action
+
+
+class SettingMode(str, Enum):
+    """WHERE the narration happens relative to the action's real setting."""
+
+    IN_SCENE = "in_scene"            # narrate FROM the action's place (e.g. in space, among planets)
+    FRAMING_DEVICE = "framing_device"  # a host frame (studio/classroom/blackboard) cut against the topic
+
+
 class ContentProfile(BaseModel):
     """The derived behavior bundle for a `ContentType` — pure, data-only.
 
@@ -606,6 +627,9 @@ class PodBlueprint(BaseModel):
     duration_seconds: int = 120
     max_clip_seconds: int = 8
     interactive_questions: int = 0
+    # How the show talks to the viewer + where it narrates (wizard questions).
+    narration_style: NarrationStyle = NarrationStyle.FOURTH_WALL
+    setting_mode: SettingMode = SettingMode.IN_SCENE
 
 
 # ============================================================================

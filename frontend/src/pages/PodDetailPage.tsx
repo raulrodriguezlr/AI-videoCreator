@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import {
   api, mediaUrl, subscribeToJob,
-  type Character, type Episode, type Pod, type Script, type Short, type Topic, type VoiceOption,
+  type Character, type Episode, type NarrationStyle, type Pod, type Script,
+  type SettingMode, type Short, type Topic, type VoiceOption,
 } from "../api/client";
 import {
   Badge, Button, Empty, ErrorState, Field, Loading, Modal, StateBadge, Tabs, useToast,
@@ -865,6 +866,21 @@ function SettingsTab({ pod }: { pod: Pod }) {
             </Field>
             <Field label="Preguntas al público" hint="0 = ninguna. Para contenido infantil/educativo">
               <input className="input" type="number" min={0} value={cfg.interactive_questions} onChange={(e) => set("interactive_questions", Number(e.target.value))} />
+            </Field>
+          </div>
+          <div className="row">
+            <Field label="Voz narrativa" hint="Cómo se dirige al público (arregla a Tico/Piña: presentador 4ª pared)">
+              <select className="select" value={cfg.narration_style ?? "fourth_wall"} onChange={(e) => set("narration_style", e.target.value as NarrationStyle)}>
+                <option value="fourth_wall">Presentador (rompe 4ª pared)</option>
+                <option value="immersive">Inmersivo (personajes entre sí)</option>
+                <option value="voiceover">Voz en off (narrador)</option>
+              </select>
+            </Field>
+            <Field label="Dónde narra" hint="Piña: 'En la acción' = en el espacio, no en la Tierra con pizarra">
+              <select className="select" value={cfg.setting_mode ?? "in_scene"} onChange={(e) => set("setting_mode", e.target.value as SettingMode)}>
+                <option value="in_scene">En la acción (p.ej. en el espacio)</option>
+                <option value="framing_device">Plató/aula (marco fijo)</option>
+              </select>
             </Field>
           </div>
           <div className="row">
