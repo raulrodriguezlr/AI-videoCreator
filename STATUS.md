@@ -1,110 +1,150 @@
-# STATUS — Estado de implementación
+# STATUS — AI-videoCreator
 
-> Matriz honesta de qué está hecho (✅), parcial (⚠️) y pendiente (☐) respecto a
-> [COMPETITIVE_ANALYSIS.md](COMPETITIVE_ANALYSIS.md) (§1–§16, incluyendo la
-> ampliación "FAR BEYOND"). Última actualización: 2026-06-13.
+> Documento único de estado del proyecto. Última actualización: **2026-06-23**.
 >
-> Resumen de una línea: **la mayor parte de §1–§16 está implementada**. Lo
-> pendiente principal es la convergencia engine→SDK, el cableado del
-> scheduler, el canvas de nodos y los backends cloud (S3/Redis).
+> - Referencia de mercado: [COMPETITIVE_ANALYSIS.md](COMPETITIVE_ANALYSIS.md)
+> - Spec técnica del render pipeline: [backend/docs/RENDER_PIPELINE_SPEC.md](backend/docs/RENDER_PIPELINE_SPEC.md)
 
 ---
 
-## 1. Arquitectura base
+## Resumen rápido
 
-| Capacidad | Estado | Notas |
-|---|---|---|
-| Clean/hexagonal architecture (`domain` → `application` → `infrastructure` → `interfaces`) | ✅ | `domain/ports.py`, `application/use_cases/`, `infrastructure/`, `interfaces/rest/routers/` |
-| Local-first (SQLite + FS) + modo server | ✅ | `APP_MODE=local\|server\|cloud`, `var/app.db` + `var/storage` por defecto |
-
----
-
-## 2. Motor de Shorts (§3–4, §16.1–16.5)
-
-| Capacidad | Estado | Notas |
-|---|---|---|
-| Beat-locking (librosa `beat_track`) | ✅ | `domain/services/beat_grid.py` |
-| SFX library + mixer LUFS | ✅ | catálogo de SFX por vibe + mezcla con `loudnorm` |
-| Captions ASS word-by-word + keyword highlight | ✅ | `infrastructure/video/ass_captions.py` (pysubs2) |
-| Hook Rewriter + LinUCB bandit | ✅ | `application/use_cases/hook_rewrite.py` conectado a `domain/services/linucb.py` |
-| Pipeline nativo de shorts (`GenerateNativeShortUseCase`) | ✅ | `application/use_cases/native_short.py` |
-| Pacing heuristics | ✅ | reglas de duración por escena en `short_planner.py` |
-| Smart auto-reframe 9:16 (OpenCV HOG + MediaPipe face) | ✅ | con fallback gracioso si no hay detección |
+Plataforma local-first de creación automática de vídeos con IA. Genera episodios
+completos (guión → clips → doblaje → montaje) y shorts (cerebro LLM + polish).
+Multi-provider: Veo 3.1, Higgsfield (Kling 3.0, Seedance, Wan, Sora, Veo),
+LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
+(domain → application → infrastructure → interfaces).
 
 ---
 
-## 3. Provider SDK (§9)
+## 1. Arquitectura
 
 | Capacidad | Estado | Notas |
 |---|---|---|
-| Manifest (`provider.yaml`) + validación Pydantic | ✅ | `infrastructure/providers/sdk/manifest.py` |
-| Registry dinámico (`providers.d/`) | ✅ | `infrastructure/providers/sdk/registry.py`, descubrimiento por `discover()` |
-| 4 tipos de adapter (python, openapi, comfyui_workflow, http_webhook) | ✅ | `adapter_base.py` + adapters por tipo |
-| Hot-reload | ✅ | `POST /system/providers/reload` |
-| Catálogo SDK | ✅ | `GET /system/providers/sdk` |
-| Providers instalados (`backend/providers.d/`) | ✅ | `artlist`, `elevenlabs-studio`, `ltx-desktop`, `runway-v2v`, `veo-gemini`, `comfyui-ltx2`, `test-provider` |
-| Provider `veo-vertex` como manifest SDK | ☐ | carpeta `providers.d/veo-vertex/` existe pero **vacía** — el engine real (`infrastructure/engine/providers/veo_vertex_provider.py`) sigue fuera del SDK |
-| Provider `ltx` (engine legacy) como manifest SDK | ☐ | `infrastructure/engine/providers/ltx_provider.py` sigue fuera del SDK; `ltx-desktop` (SDK) y `comfyui-ltx2` (SDK) son adapters distintos/paralelos ( y esa es la idea, que LTX Desktop vaya por un lado y LTX Comfy UI por otro ) |
-| Auto-benchmark al instalar provider | ☐ | el harness existe (`application/use_cases/benchmark_provider.py`) pero **no se encola automáticamente** al `discover()` |
+| Clean/hexagonal (domain → application → infrastructure → interfaces) | ✅ | |
+| Local-first (SQLite + FS + FAISS) | ✅ | Zero-docker mode, `videocreator serve` |
+| FastAPI + SQLAlchemy async | ✅ | |
+| Frontend React + Vite + Tailwind + shadcn/ui | ✅ | TanStack Query, Zustand |
+| Docker multi-stage | ✅ | docker-compose dev (postgres/redis/minio) |
+| Backends cloud (S3 / Redis / Postgres) | ☐ | `NotImplementedError` — local-first primero |
 
 ---
 
-## 4. Capability Router + DAG Orchestrator (§9.4, §11)
+## 2. Pods & Contenido
 
 | Capacidad | Estado | Notas |
 |---|---|---|
-| Capability router: scoring + circuit breaker + cost ledger | ✅ | `domain/services/capability_router.py` + `infrastructure/persistence/sqlite_cost_ledger.py` (in-memory + SQLite) |
-| Selección de provider por nodo en DAG runs | ✅ | `CapabilityExecutor._run_sdk_provider` resuelve por `find(capability)` + override explícito |
-| DAG executor (`DagSpec` + ejecución) | ✅ | `infrastructure/queue/dag_executor.py` — paralelismo por waves, reintentos, resume, cancelación |
-| Progreso SSE | ✅ | `GET /runs/{id}/events` |
-| `POST /runs` ejecuta una receta | ✅ | `interfaces/rest/routers/recipes.py` |
-| Capabilities reales wireadas (`llm_text`, `native_short`, `carousel_slides/render`, `tts`, `compose_short`, + cualquier capability vía SDK) | ✅ | registradas en `infrastructure/container.py` |
-| Proxy workflow (preview barato → render caro, §9.4/§10) | ☐ | flag `PROXY_WORKFLOW_ENABLED = False` en `infrastructure/engine/variables.py` — parked |
+| CRUD pods + configuración JSONB | ✅ | |
+| Content taxonomy (story/meme/recreation/educational) | ✅ | Wizard-aware |
+| Personajes solo-registrados + roles (protagonista/secundario/antagonista) | ✅ | `37113b1` |
+| Crear personajes desde UI del pod | ✅ | `37113b1` |
+| Narrative voice per-pod (4th_wall / immersive / voiceover) | ✅ | `9d19546` |
+| Setting mode per-pod (in_scene / framing_device) | ✅ | `9d19546` |
+| Universe memory por pod | ✅ | CRUD cascade al borrar |
+| Script overrides (prompt_story_suffix, prompt_suffix) | ✅ | ConfigTab textareas |
+| Tabla estructura guión en ConfigTab | ✅ | 11 campos con enums visibles |
 
 ---
 
-## 5. FAISS Asset Library + Format Library (§10.4, §12.4)
+## 3. Guiones (Scripts)
 
 | Capacidad | Estado | Notas |
 |---|---|---|
-| Asset library semántica (FAISS local) | ✅ | `infrastructure/vector/embedding_index.py` |
-| Format library (genome clustering + veto de "quemados" a 14 días) | ✅ | namespace de genomas en FAISS |
+| GenerateScript (LLM → scenes JSON) | ✅ | |
+| WriteStory (LLM → prosa narrativa) + retry continuación | ✅ | 2ª llamada si prosa < 90% target |
+| Contrato palabras/seg (`SPOKEN_WORDS_PER_SECOND = 2.2`) | ✅ | |
+| Guard: `_dedup_scenes` | ✅ | Mata escenas clonas |
+| Guard: `_enforce_pacing` + orphan merge (`_MIN_CHUNK_WORDS=5`) | ✅ | `a4add77` |
+| Guard: `_enforce_duration_floor` | ✅ | |
+| Guard: `_enforce_duration_ceiling` (115% target) | ✅ | `a4add77` |
+| Prompt ceiling (word target rango, no solo mínimo) | ✅ | `a4add77` |
+| Editar escena individual (`PATCH /scripts/{id}/scenes/{i}`) | ✅ | |
+| Review script (LLM feedback) | ✅ | |
 
 ---
 
-## 6. Cerebro Viral / Video Analyst (§12.4)
+## 4. Episodios (Render Pipeline)
 
 | Capacidad | Estado | Notas |
 |---|---|---|
-| Video Analyst (URL → genoma viral) | ✅ | `application/use_cases/analyze_video.py` |
-| Brain agent (loop function-calling + tools + cliente MCP) | ✅ | `infrastructure/brain/agent.py`, `tools.py`, `mcp_client.py` |
-| Benchmark harness (§9.3) | ✅ | `application/use_cases/benchmark_provider.py` — existe, pero ver "Auto-benchmark" arriba (no auto-disparado) |
-| Trending audio (§4.F, Creative Center + filtro comercial) | ✅ | scraper + filtro de licencia comercial |
-| Daily briefing use case | ✅ | `application/use_cases/daily_briefing.py` |
-| Content moderation (fail-closed) | ✅ | `application/use_cases/content_moderation.py` |
-| Scheduler (`daily_briefing`/`rebenchmark` jobs) | ☐ | `infrastructure/queue/scheduler.py` (`BrainScheduler`/APScheduler wrapper) existe pero **no se registra ni arranca en el lifespan de FastAPI** (`interfaces/rest/app.py`) |
+| Scene Builder loop (generate → dub → concat) | ✅ | `base_provider.py` |
+| Resume (continuar render crasheado) | ✅ | `POST /render?resume=true` + botón "Continuar" |
+| Regenerar una escena conservando el resto | ✅ | `POST /episodes/{id}/scenes/{i}/regenerate` |
+| Editar prompt/diálogo → re-render | ✅ | `PATCH /scripts/{id}/scenes/{i}` impacta render |
+| Borrar clip individual | ✅ | `DELETE /episodes/{id}/media/{key}` |
+| Join clips (selección) | ✅ | `POST /episodes/{id}/join {indices}` |
+| "Continuar" visible en episodios completed (no solo failed) | ✅ | `a4add77` |
+| Progress SSE por clip | ✅ | |
+| Redoblar escena/todo + recompilar | ☐ | `ManualDubber` portado pero interactivo; falta REST endpoint |
+| Higgsfield auth modal frontend | ☐ | Backend done (`HiggsfieldNeedsAuthError` 401), frontend sin empezar |
 
 ---
 
-## 7. Multiplicación de contenido (§13)
+## 5. Providers de Vídeo
 
 | Capacidad | Estado | Notas |
 |---|---|---|
-| DagSpec builders (shorts/carousel/thumbnails/thread/dubbing) | ✅ | `application/use_cases/multiply.py` |
-| YouTube publish (OAuth one-time + resumable upload) | ✅ | `interfaces/rest/routers/publish.py` |
-| `video_metrics` SQLite + reward LinUCB | ✅ | persistencia de métricas + retroalimentación al bandit |
-| Carousel render (Pillow) | ✅ | render de slides 1080×1350 |
+| Veo Vertex AI (free tier, service account) | ✅ | `veo_vertex_provider.py` |
+| Veo Gemini API | ✅ | provider SDK `veo-gemini` |
+| Veo i2v clamp: `reference_to_video` siempre 8s | ✅ | `a4add77` — mode="image" en clamp_duration |
+| Higgsfield engine (CLI → Kling/Seedance/Wan/Sora/Veo) | ✅ | `HiggsfieldEngineProvider` bridge |
+| Higgsfield manifest + valid_durations per model | ✅ | `a4add77` |
+| Higgsfield auth error type (`HiggsfieldNeedsAuthError`) | ✅ | `a4add77` |
+| LTX local (ComfyUI) | ✅ | `ltx_provider.py` |
+| LTX Desktop | ✅ | `ltx_desktop_provider.py` |
+| Artlist (HTTP cloud — Kling/Veo/Luma/MiniMax/PixVerse) | ✅ | `http_cloud_providers.py` |
+| ElevenLabs Studio 3.0 | ✅ | provider SDK |
+| `jump_to_scene` duration param en todos los providers | ✅ | `a4add77` |
+| `_get_last_frame_path` en BaseVideoProvider (ffmpeg) | ✅ | `a4add77` — fix AttributeError Higgsfield/HTTP |
+| Duración clip model-aware (clamp por provider) | ✅ | Override per-provider, no clamp global |
+| Provider SDK (manifest + registry + hot-reload) | ✅ | `providers.d/` |
+| Capability router + circuit breaker + cost ledger | ✅ | |
+| DAG executor (waves + retry + resume + cancelación) | ✅ | |
+| Convergencia engine → SDK/DAG (episodios por DAG) | ☐ | Rewrite gordo, futuro |
+| Proxy workflow (preview barato → render caro) | ☐ | Parked (`PROXY_WORKFLOW_ENABLED=False`) |
 
 ---
 
-## 8. Scene Recreation / V2V (§3.3)
+## 6. Audio & Doblaje
 
 | Capacidad | Estado | Notas |
 |---|---|---|
-| Fair-use advisor (fail-closed) | ✅ | `application/use_cases/scene_recreation.py` |
-| Planner + trend match | ✅ | mismo use case |
-| Runway manifest | ✅ | `providers.d/runway-v2v/provider.yaml` |
-| Frontend `RecreationPage` | ✅ | `frontend/src/pages/RecreationPage.tsx` |
+| ElevenLabs STS (Speech-to-Speech) | ✅ | Preserva lip-sync de Veo |
+| Demucs (Meta) separación voz/SFX | ✅ | `audio_separator.py` |
+| Demucs runner (patch torchaudio + soundfile) | ✅ | `a4add77` — fix Python 3.14 + Windows |
+| Demucs check: `importlib.util.find_spec` (sin subprocess) | ✅ | `a4add77` |
+| Música ambiental (ElevenLabs Sound Gen) | ✅ | |
+| Audio sync (time stretch + silence pad) | ✅ | `audio_mixer.py` |
+| UTF-8 en concat list files (fix paths con ñ) | ✅ | `a4add77` |
+
+---
+
+## 7. Shorts Engine
+
+| Capacidad | Estado | Notas |
+|---|---|---|
+| Capa 1: Cerebro LLM (SelectShortHighlights) | ✅ | Montaje multi-segmento |
+| Capa 2: Polish (subtítulos ASS + Ken Burns + crossfade) | ✅ | Single-pass FFmpeg |
+| Beat-locking (librosa) + SFX library | ✅ | |
+| Hook Rewriter + LinUCB bandit | ✅ | |
+| Smart auto-reframe 9:16 (OpenCV + MediaPipe) | ✅ | |
+| Capa 3: Overlays (memes/imágenes en timestamps) | ☐ | |
+| Whisper karaoke opcional | ☐ | |
+| V2V render (scene recreation) | ☐ | |
+| Narrador PiP (educativo) | ☐ | |
+
+---
+
+## 8. Wizard
+
+| Capacidad | Estado | Notas |
+|---|---|---|
+| Wave A: Content taxonomy + blueprint consciente | ✅ | |
+| DraftPodBlueprint (7 pasos: idea → bible → style → chars → refs → memory → topics) | ✅ | |
+| CreatePodFromBlueprint | ✅ | |
+| Narrative voice + setting mode en wizard | ✅ | `9d19546` |
+| Wave B: WizardSession resumable + web access | ☐ | |
+| Wave C: Mobile-slide one-question-per-screen | ☐ | |
 
 ---
 
@@ -112,56 +152,102 @@
 
 | Capacidad | Estado | Notas |
 |---|---|---|
-| Templates gallery | ✅ | `TemplatesPage.tsx` |
-| Director's Chat (JSON Patch RFC 6902 sobre DagSpec) | ✅ | `DirectorPage.tsx` + `DirectorChat.tsx` |
-| Run timeline (SSE + fallback polling) | ✅ | `RunPage.tsx` |
-| Memes page | ✅ | `MemesPage.tsx` |
-| Recreations page | ✅ | `RecreationPage.tsx` |
-| Botones "Generar" que ejecutan recetas | ✅ | varias páginas |
-| Brand kits (§10.3) | ✅ | fuentes/paleta/logo/voz/tono/watermark por pod |
-| Webhooks salientes + trace-id (§11.3) | ✅ | `infrastructure/queue/outbound_webhooks.py` |
-| Node canvas (§10.1) + timeline frame-accurate (§10.3) | ☐ | no construido — las recetas siguen siendo JSON puro, sin editor visual de nodos |
+| Pods / Characters / Episodes / Scripts / Jobs / Settings | ✅ | |
+| Director's Chat (JSON Patch sobre DagSpec) | ✅ | |
+| Run timeline (SSE + fallback polling) | ✅ | |
+| Memes page | ✅ | |
+| Recreations page | ✅ | |
+| Templates gallery | ✅ | |
+| Brand kits per-pod | ✅ | |
+| ConfigTab: estructura guión + overrides | ✅ | `a4add77` |
+| Model catalog (append installed models) | ✅ | `a4add77` |
+| Node canvas (editor visual de recetas) | ☐ | Recetas son JSON-only |
+| Timeline frame-accurate | ☐ | |
 
 ---
 
-## 10. Motores de vídeo (Veo / LTX)
+## 10. Cerebro Viral / Brain
 
 | Capacidad | Estado | Notas |
 |---|---|---|
-| Veo Gemini API (`veo-3.1-generate-preview`) | ✅ | provider SDK `veo-gemini` |
-| Veo Vertex AI (`veo-3.1-generate-001`, free tier vía service account) | ✅ | `infrastructure/engine/providers/veo_vertex_provider.py` (engine legacy, ver gap en §3) |
-| Narrator dubbing fallback (voz única sin personaje asignado) | ✅ | `infrastructure/handlers/episode_render.py` / `short_render.py` |
-| ComfyUI LTX2 provider (local) | ✅ | `providers.d/comfyui-ltx2/` — workflow API + anchor + i2v + upscale |
+| Video Analyst (URL → genoma viral) | ✅ | |
+| Brain agent (function-calling + tools + MCP client) | ✅ | |
+| FAISS asset library semántica | ✅ | |
+| Format library (genome clustering + veto 14 días) | ✅ | |
+| Daily briefing use case | ✅ | |
+| Content moderation (fail-closed) | ✅ | |
+| Trending audio (Creative Center + filtro comercial) | ✅ | |
+| Scheduler (daily_briefing/rebenchmark) | ☐ | `BrainScheduler` existe, no registrado en lifespan FastAPI |
+| Auto-benchmark al instalar provider | ☐ | Harness existe, no auto-disparado |
+| Autopilot supervisado (publicación + loop) | ☐ | |
 
 ---
 
-## 11. Pendientes principales (resumen ejecutivo)
+## 11. Publicación & Métricas
 
-| # | Pendiente | Severidad | Detalle |
-|---|---|---|---|
-| 1 | **Convergencia engine → SDK** | 🟠 | Higgsfield YA es usable desde el engine legacy (`HiggsfieldEngineProvider` bridge → episodios pueden renderizar con Kling, etc.). Falta la **migración COMPLETA**: que los episodios rendericen por el DAG/`CapabilityExecutor` en vez del `VideoEngine` legacy, eliminando el doble camino. Es un **rewrite gordo** (hay que llevar al DAG el scene-builder: dubbing, concat, resume, last-frame-i2v, continuidad SceneContext) — apuntado como opción futura, NO urgente. `veo_vertex` y `ltx` (engine) tampoco son manifests SDK aún. |
-| 2 | **Scheduler sin cablear** | 🟠 | `BrainScheduler` (APScheduler) existe; `daily_briefing`/`rebenchmark` no se registran en el lifespan de FastAPI. |
-| 3 | **Auto-benchmark on install** | 🟡 | harness listo, falta encolar automáticamente al `registry.discover()`. |
-| 4 | **Proxy workflow** | 🟡 | `PROXY_WORKFLOW_ENABLED=False`, parked (§9.4). |
-| 5 | **Node canvas + timeline frame-accurate** | 🟡 | §10.1/§10.3 no construidos — recetas son JSON-only. |
-| 6 | **Autopilot supervisado (§12.3)** | 🟡 | publicación + moderación existen; falta el loop de scheduler supervisado. |
-| 7 | **Backends cloud (S3 / Redis)** | ☐ | `NotImplementedError` por diseño local-first — pendiente para modo "server"/"cloud" real. |
-| 8 | **Seedance 2.0 (§5)** | ☐ | no evaluado; queda como manifest a escribir cuando se priorice. |
+| Capacidad | Estado | Notas |
+|---|---|---|
+| YouTube publish (OAuth + resumable upload) | ✅ | |
+| Webhooks salientes + trace-id | ✅ | |
+| DagSpec builders (shorts/carousel/thumbnails/thread/dubbing) | ✅ | |
+| Carousel render (Pillow 1080×1350) | ✅ | |
+| `video_metrics` SQLite + reward LinUCB | ✅ | |
+| MetricsIngestionPort (YouTube + TikTok analytics) | ☐ | |
+| HookScorer (LightGBM) | ☐ | |
+| RetentionCurvePredictor | ☐ | |
 
 ---
 
-## Cómo verificar este estado
+## Pendientes — priorizado
 
-```powershell
-# Providers SDK instalados
-Get-ChildItem backend/providers.d -Directory
+### Alta (afectan al uso diario)
 
-# Capabilities wireadas en el DAG
-Get-Content backend/src/videocreator/infrastructure/container.py | Select-String "executor.register"
+| # | Qué | Detalle |
+|---|---|---|
+| 1 | **Redoblar escena/todo + recompilar** | `ManualDubber` portado, falta REST no-interactivo + botón UI |
+| 2 | **Higgsfield auth modal frontend** | Backend envía 401 con `error_code="higgsfield_needs_auth"`, frontend debe mostrar modal con instrucciones |
+| 3 | **Verificar render Higgsfield completo** | 25 escenas Tico, necesita restart backend + "Continuar" |
 
-# Scheduler: ¿arranca en el lifespan?
-Get-Content backend/src/videocreator/interfaces/rest/app.py | Select-String "scheduler"
+### Media (mejoras de calidad)
 
-# Auto-benchmark: ¿se dispara en discover()?
-Get-Content backend/src/videocreator/infrastructure/providers/sdk/registry.py | Select-String "benchmark"
-```
+| # | Qué | Detalle |
+|---|---|---|
+| 4 | **Shorts capa 3** | Overlays + whisper karaoke |
+| 5 | **Wizard Wave B** | Sessions resumables + web access |
+| 6 | **Scheduler (daily briefing + rebenchmark)** | Existe `BrainScheduler`, falta cablear en lifespan FastAPI |
+| 7 | **Auto-benchmark on install** | Encolar al `registry.discover()` |
+
+### Baja (futuro / nice-to-have)
+
+| # | Qué | Detalle |
+|---|---|---|
+| 8 | **Convergencia engine → DAG** | Rewrite gordo: portar scene-builder a DAG. No urgente |
+| 9 | **Node canvas + timeline** | Editor visual de recetas |
+| 10 | **Wizard Wave C** | Mobile slide UI |
+| 11 | **Backends cloud** | S3/Redis/Postgres para modo server |
+| 12 | **Proxy workflow** | Preview barato → render caro |
+| 13 | **MetricsIngestion + HookScorer + RetentionCurve** | ML pipeline completo |
+| 14 | **Narrador PiP (educativo)** | Picture-in-picture |
+
+---
+
+## Commits recientes (develop)
+
+| Commit | Descripción |
+|---|---|
+| `a4add77` | Duration ceiling, orphan merge, i2v clamp, demucs + Higgsfield fixes, ConfigTab |
+| `9d19546` | Per-pod narrative voice + setting; fix Tico/Piña format |
+| `a8d6335` | Delete clip + join clips from selection |
+| `28c0a0b` | CRUD cascade: delete script/topic strips universe_memory |
+| `3e0180f` | Apply scene edits, fresh clips on regen/redub, dub sync + media cache-bust |
+| `37113b1` | Registered-only cast with roles; create characters from pod UI |
+
+---
+
+## Principios (no negociables)
+
+1. **Local-first**: zero-docker mode siempre funciona. `videocreator serve` en <30s.
+2. **Clean Architecture**: puertos + adapters, sin coupling.
+3. **Graceful degradation**: sin LLM/provider = fallback heurístico.
+4. **Per-pod configuration**: nada hardcoded, todo en PodConfig.
+5. **Type safety**: TypeScript strict + Python typed.
