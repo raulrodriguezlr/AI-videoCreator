@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  api, getTemplate, startRun,
+  api, ApiError, getTemplate, startRun,
   type EpisodeDetail, type MediaAsset, type ProviderCatalogEntry, type Script, type SeoMetadata,
 } from "../api/client";
 import { MediaViewer } from "../components/MediaViewer";
 import {
-  Badge, Button, ErrorState, Field, Loading, StateBadge, useToast,
+  Badge, Button, ErrorState, Field, Loading, Modal, StateBadge, useToast,
 } from "../ui/primitives";
 import { IcEdit, IcRocket } from "../ui/icons";
 
@@ -99,6 +99,9 @@ export function EpisodePage() {
               onJoined={() => nav("/jobs")}
             />
           )}
+          {(episode.state === "ready" || episode.state === "completed") && episode.final_video_key && (
+            <YouTubePublishPanel podId={podId} episodeId={episodeId} episode={episode} seo={seo} />
+          )}
           {seo && <SeoPanel seo={seo} />}
           {script && <ScriptPanel script={script} episodeId={episodeId} />}
         </div>
@@ -123,6 +126,11 @@ function RenderConfig({ podId, episodeId, detail, providers, episodeState, onSav
   const [model, setModel] = useState(detail.episode.video_model ?? "");
   const [isRendering, setIsRendering] = useState(false);
 
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  const isHiggsfieldAuth = (e: unknown) =>
+    e instanceof ApiError && e.code === "higgsfield_needs_auth";
+
   const selected = providers.find((p) => p.name === provider);
   const models = selected?.models ?? [];
 
@@ -139,14 +147,17 @@ function RenderConfig({ podId, episodeId, detail, providers, episodeState, onSav
   const renderOnly = useMutation({
     mutationFn: () => api.post<{ job_id: string }>(`/pods/${podId}/episodes/${episodeId}/render`),
     onSuccess: (r) => { toast.ok("Render encolado", `Job ${r.job_id.slice(0, 12)}…`); onRendered(); },
-    onError: (e) => { toast.err("No se pudo encolar", (e as Error).message); setIsRendering(false); },
+    onError: (e) => {
+      if (isHiggsfieldAuth(e)) { setShowAuthModal(true); } else { toast.err("No se pudo encolar", (e as Error).message); }
+      setIsRendering(false);
+    },
   });
   // Resume an interrupted render: continues from the last completed scene
   // (clips already on disk are kept; the engine seeds the next scene i2v).
   const resumeRender = useMutation({
     mutationFn: () => api.post<{ job_id: string }>(`/pods/${podId}/episodes/${episodeId}/render?resume=true`),
     onSuccess: (r) => { toast.ok("Render reanudado", `Job ${r.job_id.slice(0, 12)}…`); onRendered(); },
-    onError: (e) => toast.err("No se pudo reanudar", (e as Error).message),
+    onError: (e) => { if (isHiggsfieldAuth(e)) setShowAuthModal(true); else toast.err("No se pudo reanudar", (e as Error).message); },
   });
   // Re-dub EVERY clip (replace existing dubs) and recompile the dubbed final.
   const redubAll = useMutation({
@@ -237,6 +248,100 @@ function RenderConfig({ podId, episodeId, detail, providers, episodeState, onSav
             <IcRocket /> {episodeState === "ready" ? "Re-renderizar" : "Renderizar"}
           </Button>
         </div>
+      </div>
+      {showAuthModal && (
+        <HiggsfieldAuthModal onClose={() => setShowAuthModal(false)} onRetry={handleRender} />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Higgsfield auth modal
+function HiggsfieldAuthModal({ onClose, onRetry }: { onClose: () => void; onRetry: () => void }) {
+  return (
+    <Modal title="Higgsfield requiere autenticación" onClose={onClose} footer={
+      <div className="btn-row" style={{ gap: 8 }}>
+        <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
+        <Button variant="mint" size="sm" onClick={() => { onClose(); onRetry(); }}>Reintentar render</Button>
+      </div>
+    }>
+      <div className="stack" style={{ gap: 12, fontSize: 14 }}>
+        <p>La CLI de Higgsfield necesita que inicies sesión con tu cuenta Plus.</p>
+        <div style={{ background: "var(--color-background-secondary, var(--bg2))", borderRadius: 8, padding: "12px 16px", fontFamily: "var(--font-mono, monospace)", fontSize: 13 }}>
+          hf auth login
+        </div>
+        <ol style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+          <li>Abre una terminal en la carpeta del proyecto</li>
+          <li>Ejecuta <code>hf auth login</code></li>
+          <li>Se abrirá una URL — inicia sesión con tu cuenta Higgsfield</li>
+          <li>Cuando termine, vuelve aquí y pulsa "Reintentar render"</li>
+        </ol>
+      </div>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------- YouTube publish
+function YouTubePublishPanel({ podId, episodeId, episode, seo }: {
+  podId: string; episodeId: string; episode: EpisodeDetail["episode"]; seo: SeoMetadata | null;
+}) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [privacy, setPrivacy] = useState("private");
+
+  const ytStatus = useQuery({ queryKey: ["yt-status"], queryFn: () => api.get<{ connected: boolean }>("/publish/youtube") });
+
+  const publish = useMutation({
+    mutationFn: () => api.post<{ video_id: string; url: string }>("/publish/youtube/upload", {
+      episode_id: episodeId, privacy,
+    }),
+    onSuccess: (r) => {
+      toast.ok("Subido a YouTube", r.url);
+      qc.invalidateQueries({ queryKey: ["episode-detail", episodeId] });
+    },
+    onError: (e) => toast.err("No se pudo subir", (e as Error).message),
+  });
+
+  if (episode.youtube_video_id) {
+    return (
+      <div className="card">
+        <div className="card-head"><h3>YouTube</h3></div>
+        <div className="card-pad">
+          <p style={{ fontSize: 13 }}>
+            Publicado: <a href={`https://www.youtube.com/watch?v=${episode.youtube_video_id}`} target="_blank" rel="noopener noreferrer">
+              {episode.youtube_video_id}
+            </a>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const connected = ytStatus.data?.connected ?? false;
+
+  return (
+    <div className="card">
+      <div className="card-head"><h3>Publicar en YouTube</h3></div>
+      <div className="card-pad">
+        {!connected ? (
+          <p className="muted" style={{ fontSize: 13 }}>
+            YouTube no conectado. Ve a Ajustes para vincular tu cuenta de Google.
+          </p>
+        ) : (
+          <div className="stack" style={{ gap: 12 }}>
+            <Field label="Privacidad">
+              <select className="select" value={privacy} onChange={(e) => setPrivacy(e.target.value)}>
+                <option value="private">Privado</option>
+                <option value="unlisted">No listado</option>
+                <option value="public">Público</option>
+              </select>
+            </Field>
+            {seo?.selected_title && <p className="dim" style={{ fontSize: 12 }}>Título: {seo.selected_title}</p>}
+            <Button variant="mint" size="sm" loading={publish.isPending} onClick={() => publish.mutate()}>
+              Subir a YouTube
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

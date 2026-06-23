@@ -923,6 +923,23 @@ class YouTubeStatusResponse(BaseModel):
     connected: bool
 
 
+class YouTubeUploadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    episode_id: str = Field(..., min_length=1)
+    title: str | None = None
+    description: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    privacy: str = "private"
+
+
+class YouTubeUploadResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    video_id: str
+    url: str
+
+
 # ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
@@ -1011,6 +1028,8 @@ __all__ = [
     "RunSnapshotResponse",
     "ConnectYouTubeRequest",
     "YouTubeStatusResponse",
+    "YouTubeUploadRequest",
+    "YouTubeUploadResponse",
     "PlanRecreationRequest",
     "FairUseResponse",
     "RecreationBeatResponse",

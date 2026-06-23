@@ -76,7 +76,7 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | "Continuar" visible en episodios completed (no solo failed) | ✅ | `a4add77` |
 | Progress SSE por clip | ✅ | |
 | Redoblar escena/todo + recompilar | ✅ | `POST /episodes/{id}/redub` + `/scenes/{i}/redub` + botones UI |
-| Higgsfield auth modal frontend | ☐ | Backend done (`HiggsfieldNeedsAuthError` 401), frontend sin empezar |
+| Higgsfield auth modal frontend | ✅ | Modal con instrucciones `hf auth login` + botón reintentar |
 
 ---
 
@@ -188,13 +188,13 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | Capacidad | Estado | Notas |
 |---|---|---|
 | YouTube OAuth flow | ⚠️ | Código real, **nunca testado contra Google** |
-| YouTube upload (`YouTubePublisher.upload()`) | ⚠️ | Unit-tested, pero **ningún endpoint lo llama** — falta wiring |
-| YouTube publish UI (frontend) | 💀 | **No existe** — zero botones de publicar |
+| YouTube upload (POST /publish/youtube/upload) | ✅ | Endpoint wired: episode → video → YouTubePublisher.upload() → save youtube_video_id |
+| YouTube publish UI (frontend) | ✅ | Panel en EpisodePage: check conexión, selector privacidad, botón "Subir a YouTube" |
 | YouTube metrics ingestion | 💀 | `VideoMetricsStore`, `parse_analytics_rows()`, `retention_at_3s()` — **zero callers** |
 | Webhooks salientes + trace-id | ✅ | |
 | DagSpec builders (carousel + thread) | ✅ | Funcionan |
 | DagSpec builders (shorts/thumbnails/dubbing) | 💀 | Builders existen, **nunca llamados** |
-| `text_to_image` capability | 💀 | Declarada en specs, **no tiene handler** |
+| `text_to_image` capability (SdkImageProvider) | ✅ | Bridge a Higgsfield Soul/Seedream/NanoBanana; `build_thumbnails_dag` la usa |
 | Carousel render (Pillow 1080×1350) | ✅ | |
 | `video_metrics` SQLite + reward LinUCB | ✅ | |
 | SEO metadata generation | ⚠️ | Use case llama LLM + persiste en DB, **nunca testado con LLM real** |
@@ -212,9 +212,8 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 
 | # | Qué | Detalle |
 |---|---|---|
-| 1 | **Higgsfield auth modal frontend** | Backend envía 401 con `error_code="higgsfield_needs_auth"`, frontend debe mostrar modal con instrucciones |
-| 2 | **YouTube publish wiring** | `YouTubePublisher.upload()` existe pero ningún endpoint lo llama + zero UI (botón publicar) |
-| 3 | **DAG executor E2E test** | POST /runs + botón "Multiplicar" wired, nunca testado. Probar con un episodio real |
+| 1 | **DAG executor E2E test** | POST /runs + botón "Multiplicar" wired, nunca testado. Probar con un episodio real |
+| 2 | **YouTube OAuth E2E test** | Endpoint + UI listos, falta probar flujo real contra Google |
 
 ### Media (mejoras de calidad)
 
@@ -233,7 +232,7 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | D1 | Brain agent (tool-calling loop) | 💀 zero callers | **Borrar** — endpoints usan use cases dedicados |
 | D2 | Daily briefing | 💀 nunca arrancado | **Wire** si se quiere automatizar, o **borrar** |
 | D3 | YouTube metrics ingestion | 💀 zero callers | **Borrar** hasta tener datos reales de YouTube |
-| D4 | `text_to_image` capability | 💀 sin handler | **Borrar** spec entry o implementar handler |
+| D4 | ~~`text_to_image` capability~~ | ✅ SdkImageProvider existe | ~~No es dead code — audit equivocado~~ |
 | D5 | `capability_router.py` (scoring) | Shadow — solo tests | **Mantener** como experimental, no confundir con ProviderRouter producción |
 
 ### Baja (futuro / nice-to-have)
