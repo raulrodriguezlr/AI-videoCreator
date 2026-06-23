@@ -25,7 +25,7 @@ from videocreator.infrastructure.providers.sdk.manifest import (
     ModelSpec,
     ProviderManifest,
 )
-from videocreator.shared.errors import ProviderError
+from videocreator.shared.errors import HiggsfieldNeedsAuthError, ProviderError
 
 ADAPTER_PATH = (
     Path(__file__).resolve().parents[2] / "providers.d" / "higgsfield" / "adapter.py"
@@ -53,6 +53,9 @@ def _manifest() -> ProviderManifest:
             ModelSpec(id="wan-2.6", cli_type="wan2_6", backend="web",
                       capabilities=["text_to_video", "image_to_video"],
                       max_duration_s=15),
+            ModelSpec(id="veo-web", cli_type="veo3_1", backend="web",
+                      capabilities=["text_to_video", "image_to_video"],
+                      max_duration_s=8, valid_durations=(4, 6, 8)),
             ModelSpec(id="no-cli", capabilities=["text_to_video"]),  # no cli_type
         ],
     )
@@ -102,6 +105,18 @@ class TestHelpers:
         out = 'submitting...\nrendering 50%\n{"result_url": "https://a/x.png"}'
         assert mod._parse_json(out) == {"result_url": "https://a/x.png"}
 
+    def test_snap_duration(self) -> None:
+        mod = _load_module()
+        veo = SimpleNamespace(max_duration_s=8, valid_durations=(4, 6, 8))
+        assert mod._snap_duration(3.5, veo) == 4
+        assert mod._snap_duration(5, veo) == 6      # tie → longer
+        assert mod._snap_duration(7, veo) == 8
+        assert mod._snap_duration(8, veo) == 8
+        # continuous model: clamp to max + round, no snap list
+        wan = SimpleNamespace(max_duration_s=15, valid_durations=())
+        assert mod._snap_duration(20, wan) == 15
+        assert mod._snap_duration(6, wan) == 6
+
 
 # ---- generate() ------------------------------------------------------------
 class TestGenerate:
@@ -146,12 +161,29 @@ class TestGenerate:
         assert res.has_audio is True
 
     @pytest.mark.asyncio
+    async def test_video_snaps_duration_to_discrete_values(self, tmp_path: Path) -> None:
+        mod = _load_module()
+        adapter = _adapter(mod, tmp_path)
+        cap = _stub_io(adapter, stdout=json.dumps({"result_url": "https://cdn.hf/v.mp4"}))
+
+        await adapter.generate(GenRequest(
+            prompt="hero shot", duration_s=5, width=1920, height=1080, model_id="veo-web",
+        ))
+
+        args = cap["args"]
+        di = args.index("--duration")
+        # 5s is not a valid Veo length → must snap to 4 or 6, never send 5.
+        assert args[di + 1] in {"4", "6"}
+        # --resolution is never sent (CLI uses model's native resolution).
+        assert "--resolution" not in args
+
+    @pytest.mark.asyncio
     async def test_cli_nonzero_exit_raises(self, tmp_path: Path) -> None:
         mod = _load_module()
         adapter = _adapter(mod, tmp_path)
         _stub_io(adapter, stdout="", code=1, stderr="Session expired")
 
-        with pytest.raises(ProviderError, match="Session expired"):
+        with pytest.raises(HiggsfieldNeedsAuthError):
             await adapter.generate(GenRequest(prompt="x", model_id="soul"))
 
     @pytest.mark.asyncio

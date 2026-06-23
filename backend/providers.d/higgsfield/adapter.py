@@ -14,11 +14,15 @@ CONTRACT BLOCK — the ONE place to edit if the CLI surface changes.
 Verified against `@higgsfield/cli` v0.2.x (github.com/higgsfield-ai/cli):
   • Auth (once, by the user): `hf auth login`            → spends PLUS credits
   • Generate: `hf generate create <job_set_type> --prompt "..." [flags] --json --wait`
-  • Flags: --aspect_ratio R · --duration N · --start-image PATH · --resolution R
+  • Flags: --aspect_ratio R · --duration N · --start-image PATH
            --wait (block, print result) · --wait-timeout 10m · --json (machine output)
   • `--json --wait` prints a JSON job with the finished media at `result_url`
     (tolerant dig below also accepts results[].url / url / video_url).
   • Model id ⇒ `job_set_type` comes from each ModelSpec's `cli_type`.
+  • Param handling: --duration is snapped to the model's `valid_durations`/
+    `max_duration_s` (see `_snap_duration`) so we never send an unsupported clip
+    length. The CLI exposes NO --resolution, seed or negative-prompt flag, so those
+    fields are intentionally dropped (a CLI limitation, not an omission).
 The binary is resolved from Settings.higgsfield_cli_path (default "hf" on PATH).
 ────────────────────────────────────────────────────────────────────────────
 """
@@ -35,7 +39,7 @@ from videocreator.infrastructure.providers.sdk.adapter_base import (
     GenResult,
 )
 from videocreator.shared.config import get_settings
-from videocreator.shared.errors import ProviderError
+from videocreator.shared.errors import HiggsfieldNeedsAuthError, ProviderError
 from videocreator.shared.logging import get_logger
 
 log = get_logger(__name__)
@@ -120,6 +124,26 @@ def _aspect_ratio(width: int, height: int) -> str:
     return "1:1"
 
 
+def _snap_duration(seconds: float, model: Any) -> int:
+    """Clamp to the model's max and snap to its discrete valid durations.
+
+    The model only accepts certain clip lengths (Veo → 4/6/8). Sending an
+    unsupported value (e.g. 5 or 7) can fail the job, so snap to the nearest
+    allowed value (ties → longer). Without a `valid_durations` list, just clamp
+    to `max_duration_s` and round.
+    """
+    max_s = int(getattr(model, "max_duration_s", 0) or 0)
+    valid = tuple(getattr(model, "valid_durations", ()) or ())
+    s = float(seconds)
+    if max_s:
+        s = min(s, max_s)
+    if valid:
+        allowed = [v for v in valid if not max_s or v <= max_s] or list(valid)
+        return min(allowed, key=lambda v: (abs(v - s), -v))
+    snapped = int(round(s)) or 1
+    return min(snapped, max_s) if max_s else snapped
+
+
 class Adapter(AdapterBase):
     def _cli_path(self) -> str:
         return get_settings().higgsfield_cli_path or "hf"
@@ -149,7 +173,7 @@ class Adapter(AdapterBase):
             if ar != "1:1":
                 args += ["--aspect_ratio", ar]
         else:
-            args += ["--aspect_ratio", ar, "--duration", str(int(round(request.duration_s)))]
+            args += ["--aspect_ratio", ar, "--duration", str(_snap_duration(request.duration_s, model))]
             start = request.extra.get("input_image") or request.extra.get("image_url")
             if start:
                 args += ["--start-image", str(start)]
@@ -172,6 +196,18 @@ class Adapter(AdapterBase):
 
         stdout, stderr, code = await self._run(args)
         if code != 0:
+            err_text = (stderr or stdout)[:600].lower()
+            _AUTH_HINTS = (
+                "not authenticated", "unauthenticated", "please log in",
+                "login required", "hf auth login", "auth login",
+                "unauthorized", "session expired", "need to authenticate",
+                "please authenticate", "you are not logged",
+            )
+            if any(h in err_text for h in _AUTH_HINTS):
+                raise HiggsfieldNeedsAuthError(
+                    "higgsfield CLI requires auth — run `hf auth login` to authenticate "
+                    "with your Plus subscription"
+                )
             raise ProviderError(
                 f"higgsfield CLI `{cli_type}` failed (exit {code}): {stderr[:300] or stdout[:300]}"
             )

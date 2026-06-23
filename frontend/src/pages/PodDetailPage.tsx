@@ -13,7 +13,7 @@ import { IcEdit, IcFile, IcImage, IcPlus, IcRocket, IcSparkles, IcTrash, IcUploa
 import { JsonEditor } from "../components/JsonEditor";
 import { prettyStyle } from "./PodsListPage";
 
-type TabId = "episodes" | "topics" | "scripts" | "shorts" | "characters" | "files" | "settings";
+type TabId = "episodes" | "topics" | "scripts" | "shorts" | "characters" | "config" | "settings";
 
 /** Run `fn` only after the user confirms a destructive action. */
 function confirmThen(message: string, fn: () => void): void {
@@ -55,7 +55,7 @@ export function PodDetailPage() {
         { id: "scripts", label: "Guiones", count: scripts.data?.length },
         { id: "shorts", label: "Shorts", count: shorts.data?.length },
         { id: "characters", label: "Personajes", count: chars.data?.length },
-        { id: "files", label: "Archivos" },
+        { id: "config", label: "Configuración" },
         { id: "settings", label: "Ajustes" },
       ]} />
 
@@ -64,7 +64,7 @@ export function PodDetailPage() {
       {tab === "scripts" && <ScriptsTab podId={podId} q={scripts} />}
       {tab === "shorts" && <ShortsTab podId={podId} q={shorts} episodes={eps.data ?? []} />}
       {tab === "characters" && <CharactersTab podId={podId} q={chars} />}
-      {tab === "files" && <FilesTab podId={podId} />}
+      {tab === "config" && <ConfigTab podId={podId} pod={pod.data} />}
       {tab === "settings" && <SettingsTab pod={pod.data} />}
     </div>
   );
@@ -745,38 +745,151 @@ function CharacterAssetsModal({ podId, character, onClose }: {
   );
 }
 
-// ---------------------------------------------------------------- Files (raw JSON)
-function FilesTab({ podId }: { podId: string }) {
+// ---------------------------------------------------------------- Config (series context + universe memory + legacy files)
+function ConfigTab({ podId, pod }: { podId: string; pod: Pod }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [seriesCtx, setSeriesCtx] = useState(pod.config.series_context ?? "");
+  const [univMem, setUnivMem] = useState(pod.config.universe_memory ?? "");
+  const overrides = (pod.config.extra?.script_overrides ?? {}) as Record<string, string>;
+  const [storySuffix, setStorySuffix] = useState(overrides.prompt_story_suffix ?? "");
+  const [scriptSuffix, setScriptSuffix] = useState(overrides.prompt_suffix ?? "");
+
+  const save = useMutation({
+    mutationFn: () => api.put<Pod>(`/pods/${podId}/config`, {
+      config: {
+        ...pod.config,
+        series_context: seriesCtx || null,
+        universe_memory: univMem || null,
+        extra: {
+          ...pod.config.extra,
+          script_overrides: {
+            ...overrides,
+            prompt_story_suffix: storySuffix || undefined,
+            prompt_suffix: scriptSuffix || undefined,
+          },
+        },
+      },
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["pod", podId] }); toast.ok("Guardado"); },
+    onError: (e) => toast.err("No se pudo guardar", (e as Error).message),
+  });
+
   const files = useQuery<{ files: string[] }>({
     queryKey: ["pod-files", podId], queryFn: () => api.get(`/pods/${podId}/files`),
   });
-  const [active, setActive] = useState<string | null>(null);
   const list = files.data?.files ?? [];
-  const current = active ?? list[0] ?? null;
-
-  if (files.isLoading) return <Loading />;
-  if (!list.length) {
-    return <Empty emoji="📄" title="Sin archivos editables">Este pod no tiene JSON heredado (config.json, prompts.json…).</Empty>;
-  }
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const currentFile = activeFile ?? list[0] ?? null;
 
   return (
     <div className="stack">
-      <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-        <IcFile /> JSON heredado del pod — edición en crudo. Se valida antes de guardar.
-      </p>
-      <div className="file-pills">
-        {list.map((f) => (
-          <button key={f} className={f === current ? "on" : ""} onClick={() => setActive(f)}>{f}</button>
-        ))}
+      <div className="field">
+        <label>Contexto de la serie</label>
+        <span className="hint">Descripción larga de la serie — se inyecta en cada guión</span>
+        <textarea
+          className="input" rows={5} value={seriesCtx}
+          onChange={(e) => setSeriesCtx(e.target.value)}
+          style={{ resize: "vertical", fontFamily: "inherit" }}
+          placeholder="Describe el arco narrativo, el tono y el propósito de la serie…"
+        />
       </div>
-      {current && (
-        <div className="card card-pad">
-          <JsonEditor
-            key={current}
-            getPath={`/pods/${podId}/files/${current}`}
-            putPath={`/pods/${podId}/files/${current}`}
-            queryKey={["pod-file", podId, current]}
-          />
+      <div className="field">
+        <label>Memoria del universo</label>
+        <span className="hint">Resumen acumulado de episodios pasados — mantenido automáticamente, editable</span>
+        <textarea
+          className="input" rows={8} value={univMem}
+          onChange={(e) => setUnivMem(e.target.value)}
+          style={{ resize: "vertical", fontFamily: "inherit" }}
+          placeholder="Ningún episodio registrado aún."
+        />
+      </div>
+      <div className="btn-row" style={{ justifyContent: "flex-end" }}>
+        <Button variant="mint" size="sm" loading={save.isPending} onClick={() => save.mutate()}>
+          Guardar
+        </Button>
+      </div>
+
+      <details style={{ marginTop: 8 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+          Estructura del guión
+        </summary>
+        <div style={{ marginTop: 8, overflowX: "auto" }}>
+          <table className="mini-table" style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid var(--c-border)" }}>Campo</th>
+                <th style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid var(--c-border)" }}>Tipo</th>
+                <th style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid var(--c-border)" }}>Valores</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["visual_prompt", "string", "Descripción visual en inglés"],
+                ["audio_text", "string", "Diálogo/narración en idioma del pod"],
+                ["duration_seconds", "number", "4–max_clip_seconds"],
+                ["transition_to_next", "enum", "continue, cut, scene_change"],
+                ["camera.shot_type", "enum", "wide, medium, close-up, extreme_close_up, aerial, over_the_shoulder"],
+                ["camera.movement", "enum", "static, pan_left, pan_right, tracking, dolly_in, dolly_out, crane_up"],
+                ["camera.angle", "enum", "eye_level, low_angle, high_angle, bird_eye, dutch_angle"],
+                ["mood", "enum", "warm, tense, joyful, mysterious, triumphant, calm, exciting"],
+                ["lighting", "enum", "golden_hour, soft_diffused, dramatic_shadows, bright_daylight, moonlit"],
+                ["character", "string", "Nombre exacto del personaje"],
+                ["narrative_phase", "enum", "introduction, establishing, rising_action, climax, falling_action, resolution, transition"],
+              ].map(([campo, tipo, valores]) => (
+                <tr key={campo}>
+                  <td style={{ padding: "3px 8px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{campo}</td>
+                  <td style={{ padding: "3px 8px", opacity: 0.7 }}>{tipo}</td>
+                  <td style={{ padding: "3px 8px", fontSize: 11 }}>{valores}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="stack" style={{ marginTop: 12, gap: 10 }}>
+          <div className="field">
+            <label style={{ fontSize: 13 }}>Instrucciones extra para la historia</label>
+            <span className="hint">Se añaden al prompt de WriteStory (narración)</span>
+            <textarea
+              className="input" rows={3} value={storySuffix}
+              onChange={(e) => setStorySuffix(e.target.value)}
+              style={{ resize: "vertical", fontFamily: "inherit", fontSize: 13 }}
+              placeholder="Ej: No menciones marcas reales. Usa metáforas con animales."
+            />
+          </div>
+          <div className="field">
+            <label style={{ fontSize: 13 }}>Instrucciones extra para el guión</label>
+            <span className="hint">Se añaden al prompt de GenerateScript (escenas + cámara)</span>
+            <textarea
+              className="input" rows={3} value={scriptSuffix}
+              onChange={(e) => setScriptSuffix(e.target.value)}
+              style={{ resize: "vertical", fontFamily: "inherit", fontSize: 13 }}
+              placeholder="Ej: Máximo 3 continues seguidos. Prefiere planos medios."
+            />
+          </div>
+        </div>
+      </details>
+
+      {list.length > 0 && (
+        <div className="stack" style={{ marginTop: 16 }}>
+          <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+            <IcFile /> Archivos JSON heredados
+          </p>
+          <div className="file-pills">
+            {list.map((f) => (
+              <button key={f} className={f === currentFile ? "on" : ""} onClick={() => setActiveFile(f)}>{f}</button>
+            ))}
+          </div>
+          {currentFile && (
+            <div className="card card-pad">
+              <JsonEditor
+                key={currentFile}
+                getPath={`/pods/${podId}/files/${currentFile}`}
+                putPath={`/pods/${podId}/files/${currentFile}`}
+                queryKey={["pod-file", podId, currentFile]}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

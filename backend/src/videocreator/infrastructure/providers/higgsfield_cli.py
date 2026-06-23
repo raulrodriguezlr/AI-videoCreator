@@ -143,4 +143,47 @@ async def account_balance(settings: Settings, *, runner: Any = None) -> dict[str
     return {"available": True, "credits": credits, "plan": plan, "detail": "ok"}
 
 
-__all__ = ["account_balance"]
+async def auth_status(settings: Settings, *, runner: Any = None) -> dict[str, Any]:
+    """Return {logged_in: bool, detail: str} — fail-soft, never raises.
+
+    Reuses `hf account status --json`: exit 0 with parseable output → logged in.
+    """
+    balance = await account_balance(settings, runner=runner)
+    return {"logged_in": balance["available"], "detail": balance["detail"]}
+
+
+async def auth_login_stream(settings: Settings):
+    """Async generator that runs `hf auth login` and yields SSE data lines.
+
+    Each yielded string is a complete SSE event (ends with double newline).
+    The stream merges stdout+stderr and includes the device-code URL when found.
+    Caller wraps in StreamingResponse(media_type="text/event-stream").
+    """
+    import re
+    _url_re = re.compile(r"https?://\S+")
+
+    cli_path = settings.higgsfield_cli_path or "hf"
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            cli_path, "auth", "login",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,  # merge: device code printed to stderr
+        )
+    except FileNotFoundError:
+        payload = json.dumps({"error": f"CLI not found at '{cli_path}'"})
+        yield f"data: {payload}\n\n"
+        return
+
+    assert proc.stdout is not None
+    async for raw_line in proc.stdout:
+        line = raw_line.decode("utf-8", "replace").rstrip()
+        url_match = _url_re.search(line)
+        payload = json.dumps({"line": line, "url": url_match.group() if url_match else None})
+        yield f"data: {payload}\n\n"
+
+    await proc.wait()
+    done_payload = json.dumps({"done": True, "success": proc.returncode == 0, "code": proc.returncode})
+    yield f"data: {done_payload}\n\n"
+
+
+__all__ = ["account_balance", "auth_status", "auth_login_stream"]

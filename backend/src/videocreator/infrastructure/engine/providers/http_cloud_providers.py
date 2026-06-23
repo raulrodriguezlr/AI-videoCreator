@@ -136,11 +136,11 @@ class _HttpCloudVideoProvider(BaseVideoProvider):
         self, previous_clip: VideoClip, prompt: str,
         reference_images: Optional[List[str]] = None, save_dir: Optional[str] = None,
         scene_index: Optional[int] = None, narrative_phase: str = "",
+        duration: int = 8, **kwargs: Any,
     ) -> VideoClip:
-        # Seed image-to-video from the previous clip's last frame.
         last_frame = self._get_last_frame_path(previous_clip.file_path, save_dir, scene_index)
-        out = self._run_job(prompt, 8, None, reference_images, last_frame, save_dir, scene_index)
-        return VideoClip(file_path=out, duration=8, seed=None)
+        out = self._run_job(prompt, duration, None, reference_images, last_frame, save_dir, scene_index)
+        return VideoClip(file_path=out, duration=duration, seed=None)
 
     def extend_scene(self, video_clip: VideoClip, prompt: str, **kwargs: Any) -> VideoClip:
         return self.jump_to_scene(previous_clip=video_clip, prompt=prompt, **kwargs)

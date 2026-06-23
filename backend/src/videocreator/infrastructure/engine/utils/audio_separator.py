@@ -9,6 +9,7 @@ Esto permite doblar SOLO la voz con ElevenLabs STS y luego
 mezclarla de vuelta con los efectos originales de Veo.
 """
 
+import importlib.util
 import os
 import sys
 import subprocess
@@ -33,21 +34,20 @@ class AudioSeparator:
 
     @staticmethod
     def is_available() -> bool:
-        """Check if Demucs is installed and accessible."""
+        """Check if Demucs is installed and accessible.
+
+        Uses importlib.util.find_spec — no subprocess, no torch init cost.
+        The old approach (`python -m demucs --help`) timed out (10s) because
+        torch initialisation takes >10s on first load.
+        """
         try:
-            result = subprocess.run(
-                [sys.executable, "-m", "demucs", "--help"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                timeout=10
-            )
-            is_ok = result.returncode == 0
-            if not is_ok:
-                log.warning("demucs_not_installed", hint="Ejecuta 'pip install demucs' para habilitar el filtrado de ruido")
-                print("\n[WARNING] ⚠️ DEMUCS NO INSTALADO ⚠️\nEl sistema de doblaje no aislará la voz del ruido de fondo.\nPara solucionar los ruidos al principio/final de los clips, instala Demucs ejecutando:\n>>> pip install demucs\n")
-            return is_ok
+            available = importlib.util.find_spec("demucs") is not None
+            if not available:
+                log.warning("demucs_not_installed", hint="pip install demucs")
+                print("\n[WARNING] ⚠️ DEMUCS NO INSTALADO ⚠️\nInstala con: pip install demucs\n")
+            return available
         except Exception as e:
             log.warning("demucs_check_failed", error=str(e))
-            print(f"\n[WARNING] ⚠️ ERROR DE DEMUCS ⚠️\nFalló la comprobación: {e}\nEl filtrado de ruido estará desactivado. Instálalo con: pip install demucs\n")
             return False
 
     @staticmethod
@@ -80,10 +80,12 @@ class AudioSeparator:
         try:
             log.info("demucs_separating", audio=os.path.basename(audio_path))
 
-            # --two-stems vocals: only separate into vocals + no_vocals (fastest)
-            # -n htdemucs: use the hybrid transformer model
+            # Use _demucs_runner.py instead of `-m demucs` — the runner patches
+            # torchaudio.save with soundfile before importing demucs, which avoids
+            # the torchcodec DLL load failure on Python 3.14 + Windows.
+            _runner = os.path.join(os.path.dirname(__file__), "_demucs_runner.py")
             cmd = [
-                sys.executable, "-m", "demucs",
+                sys.executable, _runner,
                 "--two-stems", "vocals",
                 "-n", AudioSeparator.MODEL,
                 "-o", demucs_out,
@@ -92,13 +94,14 @@ class AudioSeparator:
 
             result = subprocess.run(
                 cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 timeout=120  # 2 min max per clip
             )
 
             if result.returncode != 0:
-                log.error("demucs_separation_failed", returncode=result.returncode)
+                stderr_tail = (result.stderr or b"").decode("utf-8", errors="replace")[-600:]
+                log.error("demucs_separation_failed", returncode=result.returncode, stderr=stderr_tail)
                 return None
 
             # Demucs outputs to: <output_dir>/htdemucs/<filename_without_ext>/vocals.wav + no_vocals.wav

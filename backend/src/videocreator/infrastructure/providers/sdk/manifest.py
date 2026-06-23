@@ -48,6 +48,10 @@ class ModelSpec(BaseModel):
     family: str = "other"
     capabilities: list[str] = Field(default_factory=list)
     max_duration_s: int = 5
+    #: Discrete clip lengths the model accepts (e.g. Veo → (4, 6, 8)). Empty =
+    #: continuous up to ``max_duration_s``. The adapter snaps a requested
+    #: duration to the nearest valid value so it never sends an unsupported one.
+    valid_durations: tuple[int, ...] = ()
     max_resolution: tuple[int, int] = (1920, 1080)
     cost: CostModel = Field(default_factory=CostModel)
     latency: LatencyProfile = Field(default_factory=LatencyProfile)

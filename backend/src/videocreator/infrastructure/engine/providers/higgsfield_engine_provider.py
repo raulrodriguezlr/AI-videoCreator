@@ -68,6 +68,33 @@ class HiggsfieldEngineProvider(BaseVideoProvider):
         from videocreator.shared.config import get_settings
         return bool(get_settings().higgsfield_cli_path)
 
+    def _model_spec(self) -> Any:
+        """The active model's manifest spec (for duration bounds), or None."""
+        try:
+            for m in _higgsfield_adapter().manifest.models:
+                if m.id == self._model:
+                    return m
+        except Exception:  # noqa: BLE001 — bounds are best-effort
+            return None
+        return None
+
+    def clamp_duration(self, seconds: float) -> int:
+        """Clamp/snap to the active Higgsfield model's accepted clip lengths.
+
+        Reads `max_duration_s` / `valid_durations` from the manifest instead of
+        the engine's global [4, 8] cap, so e.g. wan-2.6 can use longer clips and
+        a 5s-only model is never asked for 8s.
+        """
+        spec = self._model_spec()
+        max_s = int(getattr(spec, "max_duration_s", 0) or 0) if spec else 0
+        max_s = max_s or self.DEFAULT_SCENE_DURATION
+        valid = tuple(getattr(spec, "valid_durations", ()) or ()) if spec else ()
+        s = max(self.MIN_SCENE_DURATION, min(float(seconds), max_s))
+        if valid:
+            allowed = [v for v in valid if v <= max_s] or list(valid)
+            return min(allowed, key=lambda v: (abs(v - s), -v))
+        return int(s)
+
     # ---- atomic ops the pipeline calls per scene --------------------------
     def _generate(
         self, prompt: str, duration: int, seed: Optional[int],
@@ -115,12 +142,12 @@ class HiggsfieldEngineProvider(BaseVideoProvider):
         self, previous_clip: VideoClip, prompt: str,
         reference_images: Optional[List[str]] = None, save_dir: Optional[str] = None,
         scene_index: Optional[int] = None, narrative_phase: str = "",
+        duration: int = 8, **kwargs: Any,
     ) -> VideoClip:
-        # Image-to-video: seed from the previous clip's last frame for continuity.
         last_frame = self._get_last_frame_path(previous_clip.file_path, save_dir, scene_index)
-        out = self._generate(prompt, 8, None, reference_images, None,
+        out = self._generate(prompt, duration, None, reference_images, None,
                              last_frame, save_dir, scene_index)
-        return VideoClip(file_path=out, duration=8, seed=None)
+        return VideoClip(file_path=out, duration=duration, seed=None)
 
     def extend_scene(self, video_clip: VideoClip, prompt: str, **kwargs: Any) -> VideoClip:
         return self.jump_to_scene(previous_clip=video_clip, prompt=prompt, **kwargs)

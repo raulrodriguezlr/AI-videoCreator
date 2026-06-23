@@ -106,10 +106,10 @@ models:
     endpoint: kling3
     cli_type: kling3_0
     backend: web
-    max_duration_s: 10
+    max_duration_s: 15
     max_resolution: [1920, 1080]
     cost: { credits: 9.0, currency: USD }
-    strengths: [strong motion physics, 1080p, character consistency]
+    strengths: [strong motion physics, 1080p, character consistency, up to 15s]
     good_for: [realistic, animation_3d]
   - id: seedance-2.0-fast
     family: seedance
@@ -128,10 +128,10 @@ models:
     endpoint: seedance2
     cli_type: seedance_2_0
     backend: web
-    max_duration_s: 5
+    max_duration_s: 15
     max_resolution: [1920, 1080]
     cost: { credits: 23.0, currency: USD }
-    strengths: [Pixar-grade lighting, hero shots, cloth/hair detail]
+    strengths: [Pixar-grade lighting, hero shots, cloth/hair detail, up to 15s]
     good_for: [cinematic, animation_3d]
   - id: veo-3.1
     family: veo
@@ -140,6 +140,7 @@ models:
     cli_type: veo3_1
     backend: web
     max_duration_s: 8
+    valid_durations: [4, 6, 8]
     max_resolution: [1920, 1080]
     cost: { credits: 55.0, currency: USD }
     strengths: [native audio, dialogue, photoreal]
@@ -150,7 +151,8 @@ models:
     capabilities: [text_to_video, image_to_video]
     endpoint: sora2-video
     backend: web
-    max_duration_s: 10
+    max_duration_s: 12
+    valid_durations: [4, 8, 12]
     max_resolution: [1920, 1080]
     cost: { credits: 55.0, currency: USD }
     strengths: [photoreal, world physics]

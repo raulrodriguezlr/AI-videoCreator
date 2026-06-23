@@ -217,9 +217,9 @@ function RenderConfig({ podId, episodeId, detail, providers, episodeState, onSav
               🎙 Redoblar todo
             </Button>
           )}
-          {episodeState === "failed" && (
+          {(episodeState === "failed" || episodeState === "completed") && (
             <Button variant="default" size="sm" loading={resumeRender.isPending}
-              onClick={() => resumeRender.mutate()} title="Continuar desde la última escena buena">
+              onClick={() => resumeRender.mutate()} title="Recompilar reutilizando clips ya generados">
               <IcRocket /> Continuar
             </Button>
           )}

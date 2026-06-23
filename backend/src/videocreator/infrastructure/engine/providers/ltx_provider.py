@@ -228,11 +228,12 @@ class LtxProvider(BaseVideoProvider):
         save_dir: Optional[str] = None,
         scene_index: Optional[int] = None,
         narrative_phase: str = "",
+        duration: int = 8,
+        **kwargs: Any,
     ) -> VideoClip:
         """Jump to new scene using last frame of previous clip as image input."""
         log.info("ltx.jump_to_scene", prompt=prompt[:60])
 
-        # Extract last frame from previous clip
         last_frame_path = self._get_last_frame_path(previous_clip.file_path, save_dir, scene_index)
 
         if last_frame_path is None:
@@ -244,7 +245,6 @@ class LtxProvider(BaseVideoProvider):
                 narrative_phase=narrative_phase,
             )
 
-        # Upload the frame to ComfyUI's input folder
         frame_name = self._upload_image_to_comfyui(last_frame_path)
         if frame_name is None:
             log.warning("ltx.frame_upload_failed_generating_t2v")
@@ -255,7 +255,7 @@ class LtxProvider(BaseVideoProvider):
                 narrative_phase=narrative_phase,
             )
 
-        frames = self._duration_to_frames(8)  # I2V default duration
+        frames = self._duration_to_frames(duration)
         actual_seed = int(time.time() * 1000) % (2**32)
 
         workflow = self._build_workflow_i2v(

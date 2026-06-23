@@ -152,3 +152,11 @@ class SeoMetadataNotFound(NotFoundError):
 
 class InvalidScript(ValidationError):
     error_code = "invalid_script"
+
+
+# --- Higgsfield specific ---
+class HiggsfieldNeedsAuthError(ProviderError):
+    """higgsfield CLI requires auth — user must run `hf auth login`."""
+
+    http_status = 401
+    error_code = "higgsfield_needs_auth"

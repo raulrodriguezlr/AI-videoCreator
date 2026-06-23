@@ -89,12 +89,16 @@ class VeoProvider(BaseVideoProvider):
     # SHARED CONFIG BUILDERS (DRY)
     # ==========================================
 
-    def _build_config(self, mode: str = "text") -> Any:
+    def _build_config(self, mode: str = "text", duration: int | None = None) -> Any:
         """
         Build GenerateVideosConfig shared by all generation methods.
 
         Args:
             mode: 'text' (text-to-video), 'image' (image-to-video), 'extend'
+            duration: requested clip length in seconds (Veo accepts 4/6/8). Sent
+                so a 4s action yields a 4s clip instead of an 8s one padded with
+                filler audio. Gated: if the SDK/model rejects the field we drop
+                it and warn once rather than fail the render.
         """
         config_params = {
             "aspect_ratio": VEO_ASPECT_RATIO,
@@ -106,7 +110,26 @@ class VeoProvider(BaseVideoProvider):
         # currently rejects all values (allow_all, allow_adult, dont_allow).
         # The API defaults to allowing people when the parameter is omitted.
 
-        return types.GenerateVideosConfig(**config_params)
+        if not duration:
+            return types.GenerateVideosConfig(**config_params)
+        config_params["duration_seconds"] = int(duration)
+        try:
+            return types.GenerateVideosConfig(**config_params)
+        except Exception:  # noqa: BLE001 — degrade gracefully if field unsupported
+            config_params.pop("duration_seconds", None)
+            if not getattr(self, "_warned_no_duration", False):
+                log.warning("veo.duration_param_unsupported", model=self.model)
+                self._warned_no_duration = True
+            return types.GenerateVideosConfig(**config_params)
+
+    def clamp_duration(self, seconds: float, mode: str = "text") -> int:
+        """Veo accepts only discrete clip lengths — snap to nearest (ties → longer).
+
+        For image-to-video (reference_to_video), only [8] is supported.
+        """
+        if mode == "image":
+            return 8
+        return min((4, 6, 8), key=lambda v: (abs(v - seconds), -v))
 
     def _build_gen_params(
         self,
@@ -117,12 +140,13 @@ class VeoProvider(BaseVideoProvider):
         reference_images: Optional[List[str]] = None,
         negative_prompt: Optional[str] = None,
         narrative_phase: str = "",
+        duration: Optional[int] = None,
     ) -> dict:
         """
         Build the full parameter dict for client.models.generate_videos().
         Single source of truth for all generation calls.
         """
-        config = self._build_config(mode=mode)
+        config = self._build_config(mode=mode, duration=duration)
 
         # Base parameters
         gen_params = {
@@ -170,18 +194,24 @@ class VeoProvider(BaseVideoProvider):
         Generate a single video clip using Veo 3.1 text-to-video.
         Uses referenceImages for character consistency if provided.
         """
-        log.info("veo.generate_scene", prompt=prompt[:80], model=self.model, duration_s=duration, resolution=VEO_RESOLUTION)
+        # Character reference images activate the `reference_to_video` feature,
+        # which only accepts [8]s clips — clamp accordingly (mode="image").
+        use_refs = bool(reference_images) and USE_REFERENCE_IMAGES
+        eff_duration = self.clamp_duration(duration, mode="image" if use_refs else "text")
+        log.info("veo.generate_scene", prompt=prompt[:80], model=self.model, duration_s=eff_duration, resolution=VEO_RESOLUTION)
 
         gen_params = self._build_gen_params(
             prompt=prompt,
             mode="text",
             reference_images=reference_images,
             negative_prompt=negative_prompt,
+            duration=eff_duration,
         )
         operation = self.client.models.generate_videos(**gen_params)
         return self._poll_and_download(
             operation, prompt, seed,
             save_dir=save_dir, scene_index=scene_index, narrative_phase=narrative_phase,
+            duration=eff_duration,
         )
 
     def extend_scene(
@@ -223,6 +253,8 @@ class VeoProvider(BaseVideoProvider):
         save_dir: Optional[str] = None,
         scene_index: Optional[int] = None,
         narrative_phase: str = "",
+        duration: int = 8,
+        **kwargs,
     ) -> VideoClip:
         """
         Create a new scene using the last frame of the previous clip.
@@ -254,6 +286,7 @@ class VeoProvider(BaseVideoProvider):
             prompt=prompt,
             mode="image",
             image=last_frame,
+            duration=self.clamp_duration(duration, mode="image"),
             # NOTE: Do NOT pass reference_images here.
             # Veo 3.1 rejects image + reference_images simultaneously.
             # The last frame already provides visual continuity.
@@ -341,6 +374,7 @@ class VeoProvider(BaseVideoProvider):
         save_dir: Optional[str] = None,
         scene_index: Optional[int] = None,
         narrative_phase: str = "",
+        duration: Optional[int] = None,
     ) -> VideoClip:
         """Poll operation status and download the generated video."""
         elapsed = 0
@@ -397,7 +431,7 @@ class VeoProvider(BaseVideoProvider):
 
         return VideoClip(
             file_path=output_path,
-            duration=VEO_DURATION_SECONDS,
+            duration=duration or VEO_DURATION_SECONDS,
             seed=seed,
             video_ref=generated.video,
         )

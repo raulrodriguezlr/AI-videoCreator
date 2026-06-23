@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import copy
 import json
+import math
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -47,6 +49,258 @@ from videocreator.shared.ids import (
     new_scene_id,
     new_script_id,
 )
+from videocreator.shared.logging import get_logger
+
+log = get_logger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Spoken-pace contract — words ↔ seconds
+# ---------------------------------------------------------------------------
+#: Spoken pace assumed across the whole pipeline. The prose word budget, the
+#: per-scene speech budget and the deterministic pacing guard all derive from
+#: this single figure (~Spanish TTS at the default 1.15x rate), so the story is
+#: written, split and timed against the same words↔seconds relationship.
+SPOKEN_WORDS_PER_SECOND = 2.2
+
+#: Floor for a split chunk's duration (matches the engine's MIN_SCENE_DURATION).
+_MIN_CHUNK_SECONDS = 4
+_MIN_CHUNK_WORDS = 5
+
+_SENTENCE_RE = re.compile(r"[^.!?…]+(?:[.!?…]+|$)")
+
+
+def _word_count(text: str | None) -> int:
+    return len((text or "").split())
+
+
+def _story_word_target(target_duration_s: int) -> int:
+    """Total spoken words the storyteller should write for the episode."""
+    return max(180, int(target_duration_s * SPOKEN_WORDS_PER_SECOND))
+
+
+def _scene_word_budget(duration_s: float) -> int:
+    """Max spoken words that fit ``duration_s`` at the contract pace."""
+    return max(1, int(duration_s * SPOKEN_WORDS_PER_SECOND))
+
+
+def _split_sentences(text: str) -> list[str]:
+    """Split into sentences keeping their punctuation; never returns empties."""
+    text = (text or "").strip()
+    if not text:
+        return []
+    parts = [m.group().strip() for m in _SENTENCE_RE.finditer(text)]
+    return [p for p in parts if p] or [text]
+
+
+def _pack_sentences(text: str, max_words: int) -> list[str]:
+    """Greedily group sentences into chunks of at most ``max_words`` words.
+
+    A single sentence longer than ``max_words`` is hard-split by word count so a
+    chunk never overflows the budget.
+    """
+    chunks: list[str] = []
+    cur: list[str] = []
+    cur_n = 0
+    for sent in _split_sentences(text):
+        n = _word_count(sent)
+        if n > max_words:
+            if cur:
+                chunks.append(" ".join(cur))
+                cur, cur_n = [], 0
+            words = sent.split()
+            for k in range(0, len(words), max_words):
+                chunks.append(" ".join(words[k:k + max_words]))
+            continue
+        if cur and cur_n + n > max_words:
+            chunks.append(" ".join(cur))
+            cur, cur_n = [sent], n
+        else:
+            cur.append(sent)
+            cur_n += n
+    if cur:
+        chunks.append(" ".join(cur))
+    return chunks or [text.strip()]
+
+
+def _trim_to_word_ceiling(prose: str, max_words: int) -> str:
+    """Truncate *prose* to the last complete sentence within *max_words*."""
+    if _word_count(prose) <= max_words:
+        return prose
+    sentences = _split_sentences(prose)
+    kept: list[str] = []
+    total = 0
+    for sent in sentences:
+        n = _word_count(sent)
+        if total + n > max_words and kept:
+            break
+        kept.append(sent)
+        total += n
+    return " ".join(kept)
+
+
+def _dedup_scenes(scenes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop consecutive scenes whose spoken line repeats the previous one.
+
+    The LLM sometimes pads to the requested scene count with duplicate
+    greeting/farewell beats (the "scenes 11-13 identical" bug). Collapse runs of
+    identical normalized ``audio_text``, keeping the first.
+    """
+    out: list[dict[str, Any]] = []
+    prev: str | None = None
+    for s in scenes:
+        norm = " ".join((s.get("audio_text") or "").lower().split())
+        if norm and norm == prev:
+            continue
+        out.append(s)
+        prev = norm
+    return out
+
+
+def _scene_duration(s: dict[str, Any], default: float) -> float:
+    return float(s.get("duration_seconds") or s.get("duration_s") or default)
+
+
+def _enforce_pacing(
+    scenes: list[dict[str, Any]], max_clip_seconds: int
+) -> list[dict[str, Any]]:
+    """Make every scene's ``audio_text`` fit its duration at the contract pace.
+
+    For an overflowing scene: first raise its duration toward
+    ``max_clip_seconds``; if the line still doesn't fit, split it across
+    consecutive ``continue`` scenes (same ``visual_prompt`` — the engine's
+    ``continue`` rule seamlessly extends the clip), each sized to its own word
+    count. The last chunk keeps the original transition.
+    """
+    ceiling = max(1, int(max_clip_seconds))
+    max_budget = _scene_word_budget(ceiling)
+    out: list[dict[str, Any]] = []
+    for s in scenes:
+        text = s.get("audio_text") or ""
+        words = _word_count(text)
+        duration = _scene_duration(s, ceiling)
+        if words <= _scene_word_budget(duration):
+            out.append(s)
+            continue
+        if words <= max_budget:
+            bumped = max(duration, math.ceil(words / SPOKEN_WORDS_PER_SECOND))
+            out.append({**s, "duration_seconds": min(ceiling, bumped)})
+            continue
+        chunks = _pack_sentences(text, max_budget)
+        if len(chunks) > 1 and _word_count(chunks[-1]) <= _MIN_CHUNK_WORDS:
+            chunks[-2] = chunks[-2] + " " + chunks[-1]
+            chunks.pop()
+        if len(chunks) > 1 and _word_count(chunks[0]) <= _MIN_CHUNK_WORDS:
+            chunks[1] = chunks[0] + " " + chunks[1]
+            chunks.pop(0)
+        orig_transition = s.get("transition_to_next") or s.get("transition") or "cut"
+        last = len(chunks) - 1
+        for j, chunk in enumerate(chunks):
+            part = {**s}
+            part["audio_text"] = chunk
+            part["duration_seconds"] = min(
+                ceiling,
+                max(_MIN_CHUNK_SECONDS, math.ceil(_word_count(chunk) / SPOKEN_WORDS_PER_SECOND)),
+            )
+            part["transition_to_next"] = orig_transition if j == last else "continue"
+            if "transition" in part:
+                part["transition"] = part["transition_to_next"]
+            out.append(part)
+    return out
+
+
+def _enforce_duration_floor(
+    scenes: list[dict[str, Any]], target_s: int, max_clip_seconds: int
+) -> list[dict[str, Any]]:
+    """Top up scene durations so they sum to at least ``target_s``.
+
+    Word count is the real driver of length (guaranteed upstream by the
+    storyteller word floor); this only absorbs rounding. Durations are raised
+    toward ``max_clip_seconds`` — never by fabricating filler scenes. If even all
+    scenes at the ceiling can't reach the target, the content is genuinely short:
+    log it rather than pad with silence.
+    """
+    if not scenes:
+        return scenes
+    ceiling = max(1, int(max_clip_seconds))
+    total = sum(_scene_duration(s, ceiling) for s in scenes)
+    if total >= target_s:
+        return scenes
+    if ceiling * len(scenes) < target_s:
+        log.warning(
+            "script.duration_floor_unreachable",
+            target_s=target_s, scenes=len(scenes), max_total=ceiling * len(scenes),
+        )
+    deficit = target_s - total
+    out = [dict(s) for s in scenes]
+    for s in out:
+        if deficit <= 0:
+            break
+        d = _scene_duration(s, ceiling)
+        room = ceiling - d
+        if room <= 0:
+            continue
+        add = min(room, deficit)
+        s["duration_seconds"] = d + add
+        deficit -= add
+    return out
+
+
+def _enforce_duration_ceiling(
+    scenes: list[dict[str, Any]], target_s: int, max_clip_seconds: int
+) -> list[dict[str, Any]]:
+    """Trim total duration down to ``target_s * 1.15`` when the LLM overshoots.
+
+    Phase 1: shrink scene durations toward their speech-minimum (words/WPS).
+    Phase 2: drop trailing scenes if still over budget.
+    """
+    if not scenes:
+        return scenes
+    ceiling_s = int(target_s * 1.15)
+    clip_ceil = max(1, int(max_clip_seconds))
+    total = sum(_scene_duration(s, clip_ceil) for s in scenes)
+    if total <= ceiling_s:
+        return scenes
+    out = [dict(s) for s in scenes]
+    # Phase 1: shrink from tail
+    for s in reversed(out):
+        if total <= ceiling_s:
+            break
+        d = _scene_duration(s, clip_ceil)
+        words = _word_count(s.get("audio_text") or "")
+        min_d = max(_MIN_CHUNK_SECONDS, math.ceil(words / SPOKEN_WORDS_PER_SECOND))
+        shrink = d - min_d
+        if shrink <= 0:
+            continue
+        trim = min(shrink, total - ceiling_s)
+        s["duration_seconds"] = d - trim
+        total -= trim
+    # Phase 2: drop trailing scenes
+    min_scenes = max(1, -(-target_s // clip_ceil))
+    while total > ceiling_s and len(out) > min_scenes:
+        removed = out.pop()
+        total -= _scene_duration(removed, clip_ceil)
+    if total > ceiling_s:
+        log.warning(
+            "script.duration_ceiling_unreachable",
+            target_s=target_s, ceiling_s=ceiling_s, actual_s=total,
+        )
+    return out
+
+
+def _render_story_extension_prompt(
+    story_so_far: str, extra_words: int, language: str
+) -> str:
+    """Continuation prompt when the first storyteller pass came back too short."""
+    return (
+        "The story below is too SHORT to fill the episode.\n"
+        f"Continue the SAME story in {language}, adding about {extra_words} more "
+        "words of real spoken dialogue/narration. Deepen Act 2 (exploration, "
+        "obstacle, discovery) — do NOT restart, do NOT repeat the greeting or "
+        "farewell, do NOT summarise. Pick up naturally where it stops and write "
+        "ONLY the continuation.\n\n"
+        f"## STORY SO FAR\n{story_so_far.strip()}\n"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +414,7 @@ def _render_storyteller_prompt(
     interactive_questions: int = 0,
     narration_style: object = NarrationStyle.FOURTH_WALL,
     setting_mode: object = SettingMode.IN_SCENE,
+    prompt_story_suffix: str = "",
 ) -> str:
     """Prompt for the creative pass — prose story only, no technical formatting."""
     ctx = series_context.strip() if series_context else "(no extra context)"
@@ -170,9 +425,8 @@ def _render_storyteller_prompt(
         f"\n## PREVIOUS EPISODES (for continuity — reference when natural)\n{memory}\n"
         if memory else ""
     )
-    # Rough word budget: spoken pace ~2.2 words/s of video → enough story to fill it.
-    word_target = max(180, int(target_duration_s * 2.2))
-    return (
+    word_target = _story_word_target(target_duration_s)
+    result = (
         f"{_STORYTELLER_SYSTEM}\n\n"
         f"Write the script for one episode of '{series_name}', a children's "
         f"series. Write it as a STORY (prose + dialogue) in {language} — NOT as "
@@ -193,11 +447,19 @@ def _render_storyteller_prompt(
         f"{_interactive_block(interactive_questions)}\n"
         f"{_DIALOGUE_QUALITY}\n\n"
         f"## LENGTH\n"
-        f"Aim for roughly {word_target} words of spoken dialogue/narration so it "
-        f"can fill about {target_duration_s} seconds of video. Favour substance "
-        f"in Act 2 over a long intro or outro.\n\n"
+        f"You MUST write between {word_target} and {int(word_target * 1.15)} words "
+        f"of spoken dialogue/narration so it fills about {target_duration_s} seconds "
+        f"of video — no shorter AND no longer. Favour substance in Act 2 over a "
+        f"long intro or outro.\n"
+        f"Write the dialogue in SHORT spoken beats: each character line is ONE "
+        f"breath (≤ ~17 words), not a paragraph, so it maps cleanly to one short "
+        f"scene. Resolve every question you pose to the viewer before the "
+        f"farewell — never leave an open question dangling.\n\n"
         f"Write the full story now, with the characters' lines clearly attributed."
     )
+    if (prompt_story_suffix or "").strip():
+        result += f"\n\n## ADDITIONAL INSTRUCTIONS\n{prompt_story_suffix.strip()}\n"
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -521,6 +783,7 @@ def _render_script_prompt(
     story_narrative: str | None = None,
     narration_style: object = NarrationStyle.FOURTH_WALL,
     setting_mode: object = SettingMode.IN_SCENE,
+    prompt_suffix: str = "",
 ) -> str:
     """Build the full script-generation prompt with video rules and camera vocabulary.
 
@@ -574,7 +837,7 @@ def _render_script_prompt(
         )
         story_block = ""
 
-    return (
+    result = (
         f"{role}\n"
         f"Provide physical visual prompts in ENGLISH and audio dialogues in "
         f"{language}.\n\n"
@@ -588,14 +851,19 @@ def _render_script_prompt(
         f"## ART STYLE\n{style}\n"
         f"Every visual_prompt MUST start with this art style prefix.\n\n"
         f"## DURATION (STRICT — NON-NEGOTIABLE)\n"
-        f"- The episode MUST total AT LEAST {target_duration_s} seconds of video.\n"
+        f"- The episode MUST total between {target_duration_s} and {int(target_duration_s * 1.15)} seconds of video.\n"
         f"- You MUST generate around {typical_scenes} scenes. Do not generate significantly fewer or many more.\n"
         f"- Each scene should be between 4 and {max_clip_seconds} seconds long.\n"
         f"- VARY the `duration_seconds` narratively! Do NOT make every scene the exact same length (e.g. don't make them all 5). Use shorter times (4 or 5) for quick dialogue/action and longer times (7 or 8) for establishing/complex shots. The value MUST be a single number.\n"
-        f"- The SUM of every scene's `duration_seconds` MUST be >= {target_duration_s}.\n"
+        f"- The SUM of every scene's `duration_seconds` MUST be >= {target_duration_s} AND <= {int(target_duration_s * 1.15)}.\n"
         f"- No single scene may exceed {max_clip_seconds} seconds.\n"
-        f"- A script that does not reach {target_duration_s}s is INVALID. Do NOT compress the story into a handful of long scenes — tell it across EXACTLY {typical_scenes} short, dynamic scenes.\n"
-        f"- Each scene needs a vivid visual_prompt and audio_text.\n\n"
+        f"- A script below {target_duration_s}s or above {int(target_duration_s * 1.15)}s is INVALID. Tell the story across EXACTLY {typical_scenes} short, dynamic scenes.\n"
+        f"- Each scene needs a vivid visual_prompt and audio_text.\n"
+        f"## PER-SCENE SPEECH BUDGET (STRICT)\n"
+        f"- audio_text MUST be speakable within its duration_seconds at ~{SPOKEN_WORDS_PER_SECOND:g} words/sec: "
+        f"max words ≈ {SPOKEN_WORDS_PER_SECOND:g} × duration_seconds (5s≈11, 6s≈13, 8s≈17 words).\n"
+        f"- If a line is longer, SPLIT it across consecutive scenes with transition_to_next='continue' and the SAME visual_prompt — never cram a paragraph into one short clip.\n"
+        f"- NEVER repeat the same audio_text in two scenes. Do NOT pad with duplicate greeting/farewell scenes to reach the scene count; if you need more scenes, split real dialogue.\n\n"
         f"## MANDATORY NARRATIVE STRUCTURE\n"
         f"Scenes MUST progress through: introduction -> establishing -> "
         f"rising_action -> climax -> falling_action -> resolution.\n"
@@ -614,12 +882,15 @@ def _render_script_prompt(
         f"Set transition_to_next for every scene. Read the transition rules above "
         f"carefully — 'cut' is the main transition, 'continue' only for static.\n\n"
         f"## EXTRA FIELDS (required at the top level of your JSON)\n"
-        f"- `moral`: one sentence — the lesson or value the episode teaches.\n"
+        f"- `moral`: one sentence stating the concrete lesson of THIS episode's actual events (from the SOURCE STORY). Never a generic line unrelated to what happened.\n"
         f"- `ambient_audio_prompt`: short English music prompt describing the "
         f"episode's overall ambient mood (e.g. 'soft orchestral adventure music "
         f"with gentle woodwinds, warm and uplifting').\n\n"
         f"Return strict JSON matching the supplied schema."
     )
+    if (prompt_suffix or "").strip():
+        result += f"\n\n## ADDITIONAL INSTRUCTIONS\n{prompt_suffix.strip()}\n"
+    return result
 
 
 def _to_scene(idx: int, raw: dict[str, Any]) -> Scene:
@@ -699,10 +970,29 @@ class WriteStory:
             interactive_questions=pod.config.interactive_questions,
             narration_style=pod.config.narration_style,
             setting_mode=pod.config.setting_mode,
+            prompt_story_suffix=pod.config.extra.get("script_overrides", {}).get("prompt_story_suffix", ""),
         )
         # No response_schema: we want free prose, not JSON. Higher temperature
         # for creativity. Returned verbatim and fed into GenerateScript.
-        return await self.llm.complete(prompt, temperature=0.9)
+        prose = await self.llm.complete(prompt, temperature=0.9)
+
+        # Duration floor: total episode length tracks the spoken word count. If
+        # the model stopped short, ask it once to EXTEND (not restart) so the
+        # scenes can actually sum to the requested duration instead of falling
+        # short — the root cause of "asked 120s, got 80s".
+        word_target = _story_word_target(pod.config.duration_seconds)
+        if _word_count(prose) < int(word_target * 0.9):
+            deficit = word_target - _word_count(prose)
+            extra = await self.llm.complete(
+                _render_story_extension_prompt(prose, deficit, pod.config.language),
+                temperature=0.9,
+            )
+            if extra.strip():
+                prose = f"{prose.rstrip()}\n\n{extra.lstrip()}"
+        word_ceiling = int(word_target * 1.15)
+        if _word_count(prose) > word_ceiling:
+            prose = _trim_to_word_ceiling(prose, word_ceiling)
+        return prose
 
 
 @dataclass(frozen=True, slots=True)
@@ -743,6 +1033,7 @@ class GenerateScript:
             story_narrative=story_narrative,
             narration_style=pod.config.narration_style,
             setting_mode=pod.config.setting_mode,
+            prompt_suffix=pod.config.extra.get("script_overrides", {}).get("prompt_suffix", ""),
         )
         # Enforce the minimum scene count at the schema level too — Gemini honours
         # `minItems`, so this is a hard floor on top of the prompt's instruction.
@@ -758,8 +1049,21 @@ class GenerateScript:
             # Add a bit of the raw output to the error message for easier debugging
             raise ProviderError(f"LLM returned invalid JSON. Snippet: {raw[:100]}... Error: {exc}") from exc
 
-        scenes = [_to_scene(i, s) for i, s in enumerate(data.get("scenes") or [])
-                  if isinstance(s, dict) and "visual_prompt" in s]
+        # Deterministic guard: the LLM doesn't reliably honour the per-scene
+        # speech budget or the no-duplicates rule, so repair the raw scenes here.
+        # dedup → kill padded clone scenes; pacing → fit/split overflowing lines;
+        # floor → top up durations toward the requested episode length.
+        raw_scenes = [s for s in (data.get("scenes") or [])
+                      if isinstance(s, dict) and "visual_prompt" in s]
+        raw_scenes = _dedup_scenes(raw_scenes)
+        raw_scenes = _enforce_pacing(raw_scenes, pod.config.max_clip_seconds)
+        raw_scenes = _enforce_duration_floor(
+            raw_scenes, pod.config.duration_seconds, pod.config.max_clip_seconds,
+        )
+        raw_scenes = _enforce_duration_ceiling(
+            raw_scenes, pod.config.duration_seconds, pod.config.max_clip_seconds,
+        )
+        scenes = [_to_scene(i, s) for i, s in enumerate(raw_scenes)]
         script_id: ScriptId = new_script_id()
         title = str(data.get("title") or topic.title)
         summary = data.get("summary")

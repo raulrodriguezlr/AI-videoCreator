@@ -318,7 +318,8 @@ class AudioMixer:
 
                 # Step 3: Concatenate silence + stretched audio
                 concat_list_path = audio_path.replace(".wav", "_concat.txt").replace(".mp3", "_concat.txt")
-                with open(concat_list_path, "w") as f:
+                # UTF-8 mandatory — ffmpeg concat demuxer reads list as UTF-8 (paths may carry "ñ").
+                with open(concat_list_path, "w", encoding="utf-8") as f:
                     f.write(f"file '{silence_path}'\n")
                     f.write(f"file '{stretched_path}'\n")
 

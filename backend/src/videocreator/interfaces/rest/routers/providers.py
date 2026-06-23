@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import httpx
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from videocreator.domain.value_objects import ProviderPreferences, StyleProfile
 from videocreator.infrastructure.providers.artlist_provider import (
@@ -22,6 +23,7 @@ from videocreator.interfaces.rest.schemas import (
     ProviderHealthResponse,
     ProviderSelectionResponse,
 )
+from videocreator.infrastructure.providers.higgsfield_cli import auth_login_stream, auth_status
 from videocreator.shared.errors import ProviderError
 from videocreator.shared.logging import get_logger
 
@@ -300,6 +302,26 @@ async def preview_route(
         fallback_chain=list(selection.fallback_chain),
         model_hints=list(selection.model_hints),
         params=dict(selection.params),
+    )
+
+
+@router.get(
+    "/higgsfield/auth/status",
+    summary="Check if the Higgsfield CLI session is authenticated",
+)
+async def higgsfield_auth_status(container: ContainerDep) -> dict:
+    return await auth_status(container.settings)
+
+
+@router.get(
+    "/higgsfield/auth/login",
+    summary="Stream `hf auth login` output as SSE — device-code OAuth flow",
+)
+async def higgsfield_auth_login(container: ContainerDep) -> StreamingResponse:
+    return StreamingResponse(
+        auth_login_stream(container.settings),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

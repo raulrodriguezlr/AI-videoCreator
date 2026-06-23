@@ -95,6 +95,8 @@ class BaseVideoProvider(ABC):
         previous_clip: VideoClip,
         prompt: str,
         reference_images: Optional[List[str]] = None,
+        duration: int = 8,
+        **kwargs,
     ) -> VideoClip:
         """
         Create a new scene using the last frame of the previous clip as seed.
@@ -104,6 +106,7 @@ class BaseVideoProvider(ABC):
             previous_clip: The previous VideoClip (last frame will be extracted).
             prompt: Prompt describing the new scene.
             reference_images: Optional reference images for consistency.
+            duration: Clip duration in seconds.
 
         Returns:
             VideoClip with the new scene.
@@ -125,6 +128,16 @@ class BaseVideoProvider(ABC):
     DEFAULT_SCENE_DURATION = 8
     MIN_SCENE_DURATION = 4
     LOG_TAG = "[ENGINE]"
+
+    def clamp_duration(self, seconds: float) -> int:
+        """Clamp a requested scene duration to what this provider/model accepts.
+
+        Default: clamp to the provider's [MIN, DEFAULT] bounds. Subclasses that
+        only accept discrete lengths (Veo: 4/6/8) or read per-model limits from a
+        manifest (Higgsfield) override this so the script's marked seconds reach
+        the model instead of a global cap.
+        """
+        return int(max(self.MIN_SCENE_DURATION, min(seconds, self.DEFAULT_SCENE_DURATION)))
 
     def generate_full_video(
         self,
@@ -180,8 +193,9 @@ class BaseVideoProvider(ABC):
             )
             negative = scene.get("negative_prompt")
             transition = scene.get("transition_to_next", "cut")
-            scene_duration = scene.get("duration_seconds", self.DEFAULT_SCENE_DURATION)
-            scene_duration = max(self.MIN_SCENE_DURATION, min(scene_duration, self.DEFAULT_SCENE_DURATION))
+            scene_duration = self.clamp_duration(
+                scene.get("duration_seconds", self.DEFAULT_SCENE_DURATION)
+            )
             scene_num_str = f"{scene_num:02d}"
 
             log.info("scene_builder.scene_start", scene=scene_num, total=len(scenes), duration_s=scene_duration)
@@ -319,6 +333,32 @@ class BaseVideoProvider(ABC):
         """
         return None
 
+    def _get_last_frame_path(
+        self,
+        video_path: str,
+        save_dir: Optional[str],
+        scene_index: Optional[int],
+    ) -> Optional[str]:
+        """Extract last frame of a clip using ffmpeg. Used by jump_to_scene implementations."""
+        if save_dir and scene_index is not None and scene_index > 0:
+            frames_dir = os.path.join(os.path.dirname(save_dir), "frames")
+            saved_frame = os.path.join(frames_dir, f"last_frame_{scene_index:02d}.png")
+            if os.path.exists(saved_frame):
+                return saved_frame
+
+        temp_path = os.path.join(save_dir or os.path.dirname(video_path), "_temp_lastframe.png")
+        try:
+            subprocess.run(
+                ["ffmpeg", "-y", "-sseof", "-0.1", "-i", video_path, "-frames:v", "1", temp_path],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                check=True, timeout=30,
+            )
+            if os.path.exists(temp_path):
+                return temp_path
+        except Exception as e:
+            log.warning("frame_extraction_error", error=str(e))
+        return None
+
     def _get_character_reference_images(self) -> List[str]:
         """Resolve character reference images from the pod config (on disk).
 
@@ -367,6 +407,7 @@ class BaseVideoProvider(ABC):
                 previous_clip=clips[-1], prompt=prompt,
                 reference_images=ref_images, save_dir=clips_dir,
                 scene_index=i, narrative_phase=narrative_phase,
+                duration=scene_duration,
             )
         else:
             # "cut" or "scene_change"
@@ -621,7 +662,10 @@ class BaseVideoProvider(ABC):
             # Create concat file list for ffmpeg
             def run_concat(paths, out_path):
                 concat_list_path = os.path.join(self.assets_dir, f"_concat_list_{int(time.time()*1000)}.txt")
-                with open(concat_list_path, "w") as f:
+                # UTF-8 is mandatory: ffmpeg's concat demuxer reads the list as UTF-8,
+                # so a path with non-ASCII chars (e.g. "Piña") written in the Windows
+                # locale codepage corrupts every entry → "Invalid argument" on open.
+                with open(concat_list_path, "w", encoding="utf-8") as f:
                     for p in paths:
                         safe_path = os.path.abspath(p).replace("\\", "/")
                         f.write(f"file '{safe_path}'\n")

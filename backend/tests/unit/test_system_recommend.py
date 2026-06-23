@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 
 from videocreator.infrastructure.container import Container
+from videocreator.infrastructure.system.model_catalog import recommend
 from videocreator.interfaces.rest.routers.system import (
     list_sdk_providers,
     recommend_provider_models,
@@ -23,6 +24,21 @@ def _settings(**o: object) -> Settings:
     }
     base.update(o)
     return Settings(**base)  # type: ignore[arg-type]
+
+
+def test_local_catalog_surfaces_installed_uncatalogued_model() -> None:
+    # A model the user pulled that isn't in the curated shortlist must still
+    # appear (so a fresh `ollama pull` is never hidden by a stale catalogue).
+    rows = recommend(None, {"qwen3.6:27b", "qwen3:14b"})
+    by_name = {r["name"]: r for r in rows}
+    assert "qwen3.6:27b" in by_name
+    extra = by_name["qwen3.6:27b"]
+    assert extra["installed"] is True
+    assert extra["fits"] is True
+    # A catalogued model that's installed is flagged installed too.
+    assert by_name["qwen3:14b"]["installed"] is True
+    # Uncatalogued installed entries come after the curated ones.
+    assert rows[-1]["name"] == "qwen3.6:27b"
 
 
 @pytest.mark.asyncio

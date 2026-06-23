@@ -20,7 +20,7 @@ Endpoints used (base = LTX_DESKTOP_URL):
 import os
 import shutil
 import time
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import httpx
 import structlog
@@ -127,6 +127,8 @@ class LtxDesktopProvider(LtxProvider):
         save_dir: Optional[str] = None,
         scene_index: Optional[int] = None,
         narrative_phase: str = "",
+        duration: int = 8,
+        **kwargs: Any,
     ) -> VideoClip:
         """Image-to-video: seed the new scene from the previous clip's last frame."""
         log.info("ltx_desktop.jump_to_scene", prompt=prompt[:60])
@@ -137,9 +139,9 @@ class LtxDesktopProvider(LtxProvider):
                 prompt=prompt, save_dir=save_dir, scene_index=scene_index,
                 narrative_phase=narrative_phase,
             )
-        src = self._submit(prompt, 8, None, image_path=last_frame)
+        src = self._submit(prompt, duration, None, image_path=last_frame)
         out = self._place_clip(src, save_dir, scene_index)
-        return VideoClip(file_path=out, duration=8, seed=None)
+        return VideoClip(file_path=out, duration=duration, seed=None)
 
     # ---- LTX-Desktop HTTP --------------------------------------------------
     def _submit(
