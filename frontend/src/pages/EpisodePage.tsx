@@ -219,7 +219,17 @@ function RenderConfig({ podId, episodeId, detail, providers, episodeState, onSav
           )}
           {(episodeState === "failed" || episodeState === "completed") && (
             <Button variant="default" size="sm" loading={resumeRender.isPending}
-              onClick={() => resumeRender.mutate()} title="Recompilar reutilizando clips ya generados">
+              onClick={async () => {
+                try {
+                  await api.patch(`/pods/${podId}/episodes/${episodeId}`, {
+                    title, video_provider: provider || null, video_model: model || null,
+                  });
+                  onSaved();
+                  resumeRender.mutate();
+                } catch (e) {
+                  toast.err("No se pudo guardar antes de reanudar", (e as Error).message);
+                }
+              }} title="Recompilar reutilizando clips ya generados">
               <IcRocket /> Continuar
             </Button>
           )}

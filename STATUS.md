@@ -75,7 +75,7 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | Join clips (selección) | ✅ | `POST /episodes/{id}/join {indices}` |
 | "Continuar" visible en episodios completed (no solo failed) | ✅ | `a4add77` |
 | Progress SSE por clip | ✅ | |
-| Redoblar escena/todo + recompilar | ☐ | `ManualDubber` portado pero interactivo; falta REST endpoint |
+| Redoblar escena/todo + recompilar | ✅ | `POST /episodes/{id}/redub` + `/scenes/{i}/redub` + botones UI |
 | Higgsfield auth modal frontend | ☐ | Backend done (`HiggsfieldNeedsAuthError` 401), frontend sin empezar |
 
 ---
@@ -98,8 +98,8 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | `_get_last_frame_path` en BaseVideoProvider (ffmpeg) | ✅ | `a4add77` — fix AttributeError Higgsfield/HTTP |
 | Duración clip model-aware (clamp por provider) | ✅ | Override per-provider, no clamp global |
 | Provider SDK (manifest + registry + hot-reload) | ✅ | `providers.d/` |
-| Capability router + circuit breaker + cost ledger | ✅ | |
-| DAG executor (waves + retry + resume + cancelación) | ✅ | |
+| Capability router + circuit breaker + cost ledger | ⚠️ | `capability_router.py` solo en tests + 1 preview endpoint; producción usa `ProviderRouter` |
+| DAG executor (waves + retry + resume + cancelación) | ⚠️ | Wired (POST /runs + botón frontend) pero nunca testado E2E |
 | Convergencia engine → SDK/DAG (episodios por DAG) | ☐ | Rewrite gordo, futuro |
 | Proxy workflow (preview barato → render caro) | ☐ | Parked (`PROXY_WORKFLOW_ENABLED=False`) |
 
@@ -171,10 +171,10 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | Capacidad | Estado | Notas |
 |---|---|---|
 | Video Analyst (URL → genoma viral) | ✅ | |
-| Brain agent (function-calling + tools + MCP client) | ✅ | |
+| Brain agent (function-calling + tools + MCP client) | 💀 | Código completo, **zero callers en producción** — endpoints usan use cases dedicados |
 | FAISS asset library semántica | ✅ | |
 | Format library (genome clustering + veto 14 días) | ✅ | |
-| Daily briefing use case | ✅ | |
+| Daily briefing use case | 💀 | Use case + scheduler existen, **nunca arrancados** (no registrado en lifespan) |
 | Content moderation (fail-closed) | ✅ | |
 | Trending audio (Creative Center + filtro comercial) | ✅ | |
 | Scheduler (daily_briefing/rebenchmark) | ☐ | `BrainScheduler` existe, no registrado en lifespan FastAPI |
@@ -187,11 +187,19 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 
 | Capacidad | Estado | Notas |
 |---|---|---|
-| YouTube publish (OAuth + resumable upload) | ✅ | |
+| YouTube OAuth flow | ⚠️ | Código real, **nunca testado contra Google** |
+| YouTube upload (`YouTubePublisher.upload()`) | ⚠️ | Unit-tested, pero **ningún endpoint lo llama** — falta wiring |
+| YouTube publish UI (frontend) | 💀 | **No existe** — zero botones de publicar |
+| YouTube metrics ingestion | 💀 | `VideoMetricsStore`, `parse_analytics_rows()`, `retention_at_3s()` — **zero callers** |
 | Webhooks salientes + trace-id | ✅ | |
-| DagSpec builders (shorts/carousel/thumbnails/thread/dubbing) | ✅ | |
+| DagSpec builders (carousel + thread) | ✅ | Funcionan |
+| DagSpec builders (shorts/thumbnails/dubbing) | 💀 | Builders existen, **nunca llamados** |
+| `text_to_image` capability | 💀 | Declarada en specs, **no tiene handler** |
 | Carousel render (Pillow 1080×1350) | ✅ | |
 | `video_metrics` SQLite + reward LinUCB | ✅ | |
+| SEO metadata generation | ⚠️ | Use case llama LLM + persiste en DB, **nunca testado con LLM real** |
+| SEO bandit (LinUCB) | ✅ | Matemáticas OK + tested — pero sin datos reales de engagement |
+| SEO panel (frontend) | ⚠️ | Solo lectura — **sin botones generar/recomendar** |
 | MetricsIngestionPort (YouTube + TikTok analytics) | ☐ | |
 | HookScorer (LightGBM) | ☐ | |
 | RetentionCurvePredictor | ☐ | |
@@ -204,30 +212,41 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 
 | # | Qué | Detalle |
 |---|---|---|
-| 1 | **Redoblar escena/todo + recompilar** | `ManualDubber` portado, falta REST no-interactivo + botón UI |
-| 2 | **Higgsfield auth modal frontend** | Backend envía 401 con `error_code="higgsfield_needs_auth"`, frontend debe mostrar modal con instrucciones |
-| 3 | **Verificar render Higgsfield completo** | 25 escenas Tico, necesita restart backend + "Continuar" |
+| 1 | **Higgsfield auth modal frontend** | Backend envía 401 con `error_code="higgsfield_needs_auth"`, frontend debe mostrar modal con instrucciones |
+| 2 | **YouTube publish wiring** | `YouTubePublisher.upload()` existe pero ningún endpoint lo llama + zero UI (botón publicar) |
+| 3 | **DAG executor E2E test** | POST /runs + botón "Multiplicar" wired, nunca testado. Probar con un episodio real |
 
 ### Media (mejoras de calidad)
 
 | # | Qué | Detalle |
 |---|---|---|
-| 4 | **Shorts capa 3** | Overlays + whisper karaoke |
-| 5 | **Wizard Wave B** | Sessions resumables + web access |
-| 6 | **Scheduler (daily briefing + rebenchmark)** | Existe `BrainScheduler`, falta cablear en lifespan FastAPI |
-| 7 | **Auto-benchmark on install** | Encolar al `registry.discover()` |
+| 4 | **SEO panel activo** | Panel frontend es solo lectura — añadir botones generar/recomendar + testar con LLM real |
+| 5 | **DagSpec builders restantes** | shorts/thumbnails/dubbing builders existen pero nunca se llaman. Wire o borrar |
+| 6 | **Shorts capa 3** | Overlays + whisper karaoke |
+| 7 | **Wizard Wave B** | Sessions resumables + web access |
+| 8 | **Scheduler (daily briefing + rebenchmark)** | Existe `BrainScheduler`, falta cablear en lifespan FastAPI |
+
+### Decisiones pendientes (dead code: wire o borrar)
+
+| # | Qué | Estado | Recomendación |
+|---|---|---|---|
+| D1 | Brain agent (tool-calling loop) | 💀 zero callers | **Borrar** — endpoints usan use cases dedicados |
+| D2 | Daily briefing | 💀 nunca arrancado | **Wire** si se quiere automatizar, o **borrar** |
+| D3 | YouTube metrics ingestion | 💀 zero callers | **Borrar** hasta tener datos reales de YouTube |
+| D4 | `text_to_image` capability | 💀 sin handler | **Borrar** spec entry o implementar handler |
+| D5 | `capability_router.py` (scoring) | Shadow — solo tests | **Mantener** como experimental, no confundir con ProviderRouter producción |
 
 ### Baja (futuro / nice-to-have)
 
 | # | Qué | Detalle |
 |---|---|---|
-| 8 | **Convergencia engine → DAG** | Rewrite gordo: portar scene-builder a DAG. No urgente |
-| 9 | **Node canvas + timeline** | Editor visual de recetas |
-| 10 | **Wizard Wave C** | Mobile slide UI |
-| 11 | **Backends cloud** | S3/Redis/Postgres para modo server |
-| 12 | **Proxy workflow** | Preview barato → render caro |
-| 13 | **MetricsIngestion + HookScorer + RetentionCurve** | ML pipeline completo |
-| 14 | **Narrador PiP (educativo)** | Picture-in-picture |
+| 9 | **Convergencia engine → DAG** | Rewrite gordo: portar scene-builder a DAG. No urgente |
+| 10 | **Node canvas + timeline** | Editor visual de recetas |
+| 11 | **Wizard Wave C** | Mobile slide UI |
+| 12 | **Backends cloud** | S3/Redis/Postgres para modo server |
+| 13 | **Proxy workflow** | Preview barato → render caro |
+| 14 | **MetricsIngestion + HookScorer + RetentionCurve** | ML pipeline completo |
+| 15 | **Narrador PiP (educativo)** | Picture-in-picture |
 
 ---
 
