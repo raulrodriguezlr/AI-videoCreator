@@ -55,17 +55,63 @@ class _PolishOptions:
     ken_burns: bool = True
     transition: str | None = None
     transition_duration_s: float = 0.0
+    layout: str = "fill"
+    template: str = "hormozi1"
+    broll_query: str = "satisfying"
+    background_music: bool = False
+    music_vibe: str = "energetic"
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> _PolishOptions:
         raw_transition = payload.get("transition", None)
         transition = str(raw_transition) if raw_transition else None
+        # Reframe strategy: "fill" (crop to 9:16), "fit_blur" (whole frame +
+        # blurred margins) or "split" (main video over b-roll). The legacy
+        # `game_video` toggle is sugar for layout="split". Unknown → "fill".
+        raw_layout = str(payload.get("layout", "fill") or "fill").lower()
+        layout = raw_layout if raw_layout in ("fill", "fit_blur", "split") else "fill"
+        if bool(payload.get("game_video", False)):
+            layout = "split"
+        # Caption template (ssemble-style preset). Unknown → default look.
+        raw_tpl = str(payload.get("template", "hormozi1") or "hormozi1").lower()
+        template = raw_tpl if raw_tpl in ("hormozi1", "hormozi2", "karaoke") else "hormozi1"
+        broll_query = str(
+            payload.get("broll_query") or payload.get("game_query") or "satisfying"
+        ).strip() or "satisfying"
+        music_vibe = str(payload.get("music_vibe") or "energetic").strip() or "energetic"
         return cls(
             captions=bool(payload.get("captions", False)),
             ken_burns=bool(payload.get("ken_burns", True)),
             transition=transition,
             transition_duration_s=float(payload.get("transition_duration_s", 0.0)),
+            layout=layout,
+            template=template,
+            broll_query=broll_query,
+            background_music=bool(payload.get("background_music", False)),
+            music_vibe=music_vibe,
         )
+
+
+def _required_credits(assets: list[Any]) -> list[str]:
+    """Attribution lines for assets whose licence requires credit (e.g. CC-BY).
+
+    CC0 / public-domain assets need none and are skipped, so the list is empty
+    when nothing used requires attribution — paste these into the video
+    description at publish time to stay compliant.
+    """
+    out: list[str] = []
+    for a in assets:
+        if a is None:
+            continue
+        lic = a.license
+        text = (lic.license or "").upper()
+        if "BY" in text or "ATTRIB" in text:
+            who = lic.author or lic.source or "unknown"
+            line = f"{who} — {lic.license}"
+            if lic.source_url:
+                line += f" ({lic.source_url})"
+            out.append(line)
+    return out
 
 
 class ShortRenderHandler:
@@ -85,6 +131,8 @@ class ShortRenderHandler:
         settings: Settings,
         assembler: VideoAssemblerPort,
         highlight_selector: SelectShortHighlights | None = None,
+        broll_library: Any = None,
+        music_library: Any = None,
     ) -> None:
         self._pods = pod_repo
         self._shorts = short_repo
@@ -100,6 +148,11 @@ class ShortRenderHandler:
         # picks a highlight montage; otherwise we fall back to the heuristic
         # single-cut planner so the engine still works offline / for legacy eps.
         self._selector = highlight_selector
+        # Optional CC0 b-roll library for the split-screen layout; absent →
+        # split degrades to a normal full-frame reframe.
+        self._broll = broll_library
+        # Optional royalty-free music library; absent / empty → no music bed.
+        self._music = music_library
 
     async def __call__(self, job: Job, ctx: JobContext) -> dict[str, Any]:
         short, episode = await self._load(job, ctx)
@@ -119,7 +172,14 @@ class ShortRenderHandler:
             brain=len(timeline.segments) > 1,
         )
 
-        key = await self._compose_and_store(short, episode, timeline, ctx)
+        broll = await self._fetch_broll(timeline, style)
+        music = self._fetch_music(style)
+        credits = _required_credits([broll, music])
+        key = await self._compose_and_store(
+            short, episode, timeline, ctx,
+            broll.path if broll else None,
+            music.path if music else None,
+        )
         
         import shutil
         import asyncio
@@ -138,6 +198,9 @@ class ShortRenderHandler:
             "rendered_video_key": key,
             "duration_s": timeline.total_duration_s,
             "platform": short.target_platform,
+            # Attribution lines for any asset whose licence requires credit
+            # (e.g. CC-BY music). Empty when everything used is CC0/public domain.
+            "credits": credits,
         }
 
     # ---- steps ------------------------------------------------------------
@@ -212,6 +275,7 @@ class ShortRenderHandler:
                     transition=style.transition,
                     transition_duration_s=style.transition_duration_s,
                     requested_duration_s=short.duration_s,
+                    layout=style.layout,
                 )
                 if not timeline.is_empty:
                     if selection.hook_text and not short.hook_text:
@@ -224,14 +288,17 @@ class ShortRenderHandler:
                         ken_burns=style.ken_burns,
                         transition=style.transition,
                     )
-                    return timeline
+                    return timeline.model_copy(
+                        update={"template": style.template}
+                    )
 
         return self._planner.plan(
             source_duration_s=self._duration_from_script(script),
             requested_duration_s=short.duration_s,
             rule=rule,
             start_s=start_s,
-        )
+            layout=style.layout,
+        ).model_copy(update={"template": style.template})
 
     async def _compose_and_store(
         self,
@@ -239,14 +306,61 @@ class ShortRenderHandler:
         episode: Episode,
         timeline: EditingTimeline,
         ctx: JobContext,
+        broll_path: Path | None = None,
+        music_path: Path | None = None,
     ) -> str:
         source_local = await self._resolve_source(short, episode)
         out_local = self._workdir(short) / f"{short.id}.mp4"
         crop_map = self._analyze_crop(short, source_local, timeline)
         await ctx.progress(0.4, "reframing to 9:16")
-        await self._composer.compose(source_local, timeline, out_local, crop_x=crop_map)
+        # Only pass the optional kwargs when present so composers that predate
+        # them (e.g. test fakes) keep working unchanged.
+        extra: dict[str, Any] = {}
+        if broll_path is not None:
+            extra["broll_path"] = broll_path
+        if music_path is not None:
+            extra["music_path"] = music_path
+        await self._composer.compose(
+            source_local, timeline, out_local, crop_x=crop_map, **extra
+        )
         await ctx.progress(0.9, "storing short")
         return await self._store(short, out_local)
+
+    async def _fetch_broll(
+        self, timeline: EditingTimeline, style: _PolishOptions
+    ) -> Any:
+        """Best-effort CC0 b-roll for the split-screen layout, or `None`.
+
+        Only fetches for the "split" layout when a library is wired; any
+        failure (no key, network, empty result) degrades to no b-roll, which
+        the composer in turn degrades to a normal full-frame reframe.
+        """
+        if getattr(timeline, "layout", "fill") != "split" or self._broll is None:
+            return None
+        try:
+            asset = await self._broll.fetch(
+                style.broll_query, max_duration_s=timeline.total_duration_s
+            )
+        except Exception as exc:  # noqa: BLE001 — never fail render on b-roll
+            log.warning("short.broll_error", short_id=getattr(timeline, "id", "?"),
+                        error=str(exc))
+            return None
+        return asset
+
+    def _fetch_music(self, style: _PolishOptions) -> Path | None:
+        """Best-effort royalty-free music bed, or `None`.
+
+        Only when `background_music` is requested and a (non-empty) library is
+        wired; any miss degrades to no music rather than failing the render.
+        """
+        if not style.background_music or self._music is None:
+            return None
+        try:
+            asset = self._music.resolve(style.music_vibe)
+        except Exception as exc:  # noqa: BLE001 — never fail render on music
+            log.warning("short.music_error", error=str(exc))
+            return None
+        return asset
 
     def _analyze_crop(
         self, short: Short, source_local: Path, timeline: EditingTimeline
@@ -258,6 +372,10 @@ class ShortRenderHandler:
         composer's existing centered crop.
         """
         if not self._settings.smart_reframe_enabled:
+            return None
+        # Only the "fill" (crop) layout uses a subject-tracking crop window;
+        # "fit_blur" shows the whole frame, so face analysis would be wasted.
+        if getattr(timeline, "layout", "fill") != "fill":
             return None
         try:
             from videocreator.infrastructure.video.smart_reframe import (  # noqa: PLC0415

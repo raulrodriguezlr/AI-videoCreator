@@ -28,6 +28,7 @@ class ShortPlanner:
         requested_duration_s: float,
         rule: PlatformRule,
         start_s: float = 0.0,
+        layout: str = "fill",
     ) -> EditingTimeline:
         """Plan a single-highlight timeline that respects the platform rule.
 
@@ -47,7 +48,8 @@ class ShortPlanner:
             source_start_s=start, duration_s=target, label="highlight"
         )
         return EditingTimeline(
-            segments=(segment,), width=rule.width, height=rule.height
+            segments=(segment,), width=rule.width, height=rule.height,
+            layout=layout,
         )
 
     def plan_montage(
@@ -61,6 +63,7 @@ class ShortPlanner:
         transition: str | None = None,
         transition_duration_s: float = 0.0,
         requested_duration_s: float = 0.0,
+        layout: str = "fill",
     ) -> EditingTimeline:
         """Build a multi-cut montage `EditingTimeline` from chosen scene indices.
 
@@ -101,7 +104,17 @@ class ShortPlanner:
                 break
             
             full_span = max(0.0, scene_durations[idx])
-            span = min(full_span, remaining_hard)
+            # Never cut a scene mid-sentence: each scene is one narrated
+            # utterance, so keep it whole when it fits (a small tolerance lets
+            # the last scene slightly overrun rather than chop a word). A scene
+            # that won't fit is skipped — unless nothing is chosen yet, where
+            # trimming the single oversized pick is unavoidable.
+            if full_span <= remaining_hard + 1.5:
+                span = full_span
+            elif not segments:
+                span = remaining_hard
+            else:
+                continue
             
             if span <= 0.01:
                 continue
@@ -128,6 +141,7 @@ class ShortPlanner:
             height=rule.height,
             transition=transition,
             transition_duration_s=transition_duration_s,
+            layout=layout,
         )
 
     # ---- internals --------------------------------------------------------

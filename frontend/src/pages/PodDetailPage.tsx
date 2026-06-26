@@ -281,9 +281,11 @@ function ShortsTab({ podId, q, episodes }: {
   const qc = useQueryClient();
   const toast = useToast();
   const [creating, setCreating] = useState(false);
+  const [renderFor, setRenderFor] = useState<Short | null>(null);
 
   const render = useMutation({
-    mutationFn: (shortId: string) => api.post<{ job_id: string }>(`/pods/${podId}/shorts/${shortId}/render`),
+    mutationFn: ({ shortId, opts }: { shortId: string; opts: RenderOpts }) =>
+      api.post<{ job_id: string }>(`/pods/${podId}/shorts/${shortId}/render`, opts),
     onSuccess: (r) => {
       toast.ok("Render de short en curso", `Job ${r.job_id.slice(0, 12)}…`);
       // Live-refresh the list when the render job reaches a terminal state.
@@ -347,7 +349,7 @@ function ShortsTab({ podId, q, episodes }: {
             {s.hook_text && <p className="muted" style={{ fontSize: 13, margin: 0 }}>“{s.hook_text}”</p>}
             <div className="between">
               <Badge tone={s.rendered_video_key ? "ok" : "default"}>{s.rendered_video_key ? "renderizado" : "pendiente"}</Badge>
-              <Button size="sm" loading={render.isPending && render.variables === s.id} onClick={() => render.mutate(s.id)}>
+              <Button size="sm" loading={render.isPending && render.variables?.shortId === s.id} onClick={() => setRenderFor(s)}>
                 <IcRocket /> {s.rendered_video_key ? "Re-render" : "Renderizar"}
               </Button>
             </div>
@@ -359,7 +361,104 @@ function ShortsTab({ podId, q, episodes }: {
         <CreateShortModal podId={podId} episodes={episodes} onClose={() => setCreating(false)}
           onCreated={() => { qc.invalidateQueries({ queryKey: ["shorts", podId] }); setCreating(false); }} />
       )}
+
+      {renderFor && (
+        <RenderShortModal
+          short={renderFor}
+          busy={render.isPending}
+          onClose={() => setRenderFor(null)}
+          onRender={(opts) => { render.mutate({ shortId: renderFor.id, opts }); setRenderFor(null); }}
+        />
+      )}
     </div>
+  );
+}
+
+// Render options panel — mirrors ssemble's "Advanced Options" (template, layout,
+// captions, game-video b-roll, music). Forwarded as the /render request body.
+type RenderOpts = {
+  template: string;
+  layout: string;
+  captions: boolean;
+  ken_burns: boolean;
+  game_video: boolean;
+  broll_query: string;
+  background_music: boolean;
+  music_vibe: string;
+};
+
+function RenderShortModal({ short, busy, onClose, onRender }: {
+  short: Short; busy: boolean; onClose: () => void; onRender: (o: RenderOpts) => void;
+}) {
+  const [template, setTemplate] = useState("hormozi1");
+  const [layout, setLayout] = useState("fill");
+  const [captions, setCaptions] = useState(true);
+  const [kenBurns, setKenBurns] = useState(true);
+  const [gameVideo, setGameVideo] = useState(false);
+  const [brollQuery, setBrollQuery] = useState("satisfying");
+  const [music, setMusic] = useState(false);
+  const [musicVibe, setMusicVibe] = useState("energetic");
+  // The Game-video toggle is sugar for the split layout.
+  const effLayout = gameVideo ? "split" : layout;
+
+  return (
+    <Modal title={`Renderizar short${short.hook_text ? ` · “${short.hook_text}”` : ""}`} onClose={onClose} footer={
+      <>
+        <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+        <Button variant="mint" loading={busy} onClick={() => onRender({
+          template, layout: effLayout, captions, ken_burns: kenBurns,
+          game_video: gameVideo, broll_query: brollQuery,
+          background_music: music, music_vibe: musicVibe,
+        })}><IcRocket /> Renderizar</Button>
+      </>
+    }>
+      <div className="row">
+        <Field label="Plantilla">
+          <select className="select" value={template} onChange={(e) => setTemplate(e.target.value)}>
+            <option value="hormozi1">Hormozi 1 (oro)</option>
+            <option value="hormozi2">Hormozi 2 (verde)</option>
+            <option value="karaoke">Karaoke (cian)</option>
+          </select>
+        </Field>
+        <Field label="Layout" hint="Encuadre vertical">
+          <select className="select" value={layout} disabled={gameVideo} onChange={(e) => setLayout(e.target.value)}>
+            <option value="fill">Fill — recorte 9:16</option>
+            <option value="fit_blur">Fit + blur — sin bandas</option>
+            <option value="split">Split-screen</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="Subtítulos">
+        <label className="row" style={{ gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={captions} onChange={(e) => setCaptions(e.target.checked)} /> Captions palabra a palabra
+        </label>
+      </Field>
+      <Field label="Zoom Ken-Burns">
+        <label className="row" style={{ gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={kenBurns} onChange={(e) => setKenBurns(e.target.checked)} /> Push-in lento
+        </label>
+      </Field>
+      <Field label="Game video" hint="Split-screen con b-roll CC0 (legal)">
+        <label className="row" style={{ gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={gameVideo} onChange={(e) => setGameVideo(e.target.checked)} /> Vídeo de fondo abajo
+        </label>
+      </Field>
+      {(gameVideo || effLayout === "split") && (
+        <Field label="Tema del b-roll" hint="Pexels/Pixabay CC0 — ej. hydraulic press, slime">
+          <input className="input" value={brollQuery} onChange={(e) => setBrollQuery(e.target.value)} placeholder="satisfying" />
+        </Field>
+      )}
+      <Field label="Música de fondo">
+        <label className="row" style={{ gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={music} onChange={(e) => setMusic(e.target.checked)} /> Cama royalty-free
+        </label>
+      </Field>
+      {music && (
+        <Field label="Vibe de música">
+          <input className="input" value={musicVibe} onChange={(e) => setMusicVibe(e.target.value)} placeholder="energetic" />
+        </Field>
+      )}
+    </Modal>
   );
 }
 

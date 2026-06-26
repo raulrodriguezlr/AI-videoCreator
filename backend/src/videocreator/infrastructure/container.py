@@ -133,6 +133,7 @@ from videocreator.infrastructure.handlers.episode_render import EpisodeRenderHan
 from videocreator.infrastructure.handlers.short_render import ShortRenderHandler
 from videocreator.infrastructure.llm.gemini_llm import GeminiLLM
 from videocreator.infrastructure.llm.ollama_llm import OllamaLLM
+from videocreator.infrastructure.media.cc0_library import CC0BrollLibrary, MusicLibrary
 from videocreator.infrastructure.media.library import LocalMediaLibrary
 from videocreator.infrastructure.persistence.database import get_sessionmaker
 from videocreator.infrastructure.providers.artlist_provider import ArtlistProvider
@@ -296,6 +297,8 @@ class Container:
                 settings=self.settings,
                 assembler=self.video_assembler(),
                 highlight_selector=self.short_highlight_selector(),
+                broll_library=self.broll_library(),
+                music_library=self.music_library(),
             ),
         )
 
@@ -434,6 +437,20 @@ class Container:
     # ---- media library ----------------------------------------------------
     def media_library(self) -> MediaLibraryPort:
         return self._get("media_library", lambda: LocalMediaLibrary(self.storage()))
+
+    def broll_library(self) -> CC0BrollLibrary:
+        """CC0 b-roll library for the split-screen short layout."""
+        def _build() -> CC0BrollLibrary:
+            return CC0BrollLibrary(
+                self.settings.var_dir / "cache" / "broll",
+                pexels_key=self.settings.pexels_api_key,
+                pixabay_key=self.settings.pixabay_api_key,
+            )
+        return self._get("broll_library", _build)
+
+    def music_library(self) -> MusicLibrary:
+        """Local royalty-free music catalog for the shorts background bed."""
+        return self._get("music_library", MusicLibrary)
 
     def image_provider(self) -> ImageGenerationPort:
         return self._get("image_provider", lambda: GeminiImageProvider(self.settings))

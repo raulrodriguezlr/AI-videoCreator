@@ -9,6 +9,7 @@ from videocreator.interfaces.rest.schemas import (
     EnqueueRenderResponse,
     GenerateNativeShortRequest,
     NativeShortStructureResponse,
+    RenderShortRequest,
     ShortResponse,
     ShortSegmentResponse,
 )
@@ -80,10 +81,14 @@ async def delete_short(
 )
 async def enqueue_render(
     pod_id: str, short_id: str, uc: UseCasesDep, user_id: UserIdDep,
+    body: RenderShortRequest | None = None,
 ) -> EnqueueRenderResponse:
     del pod_id
+    # Forward the (validated) render options as the job payload; an omitted body
+    # renders with the defaults baked into RenderShortRequest.
+    extra = (body or RenderShortRequest()).model_dump()
     job_id = await uc.shorts.enqueue_render.execute(
-        short_id=ShortId(short_id), requester_id=user_id,
+        short_id=ShortId(short_id), requester_id=user_id, extra_payload=extra,
     )
     return EnqueueRenderResponse(job_id=job_id)
 

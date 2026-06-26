@@ -402,7 +402,7 @@ git clone https://github.com/raulrodriguezlr/AI-videoCreator.git
 cd AI-videoCreator
 
 # Backend
-cd backend
+cd backend;
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # Windows PowerShell
 # source .venv/bin/activate          # macOS/Linux
@@ -416,6 +416,8 @@ python -m videocreator.interfaces.cli.main pods import
 
 # Arrancar backend
 python -m videocreator.interfaces.cli.main serve --reload
+# para lanzarlo de una
+cd backend;.venv\Scripts\Activate;python -m videocreator.interfaces.cli.main serve --reload
 
 # Frontend (nueva terminal)
 cd ../frontend

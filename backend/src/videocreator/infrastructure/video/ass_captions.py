@@ -31,6 +31,28 @@ class CaptionStyle:
     outline_width: int = 3
 
 
+# Named caption "templates" (the ssemble-style presets). Each is just a
+# `CaptionStyle`; the word-by-word reveal + keyword highlight is shared by all.
+# ASS colours are &H00BBGGRR (BGR, not RGB).
+TEMPLATES: dict[str, CaptionStyle] = {
+    # Bold white text, gold keyword pop — the classic Hormozi look.
+    "hormozi1": CaptionStyle(size=62, highlight_color="&H00D7FF00"),
+    # Same energy, green keyword pop, slightly higher on frame.
+    "hormozi2": CaptionStyle(size=62, margin_v=230, highlight_color="&H0000FF00"),
+    # Karaoke: smaller, cyan highlight, sits a touch lower.
+    "karaoke": CaptionStyle(size=54, margin_v=170, highlight_color="&H00FFFF00"),
+}
+
+DEFAULT_TEMPLATE = "hormozi1"
+
+
+def style_for(template: str | None) -> CaptionStyle:
+    """Resolve a template name to a `CaptionStyle`, falling back to the default."""
+    if not template:
+        return TEMPLATES[DEFAULT_TEMPLATE]
+    return TEMPLATES.get(template.lower(), TEMPLATES[DEFAULT_TEMPLATE])
+
+
 _ASS_HEADER = """\
 [Script Info]
 Title: AI-videoCreator captions
@@ -195,6 +217,9 @@ def extract_keywords_from_script(text: str) -> set[str]:
 __all__ = [
     "WordTiming",
     "CaptionStyle",
+    "TEMPLATES",
+    "DEFAULT_TEMPLATE",
+    "style_for",
     "build_ass",
     "words_from_elevenlabs_alignment",
     "extract_keywords_from_script",

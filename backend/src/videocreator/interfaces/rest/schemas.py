@@ -252,6 +252,31 @@ class EnqueueRenderResponse(BaseModel):
     job_id: str
 
 
+class RenderShortRequest(BaseModel):
+    """Per-render options for the shorts engine (ssemble-style advanced options).
+
+    All optional; an empty body renders with these defaults. Forwarded verbatim
+    as the job payload, where `ShortRenderHandler._PolishOptions` consumes them.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    captions: bool = True
+    template: Literal["hormozi1", "hormozi2", "karaoke"] = "hormozi1"
+    layout: Literal["fill", "fit_blur", "split"] = "fill"
+    ken_burns: bool = True
+    transition: str | None = None
+    transition_duration_s: float = Field(0.0, ge=0.0, le=2.0)
+    # Split-screen b-roll (the "Game Video" toggle). game_video=True forces the
+    # split layout; broll_query picks the CC0 footage theme.
+    game_video: bool = False
+    broll_query: str = Field("satisfying", min_length=1, max_length=80)
+    # Royalty-free background music bed.
+    background_music: bool = False
+    music_vibe: str = Field("energetic", min_length=1, max_length=40)
+    start_s: float = Field(0.0, ge=0.0)
+
+
 class UpdateEpisodeRequest(BaseModel):
     """Patch editable episode fields. Omitted fields stay unchanged; sending
     `video_provider: null` clears the per-episode override (pod default wins)."""

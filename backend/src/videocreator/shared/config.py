@@ -185,6 +185,13 @@ class Settings(BaseSettings):
     # (OpenCV/MediaPipe, both optional) — disable if it ever proves too slow.
     smart_reframe_enabled: bool = True
 
+    # Royalty-free / CC0 media library for shorts (b-roll split-screen footage and
+    # background music). Both keys are free to obtain; when absent the library
+    # degrades to local catalogs only (no remote fetch). NEVER ingest copyrighted
+    # game footage here — only sources whose licence permits redistribution.
+    pexels_api_key: str = ""
+    pixabay_api_key: str = ""
+
     # --- derived helpers ---
     @property
     def is_local(self) -> bool:

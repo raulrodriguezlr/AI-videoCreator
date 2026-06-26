@@ -113,6 +113,12 @@ dev = [
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
 ]
+# One-shot install of EVERY runtime feature (shorts engine, b-roll/music library,
+# Whisper, beat-snap, vector, server stack, …). Recursive extras (PEP 508) so a
+# single `pip install -e ".[all]"` pulls them all. Add `,dev` for the test stack.
+all = [
+    "videocreator[local,audio,captions,brain,vector,sched,resilience,reframe,server]",
+]
 
 [project.scripts]
 videocreator = "videocreator.interfaces.cli.main:app"

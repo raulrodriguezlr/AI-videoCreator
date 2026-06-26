@@ -272,6 +272,15 @@ class EditingTimeline(BaseModel):
     # means a hard cut — the default — so existing timelines are unchanged.
     transition: str | None = None        # xfade name, e.g. "fade", "slideleft"
     transition_duration_s: float = 0.0
+    # Reframe strategy for fitting the source into the vertical frame:
+    #   "fill"     — crop to fill 9:16 (default; subject-aware when crop_x given)
+    #   "fit_blur" — scale whole frame to fit, fill the margins with a blurred,
+    #                zoomed copy of itself (no black bars, less zoom on subject)
+    layout: str = "fill"
+    # Caption template (ssemble-style preset): "hormozi1" | "hormozi2" |
+    # "karaoke". Controls font/size/colour of the word-by-word reveal; only
+    # applied when segments carry caption text.
+    template: str = "hormozi1"
 
     @property
     def total_duration_s(self) -> float:

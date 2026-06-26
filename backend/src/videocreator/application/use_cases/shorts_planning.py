@@ -134,6 +134,37 @@ class SelectShortHighlights:
         )
 
 
+def heuristic_highlight_indices(
+    scenes: list[Scene], target_duration_s: float
+) -> list[int]:
+    """Pick highlight scenes WITHOUT an LLM — content-density heuristic.
+
+    Scores each scene by how much dialogue it carries (a cheap proxy for "stuff
+    is happening / worth keeping"), greedily takes the densest scenes until the
+    target duration is reached, then returns them in chronological order. This
+    replaces the old offline fallback that just grabbed the first N seconds from
+    offset 0 — the root of the "todo aleatorio" cuts when no brain is wired.
+    """
+    if not scenes:
+        return []
+    by_density = sorted(
+        range(len(scenes)),
+        key=lambda i: len((scenes[i].audio_text or "").strip()),
+        reverse=True,
+    )
+    picked: list[int] = []
+    total = 0.0
+    for i in by_density:
+        dur = max(0.0, scenes[i].duration_s)
+        if picked and total + dur > target_duration_s + 1.5:
+            continue
+        picked.append(i)
+        total += dur
+        if total >= target_duration_s:
+            break
+    return sorted(picked)
+
+
 def _parse_indices(raw: object, *, scene_count: int) -> list[int]:
     """Coerce LLM 1-based scene numbers to valid, deduped 0-based indices."""
     if not isinstance(raw, list):
@@ -156,4 +187,4 @@ def _opt(value: object) -> str | None:
     return text or None
 
 
-__all__ = ["SelectShortHighlights"]
+__all__ = ["SelectShortHighlights", "heuristic_highlight_indices"]

@@ -55,6 +55,8 @@ class FfmpegShortComposer:
         *,
         beat_grid: BeatGrid | None = None,
         crop_x: dict[int, str] | None = None,
+        broll_path: Path | None = None,
+        music_path: Path | None = None,
     ) -> Path:
         if timeline.is_empty:
             raise ProviderError("short-composer: timeline has no segments")
@@ -68,11 +70,59 @@ class FfmpegShortComposer:
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         caption_files = self._write_caption_files(timeline, output_path.parent)
+        # Prefer the Hormozi-style word-by-word .ass overlay; when it's built it
+        # replaces the per-segment boxed `drawtext` caption entirely.
+        subtitle_ass = self._build_ass_subtitle(timeline, output_path.parent)
+        if subtitle_ass:
+            caption_files = {}
         args = self._build_args(
-            self._bin, source_path, timeline, output_path, caption_files, crop_x
+            self._bin, source_path, timeline, output_path, caption_files, crop_x,
+            subtitle_ass, broll_path, music_path,
         )
         await self._run(args, output_path)
         return output_path
+
+    # ---- word-by-word .ass subtitle (Hormozi look) ------------------------
+    @staticmethod
+    def _build_ass_subtitle(timeline: EditingTimeline, workdir: Path) -> str | None:
+        """Build a single word-by-word `.ass` for the whole short, or `None`.
+
+        Spreads each segment's caption text evenly across that segment's slot in
+        the OUTPUT timeline (cumulative segment durations, since segments are
+        hard-cut/concatenated) and renders it with the timeline's template style.
+        Returns an ffmpeg-escaped path, or `None` when no segment has a caption.
+        Timings are estimates (no per-word alignment persisted at short time);
+        good enough for the reveal, and a real alignment can replace it later.
+        """
+        from videocreator.infrastructure.video.ass_captions import (  # noqa: PLC0415
+            WordTiming,
+            build_ass,
+            extract_keywords_from_script,
+            style_for,
+        )
+
+        words: list[WordTiming] = []
+        keywords: set[str] = set()
+        offset = 0.0
+        for seg in timeline.segments:
+            text = (seg.caption or "").strip()
+            dur = max(seg.duration_s, 0.1)
+            if text:
+                keywords |= extract_keywords_from_script(text)
+                toks = text.replace("**", "").split()  # markers drive highlight
+                if toks:
+                    per = dur / len(toks)
+                    for j, tok in enumerate(toks):
+                        s = offset + j * per
+                        words.append(WordTiming(word=tok, start_s=s, end_s=s + per))
+            offset += dur
+
+        if not words:
+            return None
+        out = workdir / "subs.ass"
+        style = style_for(getattr(timeline, "template", None))
+        build_ass(words, keywords, out, style=style)
+        return _escape_path(str(out))
 
     # ---- caption files ----------------------------------------------------
     @staticmethod
@@ -103,14 +153,32 @@ class FfmpegShortComposer:
         output_path: Path,
         caption_files: dict[int, str] | None = None,
         crop_x: dict[int, str] | None = None,
+        subtitle_ass: str | None = None,
+        broll_path: Path | None = None,
+        music_path: Path | None = None,
     ) -> list[str]:
+        # Inputs: [0]=source, then optional b-roll, then optional music. Both
+        # extra inputs loop forever (-stream_loop -1); the graph clamps to the
+        # main video/audio length. b-roll stays index 1 so the split graph's
+        # hard-coded [1:v] is always correct.
+        inputs = ["-i", str(source_path)]
+        next_idx = 1
+        if broll_path is not None:
+            inputs += ["-stream_loop", "-1", "-i", str(broll_path)]
+            next_idx += 1
+        music_idx: int | None = None
+        if music_path is not None:
+            inputs += ["-stream_loop", "-1", "-i", str(music_path)]
+            music_idx = next_idx
+            next_idx += 1
         filtergraph, out_v, out_a = FfmpegShortComposer._build_filtergraph(
-            timeline, caption_files, crop_x
+            timeline, caption_files, crop_x, subtitle_ass,
+            broll=broll_path is not None, music_idx=music_idx,
         )
         return [
             ffmpeg_bin,
             "-y",
-            "-i", str(source_path),
+            *inputs,
             "-filter_complex", filtergraph,
             "-map", out_v,
             "-map", out_a,
@@ -127,6 +195,9 @@ class FfmpegShortComposer:
         timeline: EditingTimeline,
         caption_files: dict[int, str] | None = None,
         crop_x: dict[int, str] | None = None,
+        subtitle_ass: str | None = None,
+        broll: bool = False,
+        music_idx: int | None = None,
     ) -> tuple[str, str, str]:
         """Return `(filter_complex, video_out_label, audio_out_label)`.
 
@@ -139,42 +210,62 @@ class FfmpegShortComposer:
         captions = caption_files or {}
         crop_exprs = crop_x or {}
         w, h = timeline.width, timeline.height
-        center_crop = f"crop='min(iw,ih*{w}/{h})':ih"
+        layout = getattr(timeline, "layout", "fill") or "fill"
+        # Split-screen needs a second input ([1:v] = looped b-roll); without one
+        # it silently degrades to a normal full-frame reframe.
+        split = layout == "split" and broll
+        if split:
+            h_top = (int(h * 0.62) // 2) * 2   # main video panel (top)
+            h_bot = h - h_top                  # b-roll panel (bottom)
+            fh = h_top                         # per-segment reframe target height
+            seg_layout = "fill"                # top panel always crop-fills
+        else:
+            h_top = h_bot = 0
+            fh = h
+            seg_layout = layout
+        center_crop = f"crop='min(iw,ih*{w}/{fh})':ih"
         chains: list[str] = []
         concat_inputs: list[str] = []
         for i, seg in enumerate(timeline.segments):
             start, end = seg.source_start_s, seg.source_end_s
-            x_expr = crop_exprs.get(i)
-            crop = (
-                f"crop=w='min(iw,ih*{w}/{h})':h=ih:x={x_expr}:y=0"
-                if x_expr is not None
-                else center_crop
-            )
-            vchain = [
-                f"[0:v]trim=start={start}:end={end}",
-                "setpts=PTS-STARTPTS",
-                crop,
-            ]
-            if seg.ken_burns:
-                # Ken-Burns on VIDEO: a time-driven upscale + center crop.
-                # (`zoompan` is for still images — on video it emits `d`
-                # output frames PER input frame, inflating a 60s short into
-                # a half-hour of frozen frames.)
-                dur = max(seg.duration_s, 0.1)
-                grow = 0.12  # 12% push-in over the segment
-                vchain.append(f"scale={w}:{h}")
-                vchain.append(
-                    f"scale=w='trunc({w}*(1+{grow}*t/{dur:.3f})/2)*2':"
-                    f"h='trunc({h}*(1+{grow}*t/{dur:.3f})/2)*2':eval=frame"
-                )
-                vchain.append(f"crop={w}:{h}")
-            else:
-                vchain.append(f"scale={w}:{h}")
-            vchain.append("setsar=1")
+            trim = f"[0:v]trim=start={start}:end={end},setpts=PTS-STARTPTS"
             cap_path = captions.get(i)
-            if cap_path:
-                vchain.append(_drawtext(cap_path, h))
-            chains.append(",".join(vchain) + f"[v{i}]")
+            cap = _drawtext(cap_path, fh) if cap_path else None
+
+            if seg_layout == "fit_blur":
+                # Whole frame fits (no crop, less zoom); margins filled with a
+                # blurred, zoomed copy of the same frame instead of black bars.
+                chains.extend(
+                    FfmpegShortComposer._fit_blur_statements(i, trim, w, fh, cap)
+                )
+            else:
+                x_expr = crop_exprs.get(i)
+                crop = (
+                    f"crop=w='min(iw,ih*{w}/{fh})':h=ih:x={x_expr}:y=0"
+                    if x_expr is not None
+                    else center_crop
+                )
+                vchain = [trim, crop]
+                if seg.ken_burns:
+                    # Ken-Burns on VIDEO: a time-driven upscale + center crop.
+                    # (`zoompan` is for still images — on video it emits `d`
+                    # output frames PER input frame, inflating a 60s short into
+                    # a half-hour of frozen frames.)
+                    dur = max(seg.duration_s, 0.1)
+                    grow = 0.12  # 12% push-in over the segment
+                    vchain.append(f"scale={w}:{fh}")
+                    vchain.append(
+                        f"scale=w='trunc({w}*(1+{grow}*t/{dur:.3f})/2)*2':"
+                        f"h='trunc({fh}*(1+{grow}*t/{dur:.3f})/2)*2':eval=frame"
+                    )
+                    vchain.append(f"crop={w}:{fh}")
+                else:
+                    vchain.append(f"scale={w}:{fh}")
+                vchain.append("setsar=1")
+                if cap:
+                    vchain.append(cap)
+                chains.append(",".join(vchain) + f"[v{i}]")
+
             chains.append(
                 f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{i}]"
             )
@@ -184,12 +275,66 @@ class FfmpegShortComposer:
         tdur = timeline.transition_duration_s
         if timeline.transition and tdur > 0.0 and n >= 2:
             chains.extend(_crossfade_chains(timeline, tdur))
-            return ";".join(chains), "[outv]", "[outa]"
+            v_out, a_out = "[outv]", "[outa]"
+        else:
+            chains.append(
+                f"{''.join(concat_inputs)}concat=n={n}:v=1:a=1[outv][outa]"
+            )
+            v_out, a_out = "[outv]", "[outa]"
 
-        chains.append(
-            f"{''.join(concat_inputs)}concat=n={n}:v=1:a=1[outv][outa]"
-        )
-        return ";".join(chains), "[outv]", "[outa]"
+        # Split-screen: stack the looped b-roll ([1:v]) under the main panel.
+        if split:
+            chains.append(
+                f"[1:v]scale={w}:{h_bot}:force_original_aspect_ratio=increase,"
+                f"crop={w}:{h_bot},setsar=1[botv]"
+            )
+            chains.append(f"{v_out}[botv]vstack=inputs=2[stackv]")
+            v_out = "[stackv]"
+
+        # Word-by-word .ass burned over the assembled timeline (one pass, after
+        # concat/crossfade/stack so its timestamps match the final output clock).
+        if subtitle_ass:
+            chains.append(f"{v_out}ass='{subtitle_ass}'[subv]")
+            v_out = "[subv]"
+
+        # Royalty-free background music ([music_idx:a], looped via -stream_loop)
+        # mixed UNDER the voice at low volume; `duration=first` clamps the mix to
+        # the (main) voice track length. (Sidechain ducking is a future upgrade.)
+        if music_idx is not None:
+            chains.append(f"[{music_idx}:a]volume=0.18[mus]")
+            chains.append(
+                f"{a_out}[mus]amix=inputs=2:duration=first:dropout_transition=2[mixa]"
+            )
+            a_out = "[mixa]"
+        return ";".join(chains), v_out, a_out
+
+    @staticmethod
+    def _fit_blur_statements(
+        i: int, trim_chain: str, w: int, h: int, caption: str | None
+    ) -> list[str]:
+        """Filtergraph statements for the `fit_blur` layout of one segment.
+
+        Splits the trimmed source into a foreground and a background copy:
+        - background is scaled to *cover* the WxH frame, hard-cropped, and
+          gaussian-blurred — this replaces the black letterbox bars,
+        - foreground is scaled to *fit* inside WxH (whole frame visible, less
+          zoom on the subject) and centered over the blur.
+        Produces the segment's `[v{i}]` label (with the caption burned on top,
+        if any). Emitted as separate `;`-joined statements because `split`/
+        `overlay` need named pads, unlike the linear comma chain of `fill`.
+        """
+        fg, bg, bgb, fgs, out = f"fg{i}", f"bg{i}", f"bgb{i}", f"fgs{i}", f"v{i}"
+        stmts = [
+            f"{trim_chain},split=2[{fg}][{bg}]",
+            f"[{bg}]scale={w}:{h}:force_original_aspect_ratio=increase,"
+            f"crop={w}:{h},gblur=sigma=20[{bgb}]",
+            f"[{fg}]scale={w}:{h}:force_original_aspect_ratio=decrease,setsar=1[{fgs}]",
+        ]
+        overlay = f"[{bgb}][{fgs}]overlay=(W-w)/2:(H-h)/2"
+        if caption:
+            overlay += f",{caption}"
+        stmts.append(overlay + f"[{out}]")
+        return stmts
 
     # ---- subprocess -------------------------------------------------------
     async def _run(self, args: list[str], output_path: Path) -> None:
