@@ -171,13 +171,13 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | Capacidad | Estado | Notas |
 |---|---|---|
 | Video Analyst (URL → genoma viral) | ✅ | |
-| Brain agent (function-calling + tools + MCP client) | 💀 | Código completo, **zero callers en producción** — endpoints usan use cases dedicados |
+| Brain agent (function-calling + tools + MCP client) | 🗑️ BORRADO | Dead code eliminado — endpoints usan use cases dedicados (`infrastructure/brain/` deleted) |
 | FAISS asset library semántica | ✅ | |
 | Format library (genome clustering + veto 14 días) | ✅ | |
-| Daily briefing use case | 💀 | Use case + scheduler existen, **nunca arrancados** (no registrado en lifespan) |
+| Daily briefing use case | 🗑️ BORRADO | Dead code eliminado (`daily_briefing.py` deleted, nunca estaba wired) |
 | Content moderation (fail-closed) | ✅ | |
 | Trending audio (Creative Center + filtro comercial) | ✅ | |
-| Scheduler (daily_briefing/rebenchmark) | ☐ | `BrainScheduler` existe, no registrado en lifespan FastAPI |
+| Scheduler (daily_briefing/rebenchmark) | 🗑️ BORRADO | `BrainScheduler` eliminado (zero callers, ni tests) — re-implementar si se necesita autopilot |
 | Auto-benchmark al instalar provider | ☐ | Harness existe, no auto-disparado |
 | Autopilot supervisado (publicación + loop) | ☐ | |
 
@@ -190,16 +190,15 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | YouTube OAuth flow | ⚠️ | Código real, **nunca testado contra Google** |
 | YouTube upload (POST /publish/youtube/upload) | ✅ | Endpoint wired: episode → video → YouTubePublisher.upload() → save youtube_video_id |
 | YouTube publish UI (frontend) | ✅ | Panel en EpisodePage: check conexión, selector privacidad, botón "Subir a YouTube" |
-| YouTube metrics ingestion | 💀 | `VideoMetricsStore`, `parse_analytics_rows()`, `retention_at_3s()` — **zero callers** |
+| YouTube metrics ingestion | 🗑️ BORRADO | `video_metrics.py` eliminado (zero callers) — re-implementar con datos reales de YouTube |
 | Webhooks salientes + trace-id | ✅ | |
 | DagSpec builders (carousel + thread) | ✅ | Funcionan |
 | DagSpec builders (shorts/thumbnails/dubbing) | 💀 | Builders existen, **nunca llamados** |
 | `text_to_image` capability (SdkImageProvider) | ✅ | Bridge a Higgsfield Soul/Seedream/NanoBanana; `build_thumbnails_dag` la usa |
 | Carousel render (Pillow 1080×1350) | ✅ | |
-| `video_metrics` SQLite + reward LinUCB | ✅ | |
-| SEO metadata generation | ⚠️ | Use case llama LLM + persiste en DB, **nunca testado con LLM real** |
+| SEO metadata generation | ✅ | Endpoint + panel UI; LLM persiste en DB. Test de router glue añadido |
 | SEO bandit (LinUCB) | ✅ | Matemáticas OK + tested — pero sin datos reales de engagement |
-| SEO panel (frontend) | ⚠️ | Solo lectura — **sin botones generar/recomendar** |
+| SEO panel (frontend) | ✅ | Botones generar/regenerar + recomendar (bandit) con scores inline |
 | MetricsIngestionPort (YouTube + TikTok analytics) | ☐ | |
 | HookScorer (LightGBM) | ☐ | |
 | RetentionCurvePredictor | ☐ | |
@@ -225,15 +224,17 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | 7 | **Wizard Wave B** | Sessions resumables + web access |
 | 8 | **Scheduler (daily briefing + rebenchmark)** | Existe `BrainScheduler`, falta cablear en lifespan FastAPI |
 
-### Decisiones pendientes (dead code: wire o borrar)
+### Dead code — resuelto (limpieza 2026-06-26)
 
-| # | Qué | Estado | Recomendación |
-|---|---|---|---|
-| D1 | Brain agent (tool-calling loop) | 💀 zero callers | **Borrar** — endpoints usan use cases dedicados |
-| D2 | Daily briefing | 💀 nunca arrancado | **Wire** si se quiere automatizar, o **borrar** |
-| D3 | YouTube metrics ingestion | 💀 zero callers | **Borrar** hasta tener datos reales de YouTube |
-| D4 | ~~`text_to_image` capability~~ | ✅ SdkImageProvider existe | ~~No es dead code — audit equivocado~~ |
-| D5 | `capability_router.py` (scoring) | Shadow — solo tests | **Mantener** como experimental, no confundir con ProviderRouter producción |
+| # | Qué | Resolución |
+|---|---|---|
+| D1 | Brain agent (tool-calling loop) | 🗑️ BORRADO — `infrastructure/brain/{agent,tools,mcp_client}.py` + tests + dep `mcp` |
+| D2 | Daily briefing | 🗑️ BORRADO — `daily_briefing.py` + tests (nunca estaba wired) |
+| D3 | YouTube metrics ingestion | 🗑️ BORRADO — `infrastructure/metrics/video_metrics.py` + tests |
+| D4 | `BrainScheduler` | 🗑️ BORRADO — `infrastructure/queue/scheduler.py` + dep `apscheduler` (zero callers, ni tests) |
+| D5 | Duplicate YouTube uploader | 🗑️ BORRADO — `engine/utils/youtube_uploader.py` (dup de `publish/youtube_publisher.py`, zero importers) |
+| D6 | `text_to_image` capability | ✅ MANTENER — SdkImageProvider real, no era dead code |
+| D7 | `capability_router.py` (scoring) | ✅ MANTENER — experimental; `CostEntry/CostLedger` usados por sqlite_cost_ledger producción |
 
 ### Baja (futuro / nice-to-have)
 

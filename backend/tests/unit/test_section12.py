@@ -1,4 +1,4 @@
-"""Tests for §12 — format library, daily briefing, moderation, MCP bridge."""
+"""Tests for §12 — format library, moderation."""
 from __future__ import annotations
 
 import json
@@ -12,10 +12,7 @@ import pytest
 from videocreator.application.use_cases.content_moderation import (
     ModerateContentUseCase,
 )
-from videocreator.application.use_cases.daily_briefing import DailyBriefingUseCase
 from videocreator.domain.value_objects import GenomeHook, ViralGenome
-from videocreator.infrastructure.brain.mcp_client import McpToolBridge, mcp_available
-from videocreator.infrastructure.brain.tools import ToolRegistry
 from videocreator.infrastructure.vector.format_library import FormatLibrary
 
 
@@ -92,41 +89,6 @@ class TestFormatLibrary:
         assert lib2.add_genome(_genome(), _vec(0)) == fid
 
 
-class TestDailyBriefing:
-    @pytest.mark.asyncio
-    async def test_composes_all_sections(self) -> None:
-        async def sounds(niche: str) -> list[dict]:
-            return [{"id": "s1"}, {"id": "s2"}, {"id": "s3"}, {"id": "s4"}]
-
-        async def formats() -> list[dict]:
-            return [{"format_id": "f1"}]
-
-        async def trends(niche: str) -> list[str]:
-            return ["term-a", "term-b"]
-
-        uc = DailyBriefingUseCase(
-            sounds_source=sounds, formats_source=formats, trends_source=trends)
-        briefing = await uc.execute("pod1", niche="ai", max_sounds=3)
-        assert len(briefing.sounds) == 3  # capped
-        assert briefing.emerging_formats == ({"format_id": "f1"},)
-        assert not briefing.is_empty
-
-    @pytest.mark.asyncio
-    async def test_dead_source_degrades(self) -> None:
-        async def boom(niche: str) -> list[dict]:
-            raise RuntimeError("scraper died")
-
-        uc = DailyBriefingUseCase(sounds_source=boom)
-        briefing = await uc.execute("pod1")
-        assert briefing.sounds == ()
-        assert briefing.is_empty
-
-    @pytest.mark.asyncio
-    async def test_no_sources_empty(self) -> None:
-        briefing = await DailyBriefingUseCase().execute("pod1")
-        assert briefing.is_empty
-
-
 class TestModeration:
     @pytest.mark.asyncio
     async def test_clean_script_approved(self) -> None:
@@ -160,71 +122,3 @@ class TestModeration:
         result = await uc.execute("anything")
         assert result.approved is False
         assert result.flags[0].severity == "high"
-
-
-class _FakeMcpTool:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.description = f"does {name}"
-        self.inputSchema = {"type": "object", "properties": {}}
-
-
-class _FakeListing:
-    def __init__(self, tools: list[_FakeMcpTool]) -> None:
-        self.tools = tools
-
-
-class _FakeTextBlock:
-    def __init__(self, text: str) -> None:
-        self.text = text
-
-
-class _FakeResult:
-    def __init__(self, text: str) -> None:
-        self.content = [_FakeTextBlock(text)]
-
-
-class _FakeSession:
-    def __init__(self) -> None:
-        self.called_with: tuple[str, dict] | None = None
-
-    async def list_tools(self) -> _FakeListing:
-        return _FakeListing([_FakeMcpTool("web_search"), _FakeMcpTool("fetch")])
-
-    async def call_tool(self, name: str, arguments: dict) -> _FakeResult:
-        self.called_with = (name, arguments)
-        return _FakeResult(f"result of {name}")
-
-
-class TestMcpBridge:
-    def test_available_flag_is_bool(self) -> None:
-        assert isinstance(mcp_available(), bool)
-
-    @pytest.mark.asyncio
-    async def test_loads_namespaced_tools(self) -> None:
-        registry = ToolRegistry()
-        bridge = McpToolBridge("search", _FakeSession())
-        count = await bridge.load_tools(registry)
-        assert count == 2
-        assert "search.web_search" in registry.names
-
-    @pytest.mark.asyncio
-    async def test_tool_call_flattens_text_content(self) -> None:
-        registry = ToolRegistry()
-        session = _FakeSession()
-        await McpToolBridge("search", session).load_tools(registry)
-        tool = registry.get("search.web_search")
-        assert tool is not None
-        result = await tool.fn(query="memes this week")
-        assert result == "result of web_search"
-        assert session.called_with == ("web_search", {"query": "memes this week"})
-
-    @pytest.mark.asyncio
-    async def test_dead_session_returns_zero(self) -> None:
-        class DeadSession:
-            async def list_tools(self):  # type: ignore[no-untyped-def]
-                raise RuntimeError("gone")
-
-        registry = ToolRegistry()
-        count = await McpToolBridge("dead", DeadSession()).load_tools(registry)
-        assert count == 0

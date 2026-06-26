@@ -68,14 +68,10 @@ captions = [
 brain = [
     "yt-dlp>=2026.1",
     "faster-whisper>=1.0.0",
-    "mcp>=1.0.0",
 ]
 vector = [
     "faiss-cpu>=1.8.0",
     "sentence-transformers>=3.0.0",
-]
-sched = [
-    "apscheduler>=3.10.0",
 ]
 resilience = [
     "tenacity>=8.2.0",
@@ -117,7 +113,7 @@ dev = [
 # Whisper, beat-snap, vector, server stack, …). Recursive extras (PEP 508) so a
 # single `pip install -e ".[all]"` pulls them all. Add `,dev` for the test stack.
 all = [
-    "videocreator[local,audio,captions,brain,vector,sched,resilience,reframe,server]",
+    "videocreator[local,audio,captions,brain,vector,resilience,reframe,server]",
 ]
 
 [project.scripts]
@@ -168,7 +164,7 @@ warn_redundant_casts = true
 disallow_untyped_decorators = false  # FastAPI/Typer decorators
 
 [[tool.mypy.overrides]]
-module = ["google.*", "cv2.*", "mediapipe.*", "demucs.*", "librosa.*", "soundfile.*", "faster_whisper.*", "faiss.*", "lightgbm.*", "pyloudnorm.*", "pysubs2.*", "yt_dlp.*", "mcp.*", "apscheduler.*", "tenacity.*", "open_clip.*", "pytesseract.*"]
+module = ["google.*", "cv2.*", "mediapipe.*", "demucs.*", "librosa.*", "soundfile.*", "faster_whisper.*", "faiss.*", "lightgbm.*", "pyloudnorm.*", "pysubs2.*", "yt_dlp.*", "tenacity.*", "open_clip.*", "pytesseract.*"]
 ignore_missing_imports = true
 
 # ---------------- Pytest ----------------
