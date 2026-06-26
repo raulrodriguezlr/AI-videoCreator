@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import BinaryIO
 
 from videocreator.shared.errors import ValidationError
@@ -20,15 +20,42 @@ class LocalFileStorage:
     name = "local-file"
 
     def __init__(self, root: Path) -> None:
-        self._root = root
+        self._root = root.resolve()
         self._root.mkdir(parents=True, exist_ok=True)
 
-    def _resolve(self, bucket: str, key: str) -> Path:
-        if not bucket or "/" in bucket or bucket.startswith("."):
-            raise ValidationError(f"invalid bucket name: {bucket!r}")
-        if key.startswith("/") or ".." in Path(key).parts:
+    def _contained(self, candidate: Path, context: str) -> Path:
+        """Guarantee `candidate` stays under the storage root after resolution.
+
+        The pre-checks below reject the obvious traversal forms, but the final
+        `is_relative_to` is the real guard: it catches anything that escapes
+        root regardless of platform quirks (e.g. a Windows drive-letter key,
+        which contains no '..' and isn't '/'-prefixed yet absolutizes away root).
+        """
+        resolved = candidate.resolve()
+        if not resolved.is_relative_to(self._root):
+            raise ValidationError(f"storage path escapes root: {context!r}")
+        return resolved
+
+    @staticmethod
+    def _reject_unsafe_key(key: str) -> None:
+        # POSIX-absolute, Windows-absolute (\\, C:\), drive-letter (C:/), and
+        # parent traversal are all rejected before the path is ever joined.
+        win = PureWindowsPath(key)
+        if (
+            key.startswith("/")
+            or key.startswith("\\")
+            or ".." in Path(key).parts
+            or Path(key).is_absolute()
+            or win.is_absolute()
+            or bool(win.drive)
+        ):
             raise ValidationError(f"unsafe storage key: {key!r}")
-        return (self._root / bucket / key).resolve()
+
+    def _resolve(self, bucket: str, key: str) -> Path:
+        if not bucket or "/" in bucket or "\\" in bucket or bucket.startswith("."):
+            raise ValidationError(f"invalid bucket name: {bucket!r}")
+        self._reject_unsafe_key(key)
+        return self._contained(self._root / bucket / key, key)
 
     async def put(self, bucket: str, key: str, data: BinaryIO | bytes) -> str:
         path = self._resolve(bucket, key)
@@ -62,10 +89,14 @@ class LocalFileStorage:
 
     async def delete_prefix(self, bucket: str, prefix: str) -> None:
         import shutil
+        if "/" in bucket or "\\" in bucket or bucket.startswith("."):
+            raise ValidationError(f"invalid bucket name: {bucket!r}")
+        if prefix:
+            self._reject_unsafe_key(prefix)
         base = (self._root / bucket).resolve()
         if not base.exists():
             return
-        prefix_path = (base / prefix).resolve() if prefix else base
+        prefix_path = self._contained(base / prefix, prefix) if prefix else base
         if prefix_path.exists():
             if prefix_path.is_dir():
                 await asyncio.to_thread(shutil.rmtree, prefix_path, ignore_errors=True)
@@ -77,10 +108,14 @@ class LocalFileStorage:
         return f"/api/v1/storage/{bucket}/{key}"
 
     async def list_keys(self, bucket: str, prefix: str = "") -> list[str]:
+        if "/" in bucket or "\\" in bucket or bucket.startswith("."):
+            raise ValidationError(f"invalid bucket name: {bucket!r}")
+        if prefix:
+            self._reject_unsafe_key(prefix)
         base = (self._root / bucket).resolve()
         if not base.exists():
             return []
-        prefix_path = (base / prefix).resolve() if prefix else base
+        prefix_path = self._contained(base / prefix, prefix) if prefix else base
         keys: list[str] = []
         for p in prefix_path.rglob("*"):
             if p.is_file():

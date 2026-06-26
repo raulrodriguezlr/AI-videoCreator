@@ -205,6 +205,21 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 
 ---
 
+## Seguridad
+
+Audit 2026-06-26 (local-first single-user threat model):
+
+| Severidad | Issue | Estado |
+|---|---|---|
+| 🔴 CRITICAL | Path-traversal LFI en `LocalFileStorage._resolve` (key con letra de unidad `C:/…` escapaba root → leía vault key sin auth) | ✅ FIXED — guard `is_relative_to(root)` + rechazo de keys absolutas/drive en todas las ops + regression tests |
+| 🟠 MEDIUM | `/storage/{bucket}/{key:path}` GET sin auth ni ownership check | ☐ Pendiente — irrelevante en single-user local; requerido para multi-user |
+| 🟠 MEDIUM | Fernet key en plaintext junto al DB cifrado (`var_dir/secret.key`) | ☐ Pendiente — perms 0600 / OS keychain para deploy no-local |
+| 🟡 LOW | `local_require_auth=False` por defecto (DNS-rebinding desde web local) | ☐ Aceptado para dev local; bind a 127.0.0.1 |
+
+Verificado limpio: sin SQL injection (ORM), sin `shell=True`, AuthZ consistente en use cases (ownership check), secrets write-only por API y no logueados, CORS scoped.
+
+---
+
 ## Pendientes — priorizado
 
 ### Alta (afectan al uso diario)
