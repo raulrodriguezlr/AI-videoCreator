@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  api, ApiError, getTemplate, startRun,
-  type EpisodeDetail, type MediaAsset, type ProviderCatalogEntry, type Script, type SeoMetadata,
+  api, ApiError, generateSeo, getTemplate, recommendTitle, startRun,
+  type EpisodeDetail, type MediaAsset, type ProviderCatalogEntry,
+  type RecommendTitleResponse, type Script, type SeoMetadata,
 } from "../api/client";
 import { MediaViewer } from "../components/MediaViewer";
 import {
@@ -102,7 +103,7 @@ export function EpisodePage() {
           {(episode.state === "ready" || episode.state === "completed") && episode.final_video_key && (
             <YouTubePublishPanel podId={podId} episodeId={episodeId} episode={episode} seo={seo} />
           )}
-          {seo && <SeoPanel seo={seo} />}
+          <SeoPanel podId={podId} episodeId={episodeId} seo={seo} />
           {script && <ScriptPanel script={script} episodeId={episodeId} />}
         </div>
       </div>
@@ -348,14 +349,67 @@ function YouTubePublishPanel({ podId, episodeId, episode, seo }: {
 }
 
 // ---------------------------------------------------------------- SEO panel
-function SeoPanel({ seo }: { seo: SeoMetadata }) {
+function SeoPanel({ podId, episodeId, seo }: {
+  podId: string; episodeId: string; seo: SeoMetadata | null;
+}) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [recommended, setRecommended] = useState<RecommendTitleResponse | null>(null);
+
+  const refresh = () => qc.invalidateQueries({ queryKey: ["episode-detail", episodeId] });
+
+  const generate = useMutation({
+    mutationFn: () => generateSeo(podId, episodeId),
+    onSuccess: () => { toast.ok("SEO generado"); setRecommended(null); refresh(); },
+    onError: (e) => toast.err("No se pudo generar SEO", (e as Error).message),
+  });
+
+  const recommend = useMutation({
+    mutationFn: () => recommendTitle(podId, episodeId),
+    onSuccess: (r) => { setRecommended(r); toast.ok("Título recomendado", r.title); },
+    onError: (e) => toast.err("No se pudo recomendar", (e as Error).message),
+  });
+
   return (
     <div className="card">
-      <div className="card-head"><h3>SEO / Publicación</h3></div>
+      <div className="card-head between">
+        <h3>SEO / Publicación</h3>
+        <Button variant="ghost" size="sm" loading={generate.isPending} onClick={() => generate.mutate()}>
+          {seo ? "Regenerar" : "Generar SEO"}
+        </Button>
+      </div>
       <div className="card-pad stack">
-        {seo.selected_title && <div><div className="dim" style={{ fontSize: 11.5 }}>TÍTULO</div><div style={{ fontWeight: 600 }}>{seo.selected_title}</div></div>}
-        {seo.description && <div><div className="dim" style={{ fontSize: 11.5 }}>DESCRIPCIÓN</div><p className="muted" style={{ fontSize: 13, whiteSpace: "pre-wrap", marginTop: 4 }}>{seo.description.slice(0, 400)}{seo.description.length > 400 ? "…" : ""}</p></div>}
-        {seo.hashtags.length > 0 && <div className="tag-list">{seo.hashtags.map((h) => <Badge key={h} tone="accent">{h}</Badge>)}</div>}
+        {!seo ? (
+          <p className="muted" style={{ fontSize: 13 }}>
+            Sin metadatos SEO. Pulsa "Generar SEO" para crear título, descripción y hashtags con IA.
+          </p>
+        ) : (
+          <>
+            {seo.selected_title && <div><div className="dim" style={{ fontSize: 11.5 }}>TÍTULO</div><div style={{ fontWeight: 600 }}>{seo.selected_title}</div></div>}
+            {seo.title_variants.length > 0 && (
+              <div>
+                <div className="dim between" style={{ fontSize: 11.5 }}>
+                  <span>VARIANTES DE TÍTULO</span>
+                  <Button variant="ghost" size="sm" loading={recommend.isPending} onClick={() => recommend.mutate()}>
+                    Recomendar (bandit)
+                  </Button>
+                </div>
+                <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
+                  {seo.title_variants.map((t) => (
+                    <li key={t} style={{ fontWeight: recommended?.title === t ? 600 : 400 }}>
+                      {t}
+                      {recommended?.scores?.[t] != null && (
+                        <span className="dim" style={{ marginLeft: 6 }}>· {recommended.scores[t].toFixed(3)}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {seo.description && <div><div className="dim" style={{ fontSize: 11.5 }}>DESCRIPCIÓN</div><p className="muted" style={{ fontSize: 13, whiteSpace: "pre-wrap", marginTop: 4 }}>{seo.description.slice(0, 400)}{seo.description.length > 400 ? "…" : ""}</p></div>}
+            {seo.hashtags.length > 0 && <div className="tag-list">{seo.hashtags.map((h) => <Badge key={h} tone="accent">{h}</Badge>)}</div>}
+          </>
+        )}
       </div>
     </div>
   );

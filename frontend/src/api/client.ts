@@ -220,6 +220,18 @@ export interface EpisodeDetail {
   media: MediaAsset[];
 }
 
+export interface RecommendTitleResponse {
+  title: string;
+  score: number;
+  scores: Record<string, number>;
+}
+
+export const generateSeo = (podId: string, episodeId: string, variantCount = 4) =>
+  api.post<SeoMetadata>(`/pods/${podId}/episodes/${episodeId}/seo`, { variant_count: variantCount });
+
+export const recommendTitle = (podId: string, episodeId: string) =>
+  api.post<RecommendTitleResponse>(`/pods/${podId}/episodes/${episodeId}/seo/recommend`);
+
 export interface Short {
   id: string;
   pod_id: string;
