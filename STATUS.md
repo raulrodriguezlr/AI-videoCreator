@@ -153,11 +153,12 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | Capacidad | Estado | Notas |
 |---|---|---|
 | Pods / Characters / Episodes / Scripts / Jobs / Settings | ✅ | |
-| Director's Chat (JSON Patch sobre DagSpec) | ✅ | |
-| Run timeline (SSE + fallback polling) | ✅ | |
+| Director's Chat (JSON Patch sobre DagSpec) | ✅ | Default spec ahora es pipeline runnable (`structure→voice→clips→render`) |
+| Run timeline + **resultado visible** (vídeo + descargas) | ✅ | `c12c4db` — snapshot expone `video_url`+`artifacts`, RunPage muestra `<video>`+descarga. Antes solo badges |
 | Memes page | ✅ | |
-| Recreations page | ✅ | |
-| Templates gallery | ✅ | |
+| Recreations page | ⚠️ | UI + plan reales; `run_recreation` corre 1 clip text_to_video (sin voz/compose). Output ya visible vía rec.result. Deep-fix (v2v+tts+compose) pendiente |
+| Templates gallery | ✅ | `f69cfa1` — `native-short-basic` arreglado (usaba caps sin handler `ass_captions`/`sfx_mix`, siempre fallaba) |
+| EpisodePage layout (media vs config rebalanceado) | ✅ | `.viewer` con tracks clampados — filmstrip ya no colapsa a 2 columnas |
 | Brand kits per-pod | ✅ | |
 | ConfigTab: estructura guión + overrides | ✅ | `a4add77` |
 | Model catalog (append installed models) | ✅ | `a4add77` |
