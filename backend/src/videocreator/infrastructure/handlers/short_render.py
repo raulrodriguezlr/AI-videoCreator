@@ -80,7 +80,7 @@ class _PolishOptions:
         ).strip() or "satisfying"
         music_vibe = str(payload.get("music_vibe") or "energetic").strip() or "energetic"
         return cls(
-            captions=bool(payload.get("captions", False)),
+            captions=bool(payload.get("captions", True)),
             ken_burns=bool(payload.get("ken_burns", True)),
             transition=transition,
             transition_duration_s=float(payload.get("transition_duration_s", 0.0)),
@@ -298,6 +298,7 @@ class ShortRenderHandler:
             rule=rule,
             start_s=start_s,
             layout=style.layout,
+            ken_burns=style.ken_burns,
         ).model_copy(update={"template": style.template})
 
     async def _compose_and_store(
