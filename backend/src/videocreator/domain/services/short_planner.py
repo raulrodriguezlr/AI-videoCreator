@@ -29,6 +29,7 @@ class ShortPlanner:
         rule: PlatformRule,
         start_s: float = 0.0,
         layout: str = "fill",
+        ken_burns: bool = False,
     ) -> EditingTimeline:
         """Plan a single-highlight timeline that respects the platform rule.
 
@@ -36,6 +37,9 @@ class ShortPlanner:
         - it never exceeds the platform's `max_duration_s`,
         - it is at least `min_duration_s` *when the source allows it*,
         - it never runs past the end of the source video.
+
+        `ken_burns` carries the creator's slow-zoom choice onto the segment so a
+        single-cut short honors the zoom toggle exactly like the montage path.
         """
         if source_duration_s <= 0.0:
             raise ValueError("source_duration_s must be positive to plan a short")
@@ -45,7 +49,8 @@ class ShortPlanner:
         target = self._clamp_duration(requested_duration_s, rule, available)
 
         segment = TimelineSegment(
-            source_start_s=start, duration_s=target, label="highlight"
+            source_start_s=start, duration_s=target, label="highlight",
+            ken_burns=ken_burns,
         )
         return EditingTimeline(
             segments=(segment,), width=rule.width, height=rule.height,
@@ -91,6 +96,12 @@ class ShortPlanner:
             target = min(ShortPlanner.DEFAULT_TARGET_S, rule.max_duration_s)
         budget = min(target, rule.max_duration_s)
         
+        # Two ceilings: `budget` is the creator's *requested* length (what the
+        # short should aim for) and `rule.max_duration_s` is the platform's hard
+        # limit. The fit decision honors the requested budget so a 30s request
+        # yields ~30s instead of silently growing to the 60s platform max — the
+        # reported "duration option ignored" bug. The hard limit still caps the
+        # single oversized-pick trim below.
         segments: list[TimelineSegment] = []
         used = 0.0
         seen: set[int] = set()
@@ -98,24 +109,26 @@ class ShortPlanner:
             if idx < 0 or idx >= len(scene_durations) or idx in seen:
                 continue
             seen.add(idx)
-            
+
             remaining_hard = rule.max_duration_s - used
+            remaining_budget = budget - used
             if remaining_hard <= 0.01:
                 break
-            
+
             full_span = max(0.0, scene_durations[idx])
             # Never cut a scene mid-sentence: each scene is one narrated
-            # utterance, so keep it whole when it fits (a small tolerance lets
-            # the last scene slightly overrun rather than chop a word). A scene
-            # that won't fit is skipped — unless nothing is chosen yet, where
-            # trimming the single oversized pick is unavoidable.
-            if full_span <= remaining_hard + 1.5:
+            # utterance, so keep it whole when it fits the requested budget (a
+            # small tolerance lets the last scene slightly overrun rather than
+            # chop a word). A scene that won't fit is skipped — unless nothing is
+            # chosen yet, where trimming the single oversized pick is unavoidable
+            # (clamped to the platform hard limit).
+            if full_span <= remaining_budget + 1.5:
                 span = full_span
             elif not segments:
-                span = remaining_hard
+                span = min(full_span, remaining_hard)
             else:
                 continue
-            
+
             if span <= 0.01:
                 continue
             caption = None
