@@ -262,3 +262,44 @@ class TestRunRegistry:
         registry = RunRegistry()
         assert registry.get("nope") is None
         assert registry.snapshot("nope") is None
+
+    def test_snapshot_surfaces_node_output_and_terminal_video(self) -> None:
+        from videocreator.infrastructure.queue.dag_executor import RunRegistry
+
+        spec = DagSpec(nodes=(
+            DagNode(id="gen", capability="text_to_video"),
+            DagNode(id="render", capability="compose_short", depends_on=("gen",)),
+        ))
+        run = DagRun(run_id="r2", spec=spec)
+        # Simulate executor outputs landing on node states.
+        run.node_states["gen"].result = {"paths": ["/api/v1/storage/x/frame.png"]}
+        run.node_states["render"].result = {
+            "video_url": "/api/v1/storage/x/final.mp4", "storage_key": "x/final.mp4",
+        }
+        registry = RunRegistry()
+        registry.register(run)
+
+        snap = registry.snapshot("r2")
+        assert snap is not None
+        # Terminal render node's video bubbles up to the top-level field.
+        assert snap["video_url"] == "/api/v1/storage/x/final.mp4"
+        # Every produced artifact is collected (image path + video).
+        assert "/api/v1/storage/x/frame.png" in snap["artifacts"]
+        assert "/api/v1/storage/x/final.mp4" in snap["artifacts"]
+        # Per-node output is exposed and JSON-safe.
+        assert snap["nodes"]["render"]["output"]["storage_key"] == "x/final.mp4"
+
+    def test_snapshot_no_video_when_no_render(self) -> None:
+        from videocreator.infrastructure.queue.dag_executor import RunRegistry
+
+        spec = DagSpec(nodes=(DagNode(id="a", capability="llm_text"),))
+        run = DagRun(run_id="r3", spec=spec)
+        run.node_states["a"].result = "just a string, not a dict"
+        registry = RunRegistry()
+        registry.register(run)
+
+        snap = registry.snapshot("r3")
+        assert snap is not None
+        assert snap["video_url"] is None
+        assert snap["artifacts"] == []
+        assert snap["nodes"]["a"]["output"] is None

@@ -821,6 +821,7 @@ class RunNodeStateResponse(BaseModel):
     state: str
     error: str | None = None
     retries_left: int
+    output: dict[str, Any] | None = None
 
 
 class RunSnapshotResponse(BaseModel):
@@ -830,6 +831,8 @@ class RunSnapshotResponse(BaseModel):
     is_complete: bool
     has_failures: bool
     nodes: dict[str, RunNodeStateResponse]
+    video_url: str | None = None
+    artifacts: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

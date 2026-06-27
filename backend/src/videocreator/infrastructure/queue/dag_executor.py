@@ -40,6 +40,17 @@ NodeExecutor = Callable[[DagNode, dict[str, Any]], Awaitable[Any]]
 EventCallback = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
+def _safe_result(value: Any) -> Any:
+    """Coerce an executor return value into a JSON-serialisable shape."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {k: _safe_result(v) for k, v in value.items() if isinstance(k, str)}
+    if isinstance(value, (list, tuple)):
+        return [_safe_result(v) for v in value]
+    return str(value)
+
+
 class DagDeadlockError(Exception):
     """Raised when no nodes are ready but work remains."""
 
@@ -223,19 +234,41 @@ class RunRegistry:
         return self._runs.get(run_id)
 
     def snapshot(self, run_id: str) -> dict[str, Any] | None:
-        """JSON-safe view of a run's node states for the timeline UI."""
+        """JSON-safe view of a run's node states + produced artifacts.
+
+        Each node carries its `output` (the executor's return value, made
+        JSON-safe); `video_url` is the last node that produced a playable video
+        (the terminal compose/render), and `artifacts` collects every video URL
+        and image path across the run so the UI can show and download results
+        instead of just a row of green badges.
+        """
         run = self._runs.get(run_id)
         if run is None:
             return None
+        video_url: str | None = None
+        artifacts: list[str] = []
+        # Iterate in spec order so `video_url` ends on the terminal render node.
+        for node in run.spec.nodes:
+            out = _safe_result(run.node_states[node.id].result)
+            if isinstance(out, dict):
+                if isinstance(out.get("video_url"), str):
+                    video_url = out["video_url"]
+                    artifacts.append(out["video_url"])
+                for path in out.get("paths", []) or []:
+                    if isinstance(path, str):
+                        artifacts.append(path)
         return {
             "run_id": run.run_id,
             "is_complete": run.is_complete,
             "has_failures": run.has_failures,
+            "video_url": video_url,
+            "artifacts": artifacts,
             "nodes": {
                 nid: {
                     "state": ns.state.value,
                     "error": ns.error,
                     "retries_left": ns.retries_left,
+                    "output": _safe_result(ns.result) if isinstance(ns.result, dict) else None,
                 }
                 for nid, ns in run.node_states.items()
             },

@@ -313,14 +313,18 @@ p { margin: 0 0 12px; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* ============================ Media viewer ============================= */
-.viewer { display: grid; grid-template-columns: 1.55fr 1fr; gap: 22px; align-items: start; }
-@media (max-width: 1000px) { .viewer { grid-template-columns: 1fr; } }
+/* Media gets all remaining width; the config rail is capped so its wide
+   min-content (long selects/buttons) can never squeeze the media column.
+   minmax(0, …) is essential — without it the right track's min-content
+   overflows its share and the filmstrip collapses to 2 cramped columns. */
+.viewer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); gap: 24px; align-items: start; }
+@media (max-width: 1040px) { .viewer { grid-template-columns: minmax(0, 1fr); } }
 .stage { background: #000; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
-.stage video, .stage img { width: 100%; max-height: 62vh; display: block; object-fit: contain; background: #000; }
+.stage video, .stage img { width: 100%; max-height: 66vh; display: block; object-fit: contain; background: #000; }
 .stage audio { width: 100%; }
 .stage .audio-wrap { padding: 40px 24px; display: grid; place-items: center; gap: 18px; }
 .media-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0; }
-.media-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 9px; }
+.media-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
 .thumb-btn {
   aspect-ratio: 16/10; border-radius: var(--r-sm); overflow: hidden; cursor: pointer;
   border: 1.5px solid var(--border); background: var(--surface-2); position: relative; padding: 0;

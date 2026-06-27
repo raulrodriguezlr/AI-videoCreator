@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  getRun, subscribeToRun, type RunNodeState, type RunSnapshot,
+  getRun, mediaUrl, subscribeToRun, type RunNodeState, type RunSnapshot,
 } from "../api/client";
 import { Badge, Empty, ErrorState, Loading } from "../ui/primitives";
-import { IcCheck, IcRefresh, IcX } from "../ui/icons";
+import { IcCheck, IcFilm, IcRefresh, IcX } from "../ui/icons";
 
 const POLL_MS = 3_000;
 
@@ -117,6 +117,41 @@ export function RunPage() {
           <div className="progress"><i style={{ width: `${pct}%` }} /></div>
         </div>
       </div>
+
+      {isFinished && !data.has_failures && (data.video_url || data.artifacts.length > 0) && (
+        <div className="card" style={{ marginBottom: 22 }}>
+          <div className="card-head"><IcFilm width={16} height={16} /><h3>Resultado</h3></div>
+          <div className="card-pad stack">
+            {data.video_url && (
+              <>
+                <div className="stage">
+                  <video src={mediaUrl(data.video_url)} controls preload="metadata" />
+                </div>
+                <div className="btn-row" style={{ justifyContent: "flex-end" }}>
+                  <a className="btn sm" href={mediaUrl(data.video_url)} download target="_blank" rel="noreferrer">
+                    Descargar vídeo
+                  </a>
+                </div>
+              </>
+            )}
+            {data.artifacts.filter((a) => a !== data.video_url).length > 0 && (
+              <div className="stack" style={{ gap: 8 }}>
+                <div className="dim" style={{ fontSize: 11.5, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  Artefactos
+                </div>
+                <div className="tag-list">
+                  {data.artifacts.filter((a) => a !== data.video_url).map((a) => (
+                    <a key={a} className="badge" href={mediaUrl(a)} target="_blank" rel="noreferrer"
+                      style={{ cursor: "pointer" }}>
+                      {a.split("/").pop()}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {total === 0 ? (
         <Empty emoji="🗺️" title="Sin nodos">Esta ejecución no tiene nodos registrados.</Empty>

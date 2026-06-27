@@ -501,6 +501,7 @@ export interface RunNodeStatus {
   state: RunNodeState;
   error: string | null;
   retries_left: number;
+  output: Record<string, unknown> | null;
 }
 
 export interface RunSnapshot {
@@ -508,6 +509,8 @@ export interface RunSnapshot {
   is_complete: boolean;
   has_failures: boolean;
   nodes: Record<string, RunNodeStatus>;
+  video_url: string | null;
+  artifacts: string[];
 }
 
 export const getTemplates = () => api.get<Template[]>("/templates");
