@@ -164,11 +164,22 @@ async def test_delete_episode() -> None:
     pod = _pod()
     ep = Episode(id=new_episode_id(), pod_id=pod.id, title="ep", number=1)
     repo = _Repo(ep)
-    uc = DeleteEpisode(_PodRepo(pod), repo)  # type: ignore[arg-type]
+
+    class _Storage:
+        def __init__(self) -> None:
+            self.purged: list[tuple[str, str]] = []
+
+        async def delete_prefix(self, bucket: str, prefix: str) -> None:
+            self.purged.append((bucket, prefix))
+
+    storage = _Storage()
+    uc = DeleteEpisode(_PodRepo(pod), repo, storage)  # type: ignore[arg-type]
 
     await uc.execute(episode_id=ep.id, requester_id=LOCAL_USER_ID)
 
     assert repo.deleted == [ep.id]
+    # Deleting an episode also purges its media prefix from storage.
+    assert storage.purged == [("episodes", str(ep.id))]
 
 
 # --------------------------------------------------------------------------

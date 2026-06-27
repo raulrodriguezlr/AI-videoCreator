@@ -292,9 +292,20 @@ async def test_draft_meme_omits_characters_and_uses_short_duration() -> None:
     assert bp.interactive_questions == 0
 
 
-async def test_draft_educational_returns_no_characters() -> None:
-    # Educational defaults to CharacterMode.NONE → wizard must not request chars.
+async def test_draft_educational_keeps_volunteered_characters() -> None:
+    # Educational defaults to CharacterMode.NONE, but it never *forces* chars.
+    # If the LLM volunteers characters, the wizard keeps them and upgrades the
+    # mode to OPTIONAL so they aren't thrown away and the UI can edit them.
     uc = DraftPodBlueprint(llm=_FakeLLM(_payload()))  # type: ignore[arg-type]
+    bp = await uc.execute(idea="historia de Roma", content_type=ContentType.EDUCATIONAL)
+    assert len(bp.characters) == 3
+    assert bp.character_mode is CharacterMode.OPTIONAL
+    assert bp.duration_seconds == 90
+
+
+async def test_draft_educational_without_characters_stays_none() -> None:
+    # When the LLM returns no characters, educational stays NONE + empty.
+    uc = DraftPodBlueprint(llm=_FakeLLM(_payload(characters=[])))  # type: ignore[arg-type]
     bp = await uc.execute(idea="historia de Roma", content_type=ContentType.EDUCATIONAL)
     assert bp.characters == ()
     assert bp.character_mode is CharacterMode.NONE

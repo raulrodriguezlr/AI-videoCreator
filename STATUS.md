@@ -128,6 +128,7 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | Beat-locking (librosa) + SFX library | ✅ | |
 | Hook Rewriter + LinUCB bandit | ✅ | |
 | Smart auto-reframe 9:16 (OpenCV + MediaPipe) | ✅ | |
+| Opciones de short honradas (duración/zoom/reframe/plantilla) | ✅ | `f729597` — duration usaba techo plataforma 60s (no budget), ken_burns nunca se aplicaba en single-cut. +8 tests integración |
 | Capa 3: Overlays (memes/imágenes en timestamps) | ☐ | |
 | Whisper karaoke opcional | ☐ | |
 | V2V render (scene recreation) | ☐ | |
