@@ -564,7 +564,7 @@ class Container:
         slides_uc = GenerateCarouselSlidesUseCase(self.llm())
 
         async def run_native_short(node, upstream):  # type: ignore[no-untyped-def]
-            concept = str(node.params.get("concept", "") or
+            concept = str(node.params.get("concept", "") or node.params.get("brief", "") or
                           next((v for v in upstream.values()
                                 if isinstance(v, str) and v.strip()), ""))
             structure = await native.execute(
@@ -574,7 +574,7 @@ class Container:
             return structure.model_dump(mode="json")
 
         async def run_carousel_slides(node, upstream):  # type: ignore[no-untyped-def]
-            script = str(node.params.get("script", "") or
+            script = str(node.params.get("script", "") or node.params.get("brief", "") or
                          next((v for v in upstream.values()
                                if isinstance(v, str) and v.strip()), ""))
             slides = await slides_uc.execute(script or "untitled")

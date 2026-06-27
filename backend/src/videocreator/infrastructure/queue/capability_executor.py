@@ -27,13 +27,14 @@ CapabilityHandler = Callable[[DagNode, dict[str, Any]], Awaitable[Any]]
 _GENERIC_TEXT_PROMPT = """\
 You are a video production assistant executing one pipeline step.
 
+SUBJECT (what the content is about): {subject}
 TASK: {task}
 PARAMETERS: {params}
 UPSTREAM RESULTS (from previous steps):
 {upstream}
 
-Produce the best possible output for this task. If the task implies
-structured output, respond with JSON; otherwise plain text.
+Write the output ABOUT the subject above. If the task implies structured
+output, respond with JSON; otherwise plain text.
 """
 
 
@@ -80,8 +81,17 @@ class CapabilityExecutor:
     async def _run_llm_text(self, node: DagNode, upstream: dict[str, Any]) -> str:
         params = dict(node.params)
         task = str(params.pop("task", "complete the step"))
+        # The content subject can arrive under any of these keys (Director's
+        # brief, a topic, a concept). Surface it explicitly so the step writes
+        # about it instead of inventing a generic "untitled" topic.
+        subject = next(
+            (str(params.pop(k)) for k in ("brief", "subject", "topic", "concept")
+             if params.get(k)),
+            "",
+        )
         upstream_txt = json.dumps(upstream, ensure_ascii=False, default=str)[:4000]
         prompt = _GENERIC_TEXT_PROMPT.format(
+            subject=subject or "(not specified — infer a sensible topic from the task/upstream)",
             task=task, params=json.dumps(params, ensure_ascii=False),
             upstream=upstream_txt or "(none)",
         )

@@ -1,20 +1,13 @@
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { startRun, getTemplates, type Template } from "../api/client";
-import { Badge, Button, Empty, ErrorState, Loading, useToast } from "../ui/primitives";
-import { IcLayout, IcSparkles, IcWand } from "../ui/icons";
+import { useQuery } from "@tanstack/react-query";
+import { getTemplates, type Template } from "../api/client";
+import { Badge, Button, Empty, ErrorState, Loading } from "../ui/primitives";
+import { IcLayout, IcWand } from "../ui/icons";
 import { DagPipeline } from "../components/DagPipeline";
 
 export function TemplatesPage() {
   const nav = useNavigate();
-  const toast = useToast();
   const templates = useQuery<Template[]>({ queryKey: ["templates"], queryFn: getTemplates });
-
-  const generate = useMutation({
-    mutationFn: (tpl: Template) => startRun(tpl.dag),
-    onSuccess: (res) => nav(`/runs/${res.run_id}`),
-    onError: (e) => toast.err("No se pudo iniciar la generación", (e as Error).message),
-  });
 
   return (
     <div className="page">
@@ -58,18 +51,10 @@ export function TemplatesPage() {
 
               <div className="template-card-foot">
                 <span className="dim mono" style={{ fontSize: 11 }}>{tpl.id}</span>
-                <div className="btn-row">
-                  <Button size="sm"
-                    onClick={() => nav("/director", { state: { spec: tpl.dag, templateName: tpl.name } })}>
-                    <IcWand /> Editar en Director
-                  </Button>
-                  <Button variant="primary" size="sm"
-                    loading={generate.isPending && generate.variables?.id === tpl.id}
-                    disabled={generate.isPending && generate.variables?.id !== tpl.id}
-                    onClick={() => generate.mutate(tpl)}>
-                    <IcSparkles /> Generar
-                  </Button>
-                </div>
+                <Button variant="primary" size="sm"
+                  onClick={() => nav("/director", { state: { spec: tpl.dag, templateName: tpl.name } })}>
+                  <IcWand /> Abrir en Director
+                </Button>
               </div>
             </article>
           ))}

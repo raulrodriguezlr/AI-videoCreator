@@ -38,6 +38,25 @@ function applySelectionToSpec(
   };
 }
 
+const _VIDEO_CAPS = ["text_to_video", "image_to_video", "video_to_video"];
+
+/** Seed the content brief into the pipeline so the run is ABOUT something.
+ * Without this the llm_text/native_short steps fall back to "untitled" and
+ * generate generic slop. We stamp `brief` on every node (the generic llm_text
+ * prompt surfaces it as the subject), `concept` on native_short, and `prompt`
+ * on generative video nodes that don't already have one. */
+function seedSpecWithBrief(spec: DagSpecDto, brief: string): DagSpecDto {
+  const b = brief.trim();
+  return {
+    nodes: spec.nodes.map((node) => {
+      const params = { ...node.params, brief: b };
+      if (node.capability === "native_short") params.concept = b;
+      if (_VIDEO_CAPS.includes(node.capability) && !params.prompt) params.prompt = b;
+      return { ...node, params };
+    }),
+  };
+}
+
 interface ChatTurn {
   role: "user" | "assistant";
   text: string;
@@ -50,6 +69,7 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
   const nav = useNavigate();
   const toast = useToast();
   const [spec, setSpec] = useState<DagSpecDto>(initialSpec);
+  const [brief, setBrief] = useState("");
   const [history, setHistory] = useState<ChatTurn[]>([]);
   const [message, setMessage] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
@@ -94,10 +114,18 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
   });
 
   const generate = useMutation({
-    mutationFn: () => startRun(spec),
+    mutationFn: () => startRun(seedSpecWithBrief(spec, brief)),
     onSuccess: (res) => nav(`/runs/${res.run_id}`),
     onError: (e) => toast.err("No se pudo iniciar la generación", (e as Error).message),
   });
+
+  const onGenerate = () => {
+    if (!brief.trim()) {
+      toast.err("Falta el brief", "Describe primero de qué va el contenido.");
+      return;
+    }
+    generate.mutate();
+  };
 
   const send = () => {
     const text = message.trim();
@@ -138,8 +166,16 @@ export function DirectorChat({ initialSpec }: { initialSpec: DagSpecDto }) {
           onModel={handleModelChange}
           capability="text_to_video"
         />
-        <Button variant="primary" loading={generate.isPending} disabled={spec.nodes.length === 0}
-          onClick={() => generate.mutate()}>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label htmlFor="director-brief">Brief — ¿sobre qué es el contenido?</label>
+          <textarea id="director-brief" className="textarea" value={brief}
+            onChange={(e) => setBrief(e.target.value)} rows={2}
+            placeholder="Ej: 5 datos curiosos sobre cómo se forman las estrellas, tono divulgativo y enérgico" />
+          <span className="hint">El pipeline genera el contenido a partir de este brief. Sin él, sale genérico.</span>
+        </div>
+        <Button variant="primary" loading={generate.isPending}
+          disabled={spec.nodes.length === 0 || !brief.trim()}
+          onClick={onGenerate}>
           <IcSparkles /> Generar
         </Button>
         <DagPipeline nodes={spec.nodes} />
