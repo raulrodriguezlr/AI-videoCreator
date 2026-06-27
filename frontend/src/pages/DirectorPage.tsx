@@ -2,8 +2,15 @@ import { useLocation } from "react-router-dom";
 import { type DagSpecDto } from "../api/client";
 import { DirectorChat } from "../components/DirectorChat";
 
+// A runnable starter pipeline (only implemented capabilities), so "Generar"
+// produces a real composed short out of the box instead of a dead-end node.
 const DEFAULT_SPEC: DagSpecDto = {
-  nodes: [{ id: "structure", capability: "native_short", params: {}, depends_on: [], max_retries: 0 }],
+  nodes: [
+    { id: "structure", capability: "native_short", params: {}, depends_on: [], max_retries: 0 },
+    { id: "voice", capability: "tts", params: { language: "es" }, depends_on: ["structure"], max_retries: 1 },
+    { id: "clips", capability: "text_to_video", params: { width: 1080, height: 1920 }, depends_on: ["structure"], max_retries: 1 },
+    { id: "render", capability: "compose_short", params: {}, depends_on: ["voice", "clips"], max_retries: 0 },
+  ],
 };
 
 interface DirectorLocationState {
