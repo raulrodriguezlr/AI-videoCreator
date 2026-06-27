@@ -969,6 +969,42 @@ class YouTubeUploadResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Dashboard / home (aggregate showcase)
+# ---------------------------------------------------------------------------
+class DashboardCounts(BaseModel):
+    pods: int
+    episodes: int
+    shorts: int
+    jobs_running: int
+
+
+class DashboardEpisode(BaseModel):
+    id: str
+    pod_id: str
+    pod_name: str
+    title: str
+    number: int
+    state: str
+    thumb_url: str | None = None
+    video_url: str | None = None
+
+
+class DashboardShort(BaseModel):
+    id: str
+    pod_id: str
+    pod_name: str
+    hook_text: str | None = None
+    duration_s: float
+    video_url: str | None = None
+
+
+class DashboardResponse(BaseModel):
+    counts: DashboardCounts
+    recent_episodes: list[DashboardEpisode]
+    recent_shorts: list[DashboardShort]
+
+
+# ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
 class HealthResponse(BaseModel):
@@ -1058,6 +1094,10 @@ __all__ = [
     "YouTubeStatusResponse",
     "YouTubeUploadRequest",
     "YouTubeUploadResponse",
+    "DashboardCounts",
+    "DashboardEpisode",
+    "DashboardShort",
+    "DashboardResponse",
     "PlanRecreationRequest",
     "FairUseResponse",
     "RecreationBeatResponse",

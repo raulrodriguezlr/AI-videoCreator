@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type HealthResponse, type LlmConfig } from "../api/client";
-import { IcActivity, IcCloud, IcCpu, IcFilm, IcLaugh, IcLayout, IcMessageCircle, IcRadar, IcSliders } from "../ui/icons";
+import { IcActivity, IcCloud, IcCpu, IcFilm, IcLaugh, IcLayout, IcMessageCircle, IcRadar, IcSliders, IcSparkles } from "../ui/icons";
 
 export function AppShell() {
   const location = useLocation();
@@ -30,7 +30,8 @@ export function AppShell() {
         </div>
 
         <div className="nav-section">Estudio</div>
-        <NavLink to="/" end className={navCls}><IcFilm /> Pods</NavLink>
+        <NavLink to="/" end className={navCls}><IcSparkles /> Inicio</NavLink>
+        <NavLink to="/pods" className={navCls}><IcFilm /> Pods</NavLink>
         <NavLink to="/templates" className={navCls}><IcLayout /> Plantillas</NavLink>
         <NavLink to="/director" className={navCls}><IcMessageCircle /> Director</NavLink>
         <NavLink to="/memes" className={navCls}><IcLaugh /> Memes</NavLink>
@@ -110,7 +111,8 @@ function HiggsfieldChip({ data }: { data?: HiggsfieldBalance }) {
 const navCls = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? "active" : ""}`;
 
 function routeLabel(path: string): string {
-  if (path === "/") return "Pods";
+  if (path === "/") return "Inicio";
+  if (path === "/pods") return "Pods";
   if (path.startsWith("/jobs")) return "Trabajos";
   if (path.startsWith("/settings")) return "Ajustes";
   if (path.startsWith("/create")) return "Crear pod";

@@ -601,6 +601,100 @@ p { margin: 0 0 12px; }
 .recreation-result { display: flex; flex-direction: column; gap: 18px; }
 
 /* =========================================================================
+   Dashboard / home
+   ========================================================================= */
+.dash-hero {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background:
+    radial-gradient(680px 280px at 82% -30%, var(--accent-soft), transparent 70%),
+    radial-gradient(520px 300px at 8% 130%, var(--violet-soft), transparent 68%),
+    linear-gradient(180deg, var(--surface), var(--bg));
+  padding: 40px 36px 38px;
+}
+.dash-hero-glow {
+  position: absolute; top: -120px; right: -80px; width: 360px; height: 360px;
+  background: conic-gradient(from 200deg, var(--accent), var(--mint) 120deg, var(--pink) 240deg, var(--accent));
+  filter: blur(90px); opacity: 0.22; pointer-events: none; border-radius: 50%;
+}
+.dash-hero-inner { position: relative; max-width: 640px; }
+.dash-eyebrow {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent-ink); background: var(--accent-soft); border: 1px solid var(--accent-line);
+  padding: 5px 11px; border-radius: var(--r-pill);
+}
+.dash-eyebrow svg { color: var(--accent); }
+.dash-title { font-size: 38px; line-height: 1.08; letter-spacing: -0.03em; margin: 18px 0 0; }
+.dash-lede { color: var(--text-2); font-size: 15px; line-height: 1.6; margin: 14px 0 0; max-width: 52ch; }
+
+.dash-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 22px; }
+@media (max-width: 760px) { .dash-stats { grid-template-columns: repeat(2, 1fr); } }
+.stat-card {
+  position: relative; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 18px; border-radius: var(--r-md); background: var(--surface);
+  border: 1px solid var(--border); transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  font-family: var(--font-body);
+}
+.stat-card:hover { transform: translateY(-3px); border-color: var(--border-strong); box-shadow: var(--shadow-lg); }
+.stat-card:focus-visible { outline: none; box-shadow: var(--ring); }
+.stat-icon {
+  width: 34px; height: 34px; display: grid; place-items: center; margin-bottom: 6px;
+  border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border);
+}
+.stat-value { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; display: inline-flex; align-items: center; gap: 8px; }
+.stat-label { font-size: 12.5px; color: var(--text-3); font-weight: 500; }
+.stat-live { width: 8px; height: 8px; border-radius: 50%; background: var(--mint); animation: pulse 1.4s ease-in-out infinite; }
+.stat-card.tone-accent .stat-icon { color: var(--accent); }
+.stat-card.tone-violet .stat-icon { color: var(--violet); }
+.stat-card.tone-pink .stat-icon { color: var(--pink); }
+.stat-card.tone-mint .stat-icon { color: var(--mint); }
+.stat-card.tone-accent:hover { border-color: var(--accent-line); }
+.stat-card.tone-violet:hover { border-color: rgba(167,139,250,0.45); }
+.stat-card.tone-pink:hover { border-color: rgba(255,107,157,0.45); }
+.stat-card.tone-mint:hover { border-color: rgba(45,212,191,0.45); }
+
+.dash-section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 34px 0 16px; }
+.dash-section-head h2 { font-size: 18px; }
+
+/* horizontal media rail with snap */
+.dash-rail {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 240px; gap: 14px;
+  overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 8px; margin: 0 -4px; padding-left: 4px; padding-right: 4px;
+}
+.dash-rail > * { scroll-snap-align: start; }
+
+.ep-card, .short-card {
+  display: flex; flex-direction: column; gap: 10px; text-align: left; cursor: pointer;
+  padding: 0; background: none; border: none; font-family: var(--font-body);
+}
+.ep-thumb, .short-thumb {
+  position: relative; overflow: hidden; border-radius: var(--r-md);
+  border: 1px solid var(--border); background: var(--surface-2);
+  display: grid; place-items: center; transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+.ep-thumb { aspect-ratio: 16/9; }
+.short-thumb { aspect-ratio: 9/16; }
+.ep-card:hover .ep-thumb, .short-card:hover .short-thumb { border-color: var(--accent-line); transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.ep-card:focus-visible, .short-card:focus-visible { outline: none; }
+.ep-card:focus-visible .ep-thumb, .short-card:focus-visible .short-thumb { box-shadow: var(--ring); }
+.ep-thumb img, .ep-thumb video, .short-thumb img, .short-thumb video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ep-thumb-hover { opacity: 0; transition: opacity 0.2s ease; }
+.ep-card:hover .ep-thumb-hover { opacity: 1; }
+.ep-thumb-ic { color: var(--text-3); z-index: 1; }
+.ep-num, .short-dur {
+  position: absolute; z-index: 2; font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: var(--r-pill); background: rgba(8,9,13,0.72); color: var(--text);
+  backdrop-filter: blur(6px); border: 1px solid var(--border);
+}
+.ep-num { top: 9px; left: 9px; color: var(--accent-ink); }
+.short-dur { bottom: 9px; right: 9px; }
+.ep-meta { display: flex; flex-direction: column; gap: 2px; padding: 0 2px; }
+.ep-title { font-size: 13.5px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ep-pod { font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* =========================================================================
    Memes — standalone meme generator
    ========================================================================= */
 .explainer-card {

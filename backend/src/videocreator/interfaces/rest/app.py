@@ -19,6 +19,7 @@ from videocreator.interfaces.rest.routers import (
     auth,
     brain,
     characters,
+    dashboard,
     episodes,
     health,
     jobs,
@@ -114,6 +115,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(brain.router, prefix=API_PREFIX)
     app.include_router(recipes.router, prefix=API_PREFIX)
     app.include_router(publish.router, prefix=API_PREFIX)
+    app.include_router(dashboard.router, prefix=API_PREFIX)
     return app
 
 

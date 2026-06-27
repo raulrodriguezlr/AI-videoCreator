@@ -6,6 +6,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./styles.css";
 import { AppShell } from "./components/AppShell";
 import { ToastProvider } from "./ui/primitives";
+import { DashboardPage } from "./pages/DashboardPage";
 import { PodsListPage } from "./pages/PodsListPage";
 import { PodDetailPage } from "./pages/PodDetailPage";
 import { EpisodePage } from "./pages/EpisodePage";
@@ -34,7 +35,8 @@ createRoot(rootEl).render(
         <BrowserRouter>
           <Routes>
             <Route element={<AppShell />}>
-              <Route index element={<PodsListPage />} />
+              <Route index element={<DashboardPage />} />
+              <Route path="/pods" element={<PodsListPage />} />
               <Route path="/create" element={<CreatePodPage />} />
               <Route path="/pods/:podId" element={<PodDetailPage />} />
               <Route path="/pods/:podId/episodes/:episodeId" element={<EpisodePage />} />

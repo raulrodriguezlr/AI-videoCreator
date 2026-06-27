@@ -226,6 +226,38 @@ export interface RecommendTitleResponse {
   scores: Record<string, number>;
 }
 
+export interface DashboardCounts {
+  pods: number;
+  episodes: number;
+  shorts: number;
+  jobs_running: number;
+}
+export interface DashboardEpisode {
+  id: string;
+  pod_id: string;
+  pod_name: string;
+  title: string;
+  number: number;
+  state: string;
+  thumb_url: string | null;
+  video_url: string | null;
+}
+export interface DashboardShort {
+  id: string;
+  pod_id: string;
+  pod_name: string;
+  hook_text: string | null;
+  duration_s: number;
+  video_url: string | null;
+}
+export interface DashboardResponse {
+  counts: DashboardCounts;
+  recent_episodes: DashboardEpisode[];
+  recent_shorts: DashboardShort[];
+}
+
+export const getDashboard = () => api.get<DashboardResponse>("/dashboard");
+
 export const generateSeo = (podId: string, episodeId: string, variantCount = 4) =>
   api.post<SeoMetadata>(`/pods/${podId}/episodes/${episodeId}/seo`, { variant_count: variantCount });
 
