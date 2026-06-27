@@ -154,7 +154,7 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | Capacidad | Estado | Notas |
 |---|---|---|
 | Pods / Characters / Episodes / Scripts / Jobs / Settings | ✅ | |
-| Director's Chat (JSON Patch sobre DagSpec) | ✅ | Default spec ahora es pipeline runnable (`structure→voice→clips→render`) |
+| Director's Chat (JSON Patch sobre DagSpec) | ✅ | Default spec runnable + **brief obligatorio** (`103764a`): el pipeline genera sobre el brief, no "untitled". Templates ahora abren en Director (no run a ciegas) |
 | Run timeline + **resultado visible** (vídeo + descargas) | ✅ | `c12c4db` — snapshot expone `video_url`+`artifacts`, RunPage muestra `<video>`+descarga. Antes solo badges |
 | Memes page | ✅ | |
 | Recreations page | ⚠️ | UI + plan reales; `run_recreation` corre 1 clip text_to_video (sin voz/compose). Output ya visible vía rec.result. Deep-fix (v2v+tts+compose) pendiente |
