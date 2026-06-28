@@ -31,12 +31,17 @@ export function EpisodePage() {
   const multiplyRun = useMutation({
     mutationFn: async () => {
       if (!detail.data) throw new Error("Datos no cargados");
+      const ep = detail.data.episode;
       const template = await getTemplate("multiply-full");
-      const spec = template.dag;
-      const master = spec.nodes.find((n) => n.id === "master");
-      if (master) {
-        master.params = { ...master.params, concept: detail.data.episode.title };
-      }
+      // Pin THIS episode as the master so load_master pulls its real script
+      // (not just the title), and seed the title as a brief on every node.
+      const spec = {
+        nodes: template.dag.nodes.map((n) => {
+          const params = { ...n.params, brief: ep.title };
+          if (n.capability === "load_master") params.episode_id = ep.id;
+          return { ...n, params };
+        }),
+      };
       return startRun(spec);
     },
     onSuccess: (run) => { toast.ok("Multiplicación iniciada"); nav(`/runs/${run.run_id}`); },

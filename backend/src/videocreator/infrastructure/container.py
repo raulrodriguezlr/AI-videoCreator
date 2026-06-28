@@ -664,11 +664,37 @@ class Container:
             return {"video_url": url, "storage_key": f"media/{key}",
                     "clips": len(local_videos), "has_voiceover": audio is not None}
 
+        async def run_load_master(node, upstream):  # type: ignore[no-untyped-def]
+            """Load a real episode's script as the master text to multiply from.
+
+            Without this `load_master` was a passthrough, so "multiply" only ever
+            saw the episode *title* — carousels/threads were written from nothing.
+            Now it pulls the episode + its script (summary + every scene's spoken
+            line) so downstream llm_text steps repurpose the actual content.
+            """
+            from videocreator.shared.ids import EpisodeId
+            episode_id = str(node.params.get("episode_id", "") or "")
+            if not episode_id:
+                # No episode pinned — fall back to a free-text brief/concept.
+                return str(node.params.get("concept", "") or node.params.get("brief", "") or "")
+            episode = await self.episode_repo().get(EpisodeId(episode_id))
+            if episode is None:
+                raise RuntimeError(f"load_master: episode {episode_id} not found")
+            parts: list[str] = [episode.title]
+            if episode.script_id is not None:
+                script = await self.script_repo().get(episode.script_id)
+                if script is not None:
+                    if script.summary:
+                        parts.append(script.summary)
+                    parts.extend(s.audio_text for s in script.scenes if s.audio_text)
+            return "\n".join(p for p in parts if p)
+
         executor.register("native_short", run_native_short)
         executor.register("carousel_slides", run_carousel_slides)
         executor.register("carousel_render", run_carousel_render)
         executor.register("tts", run_tts)
         executor.register("compose_short", run_compose_short)
+        executor.register("load_master", run_load_master)
 
     def template_gallery(self) -> TemplateGallery:
         return self._get("template_gallery", TemplateGallery)
