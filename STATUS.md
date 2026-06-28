@@ -100,6 +100,8 @@ LTX local, Artlist. Voice: ElevenLabs STS + Demucs. Arquitectura clean
 | Provider SDK (manifest + registry + hot-reload) | ✅ | `providers.d/` |
 | Capability router + circuit breaker + cost ledger | ⚠️ | `capability_router.py` solo en tests + 1 preview endpoint; producción usa `ProviderRouter` |
 | DAG executor (waves + retry + resume + cancelación) | ⚠️ | Wired (POST /runs + botón frontend) pero nunca testado E2E |
+| `load_master` carga episodio real (multiplicar) | ✅ | `1c767ea` — antes passthrough (solo título); ahora lee guión+escenas del episodio fijado |
+| Run muestra resultado (vídeo + descargas) | ✅ | `c12c4db` — snapshot expone video_url+artifacts |
 | Convergencia engine → SDK/DAG (episodios por DAG) | ☐ | Rewrite gordo, futuro |
 | Proxy workflow (preview barato → render caro) | ☐ | Parked (`PROXY_WORKFLOW_ENABLED=False`) |
 
