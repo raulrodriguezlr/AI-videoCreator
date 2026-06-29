@@ -25,6 +25,9 @@ from videocreator.domain.value_objects import (
     TransitionType,
     VoiceSettings,
     RecreationState,
+    AccountStatus,
+    PublishPlatform,
+    PublishStatus,
 )
 from videocreator.shared.ids import (
     CharacterId,
@@ -38,6 +41,8 @@ from videocreator.shared.ids import (
     TopicId,
     UserId,
     RecreationId,
+    PublishAccountId,
+    PublishJobId,
 )
 from videocreator.shared.time import utcnow
 
@@ -298,6 +303,41 @@ class Recreation(BaseModel):
     provider: str | None = None
     model: str | None = None
     result: dict[str, Any] | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class PublishAccount(BaseModel):
+    """A connected social account a user can publish to."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: PublishAccountId
+    user_id: UserId
+    platform: PublishPlatform
+    display_name: str = ""
+    handle: str | None = None
+    status: AccountStatus = AccountStatus.CONNECTED
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class PublishJob(BaseModel):
+    """One upload of an episode/short to one account, optionally scheduled."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: PublishJobId
+    user_id: UserId
+    account_id: PublishAccountId
+    platform: PublishPlatform
+    source: Literal["episode", "short"]
+    source_id: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    scheduled_at: datetime | None = None
+    status: PublishStatus = PublishStatus.PENDING
+    result_url: str | None = None
+    error: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 

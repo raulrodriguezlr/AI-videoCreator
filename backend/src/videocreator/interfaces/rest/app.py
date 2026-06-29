@@ -6,8 +6,10 @@
 """
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +20,7 @@ from videocreator.interfaces.rest.errors import install_error_handlers
 from videocreator.interfaces.rest.routers import (
     auth,
     brain,
+    channels,
     characters,
     dashboard,
     episodes,
@@ -61,11 +64,38 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
             log.info("app.startup.jobs_reconciled", count=reconciled)
     except Exception:
         log.warning("app.startup.jobs_reconcile_failed", exc_info=True)
+
+    publish_tick = asyncio.create_task(_publish_scheduler(container))
     try:
         yield
     finally:
+        publish_tick.cancel()
         await dispose_db()
         log.info("app.shutdown")
+
+
+async def _publish_scheduler(container: Any, *, interval_s: float = 30.0) -> None:
+    """Tick the Channels Hub upload queue: process due/scheduled uploads.
+
+    Cheap no-op while the feature is off (no accounts, no jobs). Each tick only
+    posts already-rendered videos — it never generates anything.
+
+    Assumes a single app process (local-first): jobs flip to UPLOADING before the
+    next list_due, so there is no in-process double-upload. Running multiple
+    uvicorn workers would need a DB-level lock to avoid duplicate posts.
+    """
+    while True:
+        try:
+            await asyncio.sleep(interval_s)
+            if not bool(container.runtime_config().get().get("channels_feature_enabled", False)):
+                continue
+            processed = await container.publish_service().process_due()
+            if processed:
+                log.info("publish.scheduler.processed", count=processed)
+        except asyncio.CancelledError:  # graceful shutdown
+            break
+        except Exception:
+            log.warning("publish.scheduler.tick_failed", exc_info=True)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -115,6 +145,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(brain.router, prefix=API_PREFIX)
     app.include_router(recipes.router, prefix=API_PREFIX)
     app.include_router(publish.router, prefix=API_PREFIX)
+    app.include_router(channels.router, prefix=API_PREFIX)
     app.include_router(dashboard.router, prefix=API_PREFIX)
     return app
 

@@ -20,6 +20,8 @@ from videocreator.domain.entities import (
     Topic,
     User,
     Recreation,
+    PublishAccount,
+    PublishJob,
 )
 from videocreator.domain.value_objects import (
     ClipArtifact,
@@ -42,6 +44,8 @@ from videocreator.shared.ids import (
     TopicId,
     UserId,
     RecreationId,
+    PublishAccountId,
+    PublishJobId,
 )
 
 
@@ -122,6 +126,25 @@ class RecreationRepository(Protocol):
     async def list_for_user(self, user_id: UserId) -> list[Recreation]: ...
     async def save(self, recreation: Recreation) -> Recreation: ...
     async def delete(self, recreation_id: RecreationId) -> None: ...
+
+
+@runtime_checkable
+class PublishAccountRepository(Protocol):
+    async def get(self, account_id: PublishAccountId) -> PublishAccount | None: ...
+    async def list_for_user(self, user_id: UserId) -> list[PublishAccount]: ...
+    async def save(self, account: PublishAccount) -> PublishAccount: ...
+    async def delete(self, account_id: PublishAccountId) -> None: ...
+
+
+@runtime_checkable
+class PublishJobRepository(Protocol):
+    async def get(self, job_id: PublishJobId) -> PublishJob | None: ...
+    async def list_for_user(self, user_id: UserId, limit: int = 100) -> list[PublishJob]: ...
+    async def list_due(self, now: Any) -> list[PublishJob]:
+        """Pending jobs whose scheduled_at is None or already past `now`."""
+        ...
+    async def save(self, job: PublishJob) -> PublishJob: ...
+    async def delete(self, job_id: PublishJobId) -> None: ...
 
 
 @runtime_checkable

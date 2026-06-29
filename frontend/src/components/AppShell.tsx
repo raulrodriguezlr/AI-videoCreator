@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { api, type HealthResponse, type LlmConfig } from "../api/client";
+import { api, type HealthResponse, type LlmConfig, type AppConfig } from "../api/client";
 import { IcActivity, IcCloud, IcCpu, IcFilm, IcLaugh, IcLayout, IcMessageCircle, IcRadar, IcSliders, IcSparkles } from "../ui/icons";
 
 export function AppShell() {
@@ -14,6 +14,9 @@ export function AppShell() {
   const hf = useQuery<HiggsfieldBalance>({
     queryKey: ["hf-balance"], queryFn: () => api.get("/system/higgsfield/balance"),
     refetchInterval: 60_000,
+  });
+  const appConfig = useQuery<AppConfig>({
+    queryKey: ["app-config"], queryFn: () => api.get("/system/config"),
   });
 
   return (
@@ -37,6 +40,9 @@ export function AppShell() {
         <NavLink to="/memes" className={navCls}><IcLaugh /> Memes</NavLink>
         <NavLink to="/recreations" className={navCls}><IcRadar /> Recreaciones</NavLink>
         <NavLink to="/jobs" className={navCls}><IcActivity /> Trabajos</NavLink>
+        {appConfig.data?.channels_feature_enabled && (
+          <NavLink to="/channels" className={navCls}><IcCloud width={16} height={16} /> Canales</NavLink>
+        )}
 
         <div className="nav-section">Sistema</div>
         <NavLink to="/settings" className={navCls}><IcSliders /> Ajustes</NavLink>
@@ -120,6 +126,7 @@ function routeLabel(path: string): string {
   if (path.startsWith("/director")) return "Director";
   if (path.startsWith("/memes")) return "Memes";
   if (path.startsWith("/recreations")) return "Recreaciones";
+  if (path.startsWith("/channels")) return "Canales";
   if (path.startsWith("/runs/")) return "Ejecución";
   if (path.includes("/episodes/")) return "Episodio";
   if (path.startsWith("/pods/")) return "Pod";

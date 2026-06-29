@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  api, streamOllamaPull, type LlmConfig, type RecommendedModels,
+  api, streamOllamaPull, getAppConfig, setAppConfig,
+  type LlmConfig, type RecommendedModels, type AppConfig,
 } from "../api/client";
 import {
   Badge, Button, ErrorState, Field, Loading, useToast,
@@ -27,7 +28,49 @@ export function SettingsPage() {
       <div style={{ height: 22 }} />
       <SecretsSection />
       <div style={{ height: 22 }} />
+      <FeaturesSection />
+      <div style={{ height: 22 }} />
       <RulesSection />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Features
+function FeaturesSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const cfg = useQuery<AppConfig>({ queryKey: ["app-config"], queryFn: getAppConfig });
+  const toggle = useMutation({
+    mutationFn: (enabled: boolean) => setAppConfig(enabled),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["app-config"] });
+      toast.ok("Ajuste guardado");
+    },
+    onError: (e) => toast.err("No se pudo guardar", (e as Error).message),
+  });
+  const enabled = cfg.data?.channels_feature_enabled ?? false;
+  return (
+    <div className="card">
+      <div className="card-head"><h2>Funciones experimentales</h2></div>
+      <div className="card-pad stack">
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={enabled}
+            disabled={cfg.isLoading || toggle.isPending}
+            onChange={(e) => toggle.mutate(e.target.checked)}
+            style={{ marginTop: 3 }}
+          />
+          <span>
+            <strong>Centro de canales</strong>
+            <div className="muted" style={{ fontSize: 13 }}>
+              Conecta varias cuentas de YouTube, TikTok e Instagram y publica
+              episodios y shorts desde la app. Las credenciales se guardan cifradas
+              en local. Con el interruptor apagado, la pestaña no aparece.
+            </div>
+          </span>
+        </label>
+      </div>
     </div>
   );
 }

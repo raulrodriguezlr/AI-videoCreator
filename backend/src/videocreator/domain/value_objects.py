@@ -36,6 +36,25 @@ class JobKind(str, Enum):
     YOUTUBE_UPLOAD = "youtube_upload"
 
 
+class PublishPlatform(str, Enum):
+    YOUTUBE = "youtube"
+    TIKTOK = "tiktok"
+    INSTAGRAM = "instagram"
+
+
+class PublishStatus(str, Enum):
+    PENDING = "pending"
+    UPLOADING = "uploading"
+    PUBLISHED = "published"
+    ERROR = "error"
+
+
+class AccountStatus(str, Enum):
+    CONNECTED = "connected"
+    EXPIRED = "expired"
+    ERROR = "error"
+
+
 class EpisodeState(str, Enum):
     DRAFT = "draft"
     SCRIPTING = "scripting"

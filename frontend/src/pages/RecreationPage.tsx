@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   planRecreation, sceneTrendMatch, runRecreation, getRecreations, updateRecreation, getRecreation,
-  getSdkProviders,
+  getSdkProviders, ingestAltUpload, ingestAltYoutube, runAlternateEnding, mediaUrl,
   type FairUse, type SceneCandidate, type RecreationBeat,
-  type UpdateRecreationRequest, type SdkProvider
+  type UpdateRecreationRequest, type SdkProvider, type IngestResponse, type AlternateEndingResponse,
 } from "../api/client";
 import { Badge, Button, Empty, ErrorState, Field, Loading, useToast, Tabs } from "../ui/primitives";
-import { IcAlertTriangle, IcRadar, IcSparkles, IcWand, IcEdit } from "../ui/icons";
+import { IcAlertTriangle, IcRadar, IcSparkles, IcWand, IcEdit, IcUpload } from "../ui/icons";
 
 const RISK_TONE: Record<FairUse["risk"] | string, "ok" | "warn" | "err"> = {
   low: "ok", medium: "warn", high: "err",
@@ -18,7 +18,7 @@ const RISK_LABEL: Record<FairUse["risk"] | string, string> = {
 };
 
 export function RecreationPage() {
-  const [activeTab, setActiveTab] = useState<"new" | "history">("new");
+  const [activeTab, setActiveTab] = useState<"new" | "alt" | "history">("new");
 
   return (
     <div className="page">
@@ -37,14 +37,131 @@ export function RecreationPage() {
         onChange={setActiveTab}
         tabs={[
           { id: "new", label: "Nueva recreación" },
+          { id: "alt", label: "Final alternativo" },
           { id: "history", label: "Borradores e Historial" }
         ]}
       />
 
       <div style={{ marginTop: 24 }}>
         {activeTab === "new" && <NewRecreationTab onGoToHistory={() => setActiveTab("history")} />}
+        {activeTab === "alt" && <AlternateEndingTab />}
         {activeTab === "history" && <HistoryTab />}
       </div>
+    </div>
+  );
+}
+
+function AlternateEndingTab() {
+  const toast = useToast();
+  const [source, setSource] = useState<IngestResponse | null>(null);
+  const [url, setUrl] = useState("");
+  const [rightsAck, setRightsAck] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [cutAt, setCutAt] = useState(2);
+  const [prompt, setPrompt] = useState("");
+  const [tailDur, setTailDur] = useState(5);
+  const [result, setResult] = useState<AlternateEndingResponse | null>(null);
+
+  const ingestFile = useMutation({
+    mutationFn: (f: File) => ingestAltUpload(f),
+    onSuccess: (r) => { setSource(r); setCutAt(Math.min(2, Math.max(0.5, r.duration_s / 2))); toast.ok("Clip cargado", `${r.duration_s.toFixed(1)}s`); },
+    onError: (e) => toast.err("No se pudo cargar", (e as Error).message),
+  });
+  const ingestYt = useMutation({
+    mutationFn: () => ingestAltYoutube(url.trim(), rightsAck),
+    onSuccess: (r) => { setSource(r); setCutAt(Math.min(2, r.duration_s / 2)); toast.ok("Vídeo descargado", `${r.duration_s.toFixed(1)}s`); },
+    onError: (e) => toast.err("No se pudo descargar", (e as Error).message),
+  });
+  const run = useMutation({
+    mutationFn: () => runAlternateEnding(source!.source_id, cutAt, prompt.trim(), tailDur),
+    onSuccess: (r) => { setResult(r); toast.ok("Final alternativo listo"); },
+    onError: (e) => toast.err("Falló la generación", (e as Error).message),
+  });
+
+  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); setDragOver(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) ingestFile.mutate(f);
+  };
+
+  return (
+    <div className="stack" style={{ gap: 16, maxWidth: 720 }}>
+      <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+        Conserva el principio del clip original y regenera solo el final desde el segundo de corte (image-to-video).
+      </p>
+
+      {/* 1) Ingesta */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+        style={{
+          border: `2px dashed ${dragOver ? "var(--mint)" : "var(--c-border)"}`,
+          borderRadius: 12, padding: 24, textAlign: "center",
+          background: dragOver ? "rgba(60,200,150,0.06)" : "transparent",
+        }}
+      >
+        <IcUpload />
+        <div style={{ marginTop: 8, fontSize: 14 }}>
+          Arrastra un mp4 aquí{source ? "" : ", o"}{" "}
+          <label style={{ color: "var(--mint)", cursor: "pointer" }}>
+            búscalo
+            <input
+              type="file" accept="video/mp4,video/quicktime,video/webm"
+              style={{ display: "none" }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) ingestFile.mutate(f); }}
+            />
+          </label>
+          {ingestFile.isPending && " · subiendo…"}
+        </div>
+      </div>
+
+      <Field label="…o pega una URL de YouTube" hint="Descargar vídeo de terceros requiere confirmar derechos / uso justo">
+        <div style={{ display: "flex", gap: 8 }}>
+          <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://youtu.be/…" style={{ flex: 1 }} />
+          <Button variant="ghost" loading={ingestYt.isPending} disabled={!url.trim() || !rightsAck} onClick={() => ingestYt.mutate()}>
+            Descargar
+          </Button>
+        </div>
+      </Field>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+        <input type="checkbox" checked={rightsAck} onChange={(e) => setRightsAck(e.target.checked)} />
+        Confirmo que tengo los derechos o una base de uso justo para este vídeo.
+      </label>
+
+      {/* 2) Corte + prompt */}
+      {source && (
+        <div className="card">
+          <div className="card-pad stack" style={{ gap: 12 }}>
+            <Badge tone="ok">Clip listo · {source.duration_s.toFixed(1)}s</Badge>
+            <Field label={`Cortar en el segundo: ${cutAt.toFixed(1)}s`} hint="Todo lo anterior queda original; a partir de aquí se regenera">
+              <input type="range" min={0.5} max={Math.max(1, source.duration_s - 0.5)} step={0.1}
+                value={cutAt} onChange={(e) => setCutAt(parseFloat(e.target.value))} style={{ width: "100%" }} />
+            </Field>
+            <Field label="Nuevo final (prompt)">
+              <textarea className="input" rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe cómo cambia el final…" style={{ resize: "vertical", fontFamily: "inherit" }} />
+            </Field>
+            <Field label={`Duración del nuevo final: ${tailDur}s`}>
+              <input type="range" min={3} max={10} step={1} value={tailDur}
+                onChange={(e) => setTailDur(parseInt(e.target.value))} style={{ width: "100%" }} />
+            </Field>
+            <Button variant="mint" loading={run.isPending} disabled={!prompt.trim()} onClick={() => run.mutate()}>
+              <IcWand /> Generar final alternativo
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* 3) Resultado */}
+      {result?.video_url && (
+        <div className="card">
+          <div className="card-head"><h3>Resultado · {result.duration_s.toFixed(1)}s</h3></div>
+          <div className="card-pad">
+            <video src={mediaUrl(result.video_url)} controls style={{ width: "100%", borderRadius: 8 }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

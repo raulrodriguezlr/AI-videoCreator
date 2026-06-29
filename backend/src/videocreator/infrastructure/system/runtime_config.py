@@ -17,7 +17,10 @@ log = get_logger(__name__)
 
 # Only these keys may be overridden at runtime — an allow-list keeps the file
 # from drifting into a second, untracked config surface.
-_ALLOWED = frozenset({"llm_provider", "gemini_model", "ollama_model", "ollama_base_url"})
+_ALLOWED = frozenset({
+    "llm_provider", "gemini_model", "ollama_model", "ollama_base_url",
+    "channels_feature_enabled",
+})
 
 
 class JsonRuntimeConfig:

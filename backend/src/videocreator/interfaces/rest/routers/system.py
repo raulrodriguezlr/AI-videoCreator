@@ -84,6 +84,32 @@ async def set_llm_config(
     return await _llm_config(container, settings)
 
 
+class AppConfigResponse(BaseModel):
+    channels_feature_enabled: bool = False
+
+
+class SetAppConfigRequest(BaseModel):
+    channels_feature_enabled: bool
+
+
+def _app_config(container: ContainerDep) -> AppConfigResponse:
+    rc = container.runtime_config().get()
+    return AppConfigResponse(
+        channels_feature_enabled=bool(rc.get("channels_feature_enabled", False)),
+    )
+
+
+@router.get("/config", response_model=AppConfigResponse, summary="Runtime feature flags")
+async def get_app_config(container: ContainerDep) -> AppConfigResponse:
+    return _app_config(container)
+
+
+@router.put("/config", response_model=AppConfigResponse, summary="Toggle runtime feature flags")
+async def set_app_config(body: SetAppConfigRequest, container: ContainerDep) -> AppConfigResponse:
+    container.runtime_config().set(channels_feature_enabled=body.channels_feature_enabled)
+    return _app_config(container)
+
+
 @router.get(
     "/llm/ollama/status", response_model=OllamaStatusResponse,
     summary="Is Ollama running and which models are installed?",

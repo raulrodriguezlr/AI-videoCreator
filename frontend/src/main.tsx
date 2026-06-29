@@ -18,6 +18,7 @@ import { DirectorPage } from "./pages/DirectorPage";
 import { RunPage } from "./pages/RunPage";
 import { RecreationPage } from "./pages/RecreationPage";
 import { MemesPage } from "./pages/MemesPage";
+import { ChannelsPage } from "./pages/ChannelsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,6 +47,7 @@ createRoot(rootEl).render(
               <Route path="/director" element={<DirectorPage />} />
               <Route path="/memes" element={<MemesPage />} />
               <Route path="/recreations" element={<RecreationPage />} />
+              <Route path="/channels" element={<ChannelsPage />} />
               <Route path="/runs/:runId" element={<RunPage />} />
             </Route>
           </Routes>

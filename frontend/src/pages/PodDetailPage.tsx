@@ -2,9 +2,10 @@ import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import {
-  api, mediaUrl, subscribeToJob,
+  api, mediaUrl, subscribeToJob, getAppConfig, listChannels,
   type Character, type Episode, type NarrationStyle, type Pod, type Script,
   type SettingMode, type Short, type Topic, type VoiceOption,
+  type AppConfig, type Channel,
 } from "../api/client";
 import {
   Badge, Button, Empty, ErrorState, Field, Loading, Modal, StateBadge, Tabs, useToast,
@@ -853,6 +854,16 @@ function ConfigTab({ podId, pod }: { podId: string; pod: Pod }) {
   const overrides = (pod.config.extra?.script_overrides ?? {}) as Record<string, string>;
   const [storySuffix, setStorySuffix] = useState(overrides.prompt_story_suffix ?? "");
   const [scriptSuffix, setScriptSuffix] = useState(overrides.prompt_suffix ?? "");
+  const [defaultAccounts, setDefaultAccounts] = useState<string[]>(() => {
+    const v = pod.config.extra?.publishing_accounts;
+    return Array.isArray(v) ? (v as string[]) : [];
+  });
+
+  const appCfg = useQuery<AppConfig>({ queryKey: ["app-config"], queryFn: getAppConfig });
+  const channelsEnabled = appCfg.data?.channels_feature_enabled ?? false;
+  const channels = useQuery<Channel[]>({
+    queryKey: ["channels"], queryFn: listChannels, enabled: channelsEnabled,
+  });
 
   const save = useMutation({
     mutationFn: () => api.put<Pod>(`/pods/${podId}/config`, {
@@ -862,6 +873,7 @@ function ConfigTab({ podId, pod }: { podId: string; pod: Pod }) {
         universe_memory: univMem || null,
         extra: {
           ...pod.config.extra,
+          publishing_accounts: defaultAccounts,
           script_overrides: {
             ...overrides,
             prompt_story_suffix: storySuffix || undefined,
@@ -903,6 +915,31 @@ function ConfigTab({ podId, pod }: { podId: string; pod: Pod }) {
           placeholder="Ningún episodio registrado aún."
         />
       </div>
+      {channelsEnabled && (
+        <div className="field">
+          <label>Canales por defecto</label>
+          <span className="hint">Cuentas preseleccionadas al publicar episodios/shorts de este pod</span>
+          {(channels.data ?? []).length === 0 ? (
+            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+              No hay cuentas conectadas. Conéctalas en <strong>Canales</strong>.
+            </p>
+          ) : (
+            <div className="stack" style={{ gap: 6 }}>
+              {(channels.data ?? []).map((a) => (
+                <label key={a.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={defaultAccounts.includes(a.id)}
+                    onChange={(e) => setDefaultAccounts((s) =>
+                      e.target.checked ? [...s, a.id] : s.filter((x) => x !== a.id))}
+                  />
+                  <span>{a.display_name} <span className="muted">· {a.platform}</span></span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="btn-row" style={{ justifyContent: "flex-end" }}>
         <Button variant="mint" size="sm" loading={save.isPending} onClick={() => save.mutate()}>
           Guardar

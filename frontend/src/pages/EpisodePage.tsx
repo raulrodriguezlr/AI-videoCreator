@@ -3,8 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api, ApiError, generateSeo, getTemplate, recommendTitle, startRun,
+  getAppConfig, listChannels, enqueueUpload,
   type EpisodeDetail, type MediaAsset, type ProviderCatalogEntry,
   type RecommendTitleResponse, type Script, type SeoMetadata,
+  type AppConfig, type Channel,
 } from "../api/client";
 import { MediaViewer } from "../components/MediaViewer";
 import {
@@ -107,6 +109,9 @@ export function EpisodePage() {
           )}
           {(episode.state === "ready" || episode.state === "completed") && episode.final_video_key && (
             <YouTubePublishPanel podId={podId} episodeId={episodeId} episode={episode} seo={seo} />
+          )}
+          {(episode.state === "ready" || episode.state === "completed") && episode.final_video_key && (
+            <ChannelsPublishPanel episodeId={episodeId} title={seo?.selected_title ?? episode.title} />
           )}
           <SeoPanel podId={podId} episodeId={episodeId} seo={seo} />
           {script && <ScriptPanel script={script} episodeId={episodeId} />}
@@ -345,6 +350,78 @@ function YouTubePublishPanel({ podId, episodeId, episode, seo }: {
             {seo?.selected_title && <p className="dim" style={{ fontSize: 12 }}>Título: {seo.selected_title}</p>}
             <Button variant="mint" size="sm" loading={publish.isPending} onClick={() => publish.mutate()}>
               Subir a YouTube
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Channels publish
+function ChannelsPublishPanel({ episodeId, title }: { episodeId: string; title: string }) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [scheduledAt, setScheduledAt] = useState("");
+
+  const cfg = useQuery<AppConfig>({ queryKey: ["app-config"], queryFn: getAppConfig });
+  const enabled = cfg.data?.channels_feature_enabled ?? false;
+  const channels = useQuery<Channel[]>({
+    queryKey: ["channels"], queryFn: listChannels, enabled,
+  });
+
+  const publish = useMutation({
+    mutationFn: () => enqueueUpload({
+      source: "episode", source_id: episodeId, account_ids: selected,
+      metadata: { title }, scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+    }),
+    onSuccess: (jobs) => {
+      toast.ok("Subida encolada", `${jobs.length} cuenta(s)`);
+      setSelected([]);
+      qc.invalidateQueries({ queryKey: ["channel-uploads"] });
+    },
+    onError: (e) => toast.err("No se pudo encolar", (e as Error).message),
+  });
+
+  if (!enabled) return null;
+  const accounts = channels.data ?? [];
+
+  return (
+    <div className="card">
+      <div className="card-head"><h3>Publicar en canales</h3></div>
+      <div className="card-pad">
+        {accounts.length === 0 ? (
+          <p className="muted" style={{ fontSize: 13 }}>
+            No hay cuentas conectadas. Ve a <strong>Canales</strong> para conectar una.
+          </p>
+        ) : (
+          <div className="stack" style={{ gap: 12 }}>
+            <Field label="Cuentas">
+              <div className="stack" style={{ gap: 6 }}>
+                {accounts.map((a) => (
+                  <label key={a.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(a.id)}
+                      onChange={(e) => setSelected((s) =>
+                        e.target.checked ? [...s, a.id] : s.filter((x) => x !== a.id))}
+                    />
+                    <span>{a.display_name} <span className="muted">· {a.platform}</span></span>
+                  </label>
+                ))}
+              </div>
+            </Field>
+            <Field label="Programar (opcional)" hint="Vacío = publicar cuanto antes">
+              <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+            </Field>
+            <Button
+              variant="mint" size="sm"
+              loading={publish.isPending}
+              disabled={selected.length === 0}
+              onClick={() => publish.mutate()}
+            >
+              Encolar subida
             </Button>
           </div>
         )}

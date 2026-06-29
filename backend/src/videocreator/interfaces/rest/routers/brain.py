@@ -1,7 +1,8 @@
 """Brain endpoints — video analysis, trend radar, scene recreation."""
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, Form, UploadFile
+from pydantic import BaseModel
 
 from videocreator.domain.services.provider_hints import hint_for
 from videocreator.interfaces.rest.deps import ContainerDep, UseCasesDep, UserIdDep
@@ -25,6 +26,7 @@ from videocreator.domain.value_objects import RecreationState
 from videocreator.domain.services.provider_hints import filter_available
 from videocreator.shared.ids import new_recreation_id, RecreationId
 from fastapi import HTTPException
+import asyncio
 import uuid
 
 router = APIRouter(prefix="/brain", tags=["brain"])
@@ -200,24 +202,21 @@ async def run_recreation(
 
     from videocreator.domain.value_objects import DagSpec, DagNode
     from videocreator.infrastructure.queue.dag_executor import DagRun, DagExecutor
-    import asyncio
 
-    # Convert the recreation into a DagSpec
-    # For now, we simulate a single V2V node or similar capability
-    nodes = []
-    # If the capability executor supports "video_to_video", we'd use that.
-    # We will just put a generic "text_to_video" capability for the prompt for demonstration.
-    # The real system might use `video_to_video` or `text_to_video` per beat.
-    # Here we just generate a simple spec based on the prompt.
-    nodes.append(DagNode(
+    # BASIC recreation: generate one clip from the plan's prompt via text_to_video
+    # (a real, registry-backed capability). This is the "from scratch" path.
+    # For keeping a real clip's head and regenerating only its ending from a cut
+    # frame, use the Alternate Ending flow (/brain/recreations/alternate-ending),
+    # which is image_to_video — NOT video_to_video (that has no provider/handler).
+    nodes = [DagNode(
         id="render_0",
         capability="text_to_video",
         params={
             "prompt": rec.v2v_prompt,
             "provider": rec.provider or "veo",
             "model": rec.model,
-        }
-    ))
+        },
+    )]
     
     spec = DagSpec(nodes=tuple(nodes))
     run_id = f"run_{uuid.uuid4().hex[:12]}"
@@ -257,6 +256,108 @@ async def run_recreation(
     await repo.save(rec)
     
     return {"run_id": run_id}
+
+
+# ---- Alternate Ending (ingest a clip, keep head, regenerate tail via i2v) ----
+class IngestYouTubeRequest(BaseModel):
+    url: str
+    rights_ack: bool = False
+
+
+class IngestResponse(BaseModel):
+    source_id: str
+    duration_s: float
+
+
+class AlternateEndingRequest(BaseModel):
+    source_id: str
+    cut_at_s: float
+    prompt: str
+    tail_duration_s: float = 5.0
+
+
+class AlternateEndingResponse(BaseModel):
+    video_url: str | None
+    duration_s: float
+
+
+def _alt_source_dir(container: ContainerDep, source_id: str):
+    from videocreator.shared.ids import generate_id
+    base = container.settings.var_dir / "runs" / "alt_ending"
+    # source_id is an opaque slug we mint; reject anything with path separators.
+    if not source_id or "/" in source_id or "\\" in source_id or ".." in source_id:
+        raise HTTPException(status_code=400, detail="invalid source_id")
+    return base / source_id
+
+
+@router.post("/recreations/ingest/upload", response_model=IngestResponse,
+             summary="Ingest a dragged-and-dropped clip for an alternate ending")
+async def ingest_upload(
+    container: ContainerDep, user_id: UserIdDep, file: UploadFile = File(...),
+) -> IngestResponse:
+    from videocreator.infrastructure.publish.media_ingest import save_upload
+    from videocreator.application.use_cases.alternate_ending import probe_duration
+    from videocreator.shared.ids import generate_id
+
+    source_id = generate_id("src")
+    dest = _alt_source_dir(container, source_id)
+    data = await file.read()
+    try:
+        path = save_upload(data, dest, filename=file.filename or "source.mp4")
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return IngestResponse(source_id=source_id, duration_s=probe_duration(path))
+
+
+@router.post("/recreations/ingest/youtube", response_model=IngestResponse,
+             summary="Ingest a YouTube clip (requires rights acknowledgement)")
+async def ingest_youtube_ep(
+    body: IngestYouTubeRequest, container: ContainerDep, user_id: UserIdDep,
+) -> IngestResponse:
+    from videocreator.infrastructure.publish.media_ingest import ingest_youtube
+    from videocreator.application.use_cases.alternate_ending import probe_duration
+    from videocreator.shared.ids import generate_id
+    from videocreator.shared.errors import ValidationError, ProviderError
+
+    source_id = generate_id("src")
+    dest = _alt_source_dir(container, source_id)
+    try:
+        path = await asyncio.to_thread(
+            ingest_youtube, body.url, dest, rights_ack=body.rights_ack,
+        )
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except ProviderError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return IngestResponse(source_id=source_id, duration_s=probe_duration(path))
+
+
+@router.post("/recreations/alternate-ending", response_model=AlternateEndingResponse,
+             summary="Keep the clip's head, regenerate the tail from the cut frame (i2v)")
+async def alternate_ending(
+    body: AlternateEndingRequest, container: ContainerDep, user_id: UserIdDep,
+) -> AlternateEndingResponse:
+    from videocreator.application.use_cases.alternate_ending import probe_duration
+    from videocreator.shared.errors import ValidationError
+
+    source = _alt_source_dir(container, body.source_id) / "source.mp4"
+    if not source.exists():
+        raise HTTPException(status_code=404, detail="source not found — ingest first")
+    svc = container.alternate_ending_service()
+    svc._work = _alt_source_dir(container, body.source_id)  # write outputs beside the source
+    try:
+        final = await asyncio.to_thread(
+            svc.run, source, cut_at_s=body.cut_at_s, prompt=body.prompt,
+            tail_duration_s=body.tail_duration_s,
+        )
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    # Publish to the media bucket so the UI can stream it.
+    storage = container.storage()
+    key = f"alt_ending/{body.source_id}.mp4"
+    await storage.put("media", key, final.read_bytes())
+    url = await storage.url_for("media", key)
+    return AlternateEndingResponse(video_url=url, duration_s=probe_duration(final))
 
 
 @router.delete(

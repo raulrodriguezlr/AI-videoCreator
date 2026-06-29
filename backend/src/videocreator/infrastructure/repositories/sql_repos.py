@@ -22,11 +22,16 @@ from videocreator.domain.entities import (
     Topic,
     User,
     Recreation,
+    PublishAccount,
+    PublishJob,
 )
 from videocreator.domain.value_objects import (
     JobKind,
     JobState,
     RecreationState,
+    AccountStatus,
+    PublishPlatform,
+    PublishStatus,
 )
 from videocreator.infrastructure.persistence.models.tables import (
     CharacterRow,
@@ -39,6 +44,8 @@ from videocreator.infrastructure.persistence.models.tables import (
     TopicRow,
     UserRow,
     RecreationRow,
+    PublishAccountRow,
+    PublishJobRow,
 )
 from videocreator.shared.ids import (
     CharacterId,
@@ -51,6 +58,8 @@ from videocreator.shared.ids import (
     TopicId,
     UserId,
     RecreationId,
+    PublishAccountId,
+    PublishJobId,
 )
 from videocreator.shared.time import utcnow
 
@@ -692,6 +701,164 @@ def _row_from_recreation(rec: Recreation) -> RecreationRow:
     )
 
 
+class SqlPublishAccountRepository(SqlBase):
+    async def get(self, account_id: PublishAccountId) -> PublishAccount | None:
+        async with self._session() as session:
+            row = await session.get(PublishAccountRow, str(account_id))
+            return _account_from_row(row) if row else None
+
+    async def list_for_user(self, user_id: UserId) -> list[PublishAccount]:
+        async with self._session() as session:
+            result = await session.execute(
+                select(PublishAccountRow)
+                .where(PublishAccountRow.user_id == str(user_id))
+                .order_by(PublishAccountRow.created_at.desc())
+            )
+            return [_account_from_row(r) for r in result.scalars().all()]
+
+    async def save(self, account: PublishAccount) -> PublishAccount:
+        async with self._session() as session:
+            row = await session.get(PublishAccountRow, str(account.id))
+            if row is None:
+                session.add(_row_from_account(account))
+            else:
+                row.platform = account.platform.value
+                row.display_name = account.display_name
+                row.handle = account.handle
+                row.status = account.status.value
+                row.updated_at = utcnow()
+            await session.commit()
+            return account
+
+    async def delete(self, account_id: PublishAccountId) -> None:
+        async with self._session() as session:
+            row = await session.get(PublishAccountRow, str(account_id))
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
+
+
+class SqlPublishJobRepository(SqlBase):
+    async def get(self, job_id: PublishJobId) -> PublishJob | None:
+        async with self._session() as session:
+            row = await session.get(PublishJobRow, str(job_id))
+            return _publish_job_from_row(row) if row else None
+
+    async def list_for_user(self, user_id: UserId, limit: int = 100) -> list[PublishJob]:
+        async with self._session() as session:
+            result = await session.execute(
+                select(PublishJobRow)
+                .where(PublishJobRow.user_id == str(user_id))
+                .order_by(PublishJobRow.created_at.desc())
+                .limit(limit)
+            )
+            return [_publish_job_from_row(r) for r in result.scalars().all()]
+
+    async def list_due(self, now: Any) -> list[PublishJob]:
+        async with self._session() as session:
+            result = await session.execute(
+                select(PublishJobRow).where(PublishJobRow.status == PublishStatus.PENDING.value)
+            )
+            jobs = [_publish_job_from_row(r) for r in result.scalars().all()]
+            now_ts = now.timestamp()
+            return [
+                j for j in jobs
+                if j.scheduled_at is None or _as_utc(j.scheduled_at).timestamp() <= now_ts
+            ]
+
+    async def save(self, job: PublishJob) -> PublishJob:
+        async with self._session() as session:
+            row = await session.get(PublishJobRow, str(job.id))
+            if row is None:
+                session.add(_row_from_publish_job(job))
+            else:
+                row.status = job.status.value
+                row.result_url = job.result_url
+                row.error = job.error
+                row.scheduled_at = job.scheduled_at
+                row.metadata_json = job.metadata
+                row.updated_at = utcnow()
+            await session.commit()
+            return job
+
+    async def delete(self, job_id: PublishJobId) -> None:
+        async with self._session() as session:
+            row = await session.get(PublishJobRow, str(job_id))
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
+
+
+def _account_from_row(row: PublishAccountRow) -> PublishAccount:
+    return PublishAccount(
+        id=PublishAccountId(row.id),
+        user_id=UserId(row.user_id),
+        platform=PublishPlatform(row.platform),
+        display_name=row.display_name or "",
+        handle=row.handle,
+        status=AccountStatus(row.status),
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _row_from_account(acc: PublishAccount) -> PublishAccountRow:
+    return PublishAccountRow(
+        id=str(acc.id),
+        user_id=str(acc.user_id),
+        platform=acc.platform.value,
+        display_name=acc.display_name,
+        handle=acc.handle,
+        status=acc.status.value,
+        created_at=acc.created_at,
+        updated_at=acc.updated_at,
+    )
+
+
+def _publish_job_from_row(row: PublishJobRow) -> PublishJob:
+    return PublishJob(
+        id=PublishJobId(row.id),
+        user_id=UserId(row.user_id),
+        account_id=PublishAccountId(row.account_id),
+        platform=PublishPlatform(row.platform),
+        source=row.source,  # type: ignore[arg-type]
+        source_id=row.source_id,
+        metadata=_ensure_dict(row.metadata_json),
+        scheduled_at=row.scheduled_at,
+        status=PublishStatus(row.status),
+        result_url=row.result_url,
+        error=row.error,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _row_from_publish_job(job: PublishJob) -> PublishJobRow:
+    return PublishJobRow(
+        id=str(job.id),
+        user_id=str(job.user_id),
+        account_id=str(job.account_id),
+        platform=job.platform.value,
+        source=job.source,
+        source_id=job.source_id,
+        metadata_json=job.metadata,
+        scheduled_at=job.scheduled_at,
+        status=job.status.value,
+        result_url=job.result_url,
+        error=job.error,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+    )
+
+
 # Module-level helpers used by infrastructure-internal code
 def _ensure_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def _as_utc(dt: Any) -> Any:
+    """Coerce a possibly-naive datetime (SQLite drops tzinfo) to aware UTC."""
+    from datetime import timezone
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt

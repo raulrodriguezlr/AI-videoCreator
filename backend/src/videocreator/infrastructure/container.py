@@ -123,6 +123,8 @@ from videocreator.domain.ports import (
     VideoAssemblerPort,
     VideoProviderPort,
     RecreationRepository,
+    PublishAccountRepository,
+    PublishJobRepository,
 )
 from videocreator.domain.services.linucb import LinUcbBandit
 from videocreator.domain.services.provider_router import ProviderRouter
@@ -158,6 +160,8 @@ from videocreator.infrastructure.repositories.sql_repos import (
     SqlTopicRepository,
     SqlUserRepository,
     SqlRecreationRepository,
+    SqlPublishAccountRepository,
+    SqlPublishJobRepository,
 )
 from videocreator.infrastructure.security.cipher import SecretCipher
 from videocreator.infrastructure.security.passwords import Argon2PasswordHasher
@@ -238,6 +242,12 @@ class Container:
 
     def recreation_repo(self) -> RecreationRepository:
         return self._get("recreation_repo", lambda: SqlRecreationRepository(self._sessionmaker()))
+
+    def publish_account_repo(self) -> PublishAccountRepository:
+        return self._get("publish_account_repo", lambda: SqlPublishAccountRepository(self._sessionmaker()))
+
+    def publish_job_repo(self) -> PublishJobRepository:
+        return self._get("publish_job_repo", lambda: SqlPublishJobRepository(self._sessionmaker()))
 
     def storage(self) -> StoragePort:
         return self._get("storage", self._build_storage)
@@ -513,6 +523,43 @@ class Container:
             YouTubeOAuthService,
         )
         return YouTubeOAuthService(self.secret_vault())
+
+    def oauth_account_service(self) -> "OAuthAccountService":
+        return self._get("oauth_account_service", self._build_oauth_account_service)
+
+    def _build_oauth_account_service(self) -> "OAuthAccountService":
+        from videocreator.infrastructure.publish.channel_accounts import (
+            OAuthAccountService,
+        )
+        return OAuthAccountService(self.secret_vault(), self.publish_account_repo())
+
+    def channel_publisher(self) -> "ChannelPublisher":
+        from videocreator.infrastructure.publish.channel_publishers import (
+            ChannelPublisher,
+        )
+        return self._get("channel_publisher", ChannelPublisher)
+
+    def alternate_ending_service(self) -> "AlternateEndingService":
+        from videocreator.application.use_cases.alternate_ending import AlternateEndingService
+        from videocreator.infrastructure.publish.i2v_continuation import ProviderI2VContinuation
+        i2v = ProviderI2VContinuation(self.provider_registry())
+        work = self.settings.var_dir / "runs" / "alt_ending"
+        return AlternateEndingService(i2v, work_dir=work)
+
+    def publish_service(self) -> "PublishService":
+        return self._get("publish_service", self._build_publish_service)
+
+    def _build_publish_service(self) -> "PublishService":
+        from videocreator.application.use_cases.publishing import PublishService
+        return PublishService(
+            episode_repo=self.episode_repo(),
+            short_repo=self.short_repo(),
+            storage=self.storage(),
+            account_repo=self.publish_account_repo(),
+            job_repo=self.publish_job_repo(),
+            oauth=self.oauth_account_service(),
+            publisher=self.channel_publisher(),
+        )
 
     # ---- provider SDK (§9.1) -----------------------------------------------
     def provider_registry(self) -> "ProviderRegistry":

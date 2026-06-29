@@ -660,6 +660,69 @@ export const deleteRecreation = (id: string) => api.delete<void>(`/brain/recreat
 export const sceneTrendMatch = (terms: string[]) =>
   api.post<SceneCandidate[]>("/brain/recreations/trend-match", { terms });
 
+// ---- Alternate Ending (keep clip head, regenerate tail via i2v) ------------
+export interface IngestResponse { source_id: string; duration_s: number; }
+export interface AlternateEndingResponse { video_url: string | null; duration_s: number; }
+
+export const ingestAltUpload = (file: File) =>
+  api.upload<IngestResponse>("/brain/recreations/ingest/upload", [file], "file");
+export const ingestAltYoutube = (url: string, rights_ack: boolean) =>
+  api.post<IngestResponse>("/brain/recreations/ingest/youtube", { url, rights_ack });
+export const runAlternateEnding = (
+  source_id: string, cut_at_s: number, prompt: string, tail_duration_s = 5,
+) => api.post<AlternateEndingResponse>("/brain/recreations/alternate-ending", {
+  source_id, cut_at_s, prompt, tail_duration_s,
+});
+
+// ---------------------------------------------------------------------------
+// Channels Hub (multi-account publishing) â€” gated behind a Settings switch
+// ---------------------------------------------------------------------------
+export type ChannelPlatform = "youtube" | "tiktok" | "instagram";
+
+export interface AppConfig {
+  channels_feature_enabled: boolean;
+}
+
+export interface Channel {
+  id: string;
+  platform: ChannelPlatform;
+  display_name: string;
+  handle: string | null;
+  status: "connected" | "expired" | "error";
+}
+
+export interface PublishJob {
+  id: string;
+  account_id: string;
+  platform: ChannelPlatform;
+  source: "episode" | "short";
+  source_id: string;
+  status: "pending" | "uploading" | "published" | "error";
+  result_url: string | null;
+  error: string | null;
+  scheduled_at: string | null;
+}
+
+export interface EnqueueUploadRequest {
+  source: "episode" | "short";
+  source_id: string;
+  account_ids: string[];
+  metadata?: Record<string, unknown>;
+  scheduled_at?: string | null;
+}
+
+export const getAppConfig = () => api.get<AppConfig>("/system/config");
+export const setAppConfig = (channels_feature_enabled: boolean) =>
+  api.put<AppConfig>("/system/config", { channels_feature_enabled });
+
+export const listChannels = () => api.get<Channel[]>("/channels");
+export const connectChannel = (platform: ChannelPlatform, client_id: string, client_secret: string) =>
+  api.post<Channel>(`/channels/${platform}/connect`, { client_id, client_secret });
+export const disconnectChannel = (accountId: string) => api.delete<void>(`/channels/${accountId}`);
+export const enqueueUpload = (body: EnqueueUploadRequest) =>
+  api.post<PublishJob[]>("/channels/upload", body);
+export const listUploads = () => api.get<PublishJob[]>("/channels/uploads");
+
 // ---------------------------------------------------------------------------
 // Streaming NDJSON (Ollama model pull progress)
 // ---------------------------------------------------------------------------
