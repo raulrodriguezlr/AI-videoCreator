@@ -542,12 +542,18 @@ class Container:
         )
         return self._get("channel_publisher", ChannelPublisher)
 
-    def alternate_ending_service(self) -> "AlternateEndingService":
+    def alternate_ending_service(
+        self, *, provider: str | None = None, model: str | None = None,
+    ) -> "AlternateEndingService":
+        """`provider`/`model` pin the video model for BOTH modes: `mode="i2v"`
+        (image_to_video) and `mode="edit"` (video_to_video, e.g. Gemini Omni
+        Flash) — `ProviderI2VContinuation` resolves the right capability per
+        call (`seed_frame=` vs `video=`), so one instance covers both."""
         from videocreator.application.use_cases.alternate_ending import AlternateEndingService
         from videocreator.infrastructure.publish.i2v_continuation import ProviderI2VContinuation
-        i2v = ProviderI2VContinuation(self.provider_registry())
+        continuation = ProviderI2VContinuation(self.provider_registry(), model=model, provider=provider)
         work = self.settings.var_dir / "runs" / "alt_ending"
-        return AlternateEndingService(i2v, work_dir=work)
+        return AlternateEndingService(continuation, work_dir=work, v2v=continuation)
 
     def publish_service(self) -> "PublishService":
         return self._get("publish_service", self._build_publish_service)

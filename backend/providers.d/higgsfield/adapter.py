@@ -14,8 +14,13 @@ CONTRACT BLOCK — the ONE place to edit if the CLI surface changes.
 Verified against `@higgsfield/cli` v0.2.x (github.com/higgsfield-ai/cli):
   • Auth (once, by the user): `hf auth login`            → spends PLUS credits
   • Generate: `hf generate create <job_set_type> --prompt "..." [flags] --json --wait`
-  • Flags: --aspect_ratio R · --duration N · --start-image PATH
+  • Flags: --aspect_ratio R · --duration N · --start-image PATH · --video PATH
            --wait (block, print result) · --wait-timeout 10m · --json (machine output)
+  • --video PATH drives video_to_video EDITING models (e.g. Gemini Omni Flash,
+    `cli_type: gemini_omni`) — the model keeps the original footage and applies
+    the prompt as an edit, instead of generating from scratch. For a model that
+    declares `video_to_video`, an `input_video` wins over `input_image` if both
+    are present (see `_build_args`).
   • `--json --wait` prints a JSON job with the finished media at `result_url`
     (tolerant dig below also accepts results[].url / url / video_url).
   • Model id ⇒ `job_set_type` comes from each ModelSpec's `cli_type`.
@@ -174,8 +179,14 @@ class Adapter(AdapterBase):
                 args += ["--aspect_ratio", ar]
         else:
             args += ["--aspect_ratio", ar, "--duration", str(_snap_duration(request.duration_s, model))]
+            video = request.extra.get("input_video")
             start = request.extra.get("input_image") or request.extra.get("image_url")
-            if start:
+            # A model that declares video_to_video prefers the real clip over a
+            # still frame when both are supplied; otherwise fall back to
+            # whichever one is actually present.
+            if video and ("video_to_video" in caps or not start):
+                args += ["--video", str(video)]
+            elif start:
                 args += ["--start-image", str(start)]
         soul_id = request.extra.get("soul_id")
         if soul_id:

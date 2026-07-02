@@ -117,6 +117,31 @@ class TestSdkFallback:
         result = await ex(_node("text_to_video"), {"plan": "a dog surfing"})
         assert result["provider"] == "p"
 
+    @pytest.mark.asyncio
+    async def test_video_to_video_aliases_input_video_path_to_input_video(self) -> None:
+        captured: dict[str, Any] = {}
+
+        class _CapturingAdapter:
+            async def generate(self, request: Any) -> _FakeGenResult:
+                captured["extra"] = dict(request.extra)
+                return _FakeGenResult()
+
+        class _CapturingLoaded:
+            def __init__(self, pid: str) -> None:
+                self.manifest = type("M", (), {"id": pid})()
+                self.adapter = _CapturingAdapter()
+
+        registry = _FakeRegistry([_CapturingLoaded("higgsfield")])  # type: ignore[list-item]
+        ex = CapabilityExecutor(FakeLLM(), provider_registry=registry)  # type: ignore[arg-type]
+
+        result = await ex(
+            _node("video_to_video", prompt="edit it", input_video_path="/tmp/clip.mp4"), {},
+        )
+
+        assert captured["extra"]["input_video"] == "/tmp/clip.mp4"
+        assert captured["extra"]["input_video_path"] == "/tmp/clip.mp4"
+        assert result["provider"] == "higgsfield"
+
 
 class TestEndToEndRun:
     @pytest.mark.asyncio

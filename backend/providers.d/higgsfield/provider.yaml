@@ -4,13 +4,15 @@ version: "2.0.0"
 description: >-
   Higgsfield multi-model hub, credit-billed. Two backends: the official API
   (platform.higgsfield.ai — documented, stable: DoP, Soul, Seedance v1, Kling
-  v2.1) and an opt-in WEB backend (cloud.higgsfield.ai — the full hub: Wan 2.6,
-  Seedance 2.0, Kling 3.0, Veo, Sora; reverse-engineered, undocumented, may
-  break). `backend: web` models are EXPERIMENTAL. Credit costs are APPROXIMATE
-  (Plus plan, ~5s clip, 2026-06) — verify in your dashboard and edit here.
+  v2.1, Gemini Omni Flash) and an opt-in WEB backend (cloud.higgsfield.ai — the
+  full hub: Wan 2.6, Seedance 2.0, Kling 3.0, Veo, Sora; reverse-engineered,
+  undocumented, may break). `backend: web` models are EXPERIMENTAL. Credit
+  costs are APPROXIMATE (Plus plan, ~5s clip / ~8s edit for Omni, 2026-06) —
+  verify in your dashboard and edit here.
 capabilities:
   - text_to_video
   - image_to_video
+  - video_to_video
   - text_to_image
 cost: { per_second_usd: 0.0, per_request_usd: 0.0, credits: 7.0, currency: USD }
 latency: { p50_s: 60.0, p95_s: 240.0, timeout_s: 600.0 }
@@ -86,6 +88,18 @@ models:
     cost: { credits: 2.0, currency: USD }
     strengths: [stylized stills, illustration]
     good_for: [animation_2d, animation_3d]
+  - id: gemini-omni-flash
+    family: omni
+    capabilities: [video_to_video, image_to_video, text_to_video]
+    endpoint: gemini-omni
+    cli_type: gemini_omni
+    backend: api
+    max_duration_s: 10
+    valid_durations: [4, 6, 8, 10]
+    max_resolution: [1280, 720]
+    cost: { credits: 10.0, currency: USD }
+    strengths: [video editing, keeps original footage, scene manipulation]
+    good_for: [recreation, alternate_ending, magic_edit]
   # ======================================================================
   # WEB BACKEND (cloud.higgsfield.ai) — EXPERIMENTAL, undocumented
   # ======================================================================

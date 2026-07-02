@@ -1,6 +1,8 @@
 """Brain endpoints — video analysis, trend radar, scene recreation."""
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, File, Form, UploadFile
 from pydantic import BaseModel
 
@@ -185,20 +187,26 @@ async def update_recreation(
         rec.provider = body.provider
     if body.video_model is not None:
         rec.model = body.video_model
+    if body.source_id is not None:
+        rec.source_id = body.source_id
 
     rec = await repo.save(rec)
     return _to_recreation_response(rec)
 
 
-def _resolve_recreation_provider(container: ContainerDep, rec: Recreation) -> str:
-    """Resolve the actual text_to_video provider for a recreation run.
+def _resolve_recreation_provider(
+    container: ContainerDep, rec: Recreation, capability: str = "text_to_video",
+) -> str:
+    """Resolve the actual provider for a recreation run (one capability).
 
     Never silently defaults to "veo" — that provider has no registered handler
     in this build (§ engine→DAG migration in progress) and would fail opaquely
     once the DAG actually executes. An explicit `rec.provider` is validated
     against what this build knows about; otherwise the first provider that
-    declares the `text_to_video` capability in the SDK registry is picked.
-    Raises 422 (listing what's available) when neither resolves.
+    declares `capability` (default `text_to_video`; `video_to_video` for a
+    recreation with an attached source clip — see `_resolve_recreation_v2v`) in
+    the SDK registry is picked. Raises 422 (listing what's available) when
+    neither resolves.
     """
     available = container.available_provider_names()
     if rec.provider:
@@ -212,13 +220,43 @@ def _resolve_recreation_provider(container: ContainerDep, rec: Recreation) -> st
             )
         return rec.provider
 
-    capable = [lp.manifest.id for lp in container.provider_registry().find("text_to_video")]
+    capable = [lp.manifest.id for lp in container.provider_registry().find(capability)]
     if not capable:
         raise HTTPException(
             status_code=422,
-            detail="No hay ningún provider disponible con la capability 'text_to_video'.",
+            detail=f"No hay ningún provider disponible con la capability '{capability}'.",
         )
     return capable[0]
+
+
+def _resolve_recreation_v2v(container: ContainerDep, rec: Recreation) -> tuple[str, str | None]:
+    """Resolve (provider, model) for a video_to_video recreation run.
+
+    Reuses `_resolve_recreation_provider` for the provider (now capability-
+    aware); then picks a model: `rec.model` if pinned, else the first model the
+    resolved provider declares for `video_to_video` — preferring
+    "gemini-omni-flash" (the reference video-editing model) when present.
+    Raises 422 when the provider has no matching model at all, instead of
+    letting the adapter silently fall back to a non-editing model.
+    """
+    provider = _resolve_recreation_provider(container, rec, capability="video_to_video")
+    if rec.model:
+        return provider, rec.model
+    loaded = container.provider_registry().get(provider)
+    capable = (
+        [m.id for m in loaded.manifest.models if "video_to_video" in m.capabilities]
+        if loaded else []
+    )
+    if not capable:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"El provider '{provider}' no declara ningún modelo con la "
+                "capability 'video_to_video' — elige otro provider o fija un modelo."
+            ),
+        )
+    model = "gemini-omni-flash" if "gemini-omni-flash" in capable else capable[0]
+    return provider, model
 
 
 @router.post(
@@ -236,22 +274,46 @@ async def run_recreation(
     from videocreator.domain.value_objects import DagSpec, DagNode
     from videocreator.infrastructure.queue.dag_executor import DagRun, DagExecutor
 
-    provider = _resolve_recreation_provider(container, rec)
+    # A recreation with a real clip attached (ingested via the Alternate-Ending
+    # upload/YouTube endpoints, PATCHed onto the draft as `source_id`) EDITS
+    # that footage through video_to_video (e.g. Gemini Omni Flash) instead of
+    # generating one from scratch — same "keep what's real" idea as Alternate
+    # Ending's head+i2v-tail, but applied to the whole clip.
+    source_path = (
+        _alt_source_dir(container, rec.source_id) / "source.mp4" if rec.source_id else None
+    )
+    if source_path is not None and source_path.exists():
+        from videocreator.application.use_cases.alternate_ending import probe_duration
 
-    # BASIC recreation: generate one clip from the plan's prompt via text_to_video
-    # (a real, registry-backed capability). This is the "from scratch" path.
-    # For keeping a real clip's head and regenerating only its ending from a cut
-    # frame, use the Alternate Ending flow (/brain/recreations/alternate-ending),
-    # which is image_to_video — NOT video_to_video (that has no provider/handler).
-    nodes = [DagNode(
-        id="render_0",
-        capability="text_to_video",
-        params={
-            "prompt": rec.v2v_prompt,
-            "provider": provider,
-            "model": rec.model,
-        },
-    )]
+        provider, model = _resolve_recreation_v2v(container, rec)
+        nodes = [DagNode(
+            id="render_0",
+            capability="video_to_video",
+            params={
+                "prompt": rec.v2v_prompt,
+                "provider": provider,
+                "model": model,
+                "input_video_path": str(source_path),
+                # ffprobe is a sync subprocess — keep it off the event loop.
+                "duration_s": await asyncio.to_thread(probe_duration, source_path),
+            },
+        )]
+    else:
+        provider = _resolve_recreation_provider(container, rec)
+        # BASIC recreation: generate one clip from the plan's prompt via
+        # text_to_video (a real, registry-backed capability). This is the
+        # "from scratch" path, used whenever no source clip is attached. For
+        # keeping only a clip's head and regenerating its ending from a cut
+        # frame, see the Alternate Ending flow (/brain/recreations/alternate-ending).
+        nodes = [DagNode(
+            id="render_0",
+            capability="text_to_video",
+            params={
+                "prompt": rec.v2v_prompt,
+                "provider": provider,
+                "model": rec.model,
+            },
+        )]
 
     spec = DagSpec(nodes=tuple(nodes))
     run_id = f"run_{uuid.uuid4().hex[:12]}"
@@ -309,6 +371,12 @@ class AlternateEndingRequest(BaseModel):
     cut_at_s: float
     prompt: str
     tail_duration_s: float = 5.0
+    #: "i2v" (default, back-compat): regenerate the tail from a still frame.
+    #: "edit": feed the REAL tail clip to a video_to_video editing model
+    #: (e.g. Gemini Omni Flash) instead of regenerating it from scratch.
+    mode: Literal["i2v", "edit"] = "i2v"
+    provider: str | None = None
+    model: str | None = None
 
 
 class AlternateEndingResponse(BaseModel):
@@ -368,7 +436,7 @@ async def ingest_youtube_ep(
 
 
 @router.post("/recreations/alternate-ending", response_model=AlternateEndingResponse,
-             summary="Keep the clip's head, regenerate the tail from the cut frame (i2v)")
+             summary="Keep the clip's head, change the tail — i2v regen or v2v edit")
 async def alternate_ending(
     body: AlternateEndingRequest, container: ContainerDep, user_id: UserIdDep,
 ) -> AlternateEndingResponse:
@@ -378,12 +446,12 @@ async def alternate_ending(
     source = _alt_source_dir(container, body.source_id) / "source.mp4"
     if not source.exists():
         raise HTTPException(status_code=404, detail="source not found — ingest first")
-    svc = container.alternate_ending_service()
+    svc = container.alternate_ending_service(provider=body.provider, model=body.model)
     svc._work = _alt_source_dir(container, body.source_id)  # write outputs beside the source
     try:
         final = await asyncio.to_thread(
             svc.run, source, cut_at_s=body.cut_at_s, prompt=body.prompt,
-            tail_duration_s=body.tail_duration_s,
+            tail_duration_s=body.tail_duration_s, mode=body.mode,
         )
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -429,6 +497,7 @@ def _to_recreation_response(rec: Recreation) -> RecreationResponse:
         fair_use=rec.fair_use,
         provider=rec.provider,
         model=rec.model,
+        source_id=rec.source_id,
         result=rec.result,
         created_at=rec.created_at,
         updated_at=rec.updated_at,

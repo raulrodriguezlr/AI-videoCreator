@@ -897,6 +897,7 @@ class RecreationResponse(BaseModel):
     fair_use: dict[str, Any]
     provider: str | None
     model: str | None
+    source_id: str | None = None
     result: dict[str, Any] | None
     created_at: datetime
     updated_at: datetime
@@ -918,6 +919,9 @@ class UpdateRecreationRequest(BaseModel):
     audio_note: str | None = None
     provider: str | None = None
     video_model: str | None = None
+    #: Attach/replace the real clip (ingested via the Alternate-Ending upload/
+    #: YouTube endpoints) this recreation edits via video_to_video. `""` clears it.
+    source_id: str | None = None
 
 
 class SceneTrendMatchRequest(BaseModel):

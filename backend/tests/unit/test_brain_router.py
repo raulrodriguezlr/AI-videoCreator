@@ -24,6 +24,7 @@ from videocreator.domain.value_objects import RecreationState
 from videocreator.infrastructure.trends.google_trends import GoogleTrendsRss
 from videocreator.interfaces.rest.routers.brain import (
     _resolve_recreation_provider,
+    _resolve_recreation_v2v,
     scene_trend_match,
 )
 from videocreator.interfaces.rest.schemas import SceneTrendMatchRequest
@@ -96,6 +97,85 @@ class TestResolveRecreationProvider:
 
         with pytest.raises(Exception) as exc_info:
             _resolve_recreation_provider(container, rec)
+
+        assert getattr(exc_info.value, "status_code", None) == 422
+
+
+# ============================================================================
+# _resolve_recreation_v2v (Fase 1: recreations that edit a real ingested clip)
+# ============================================================================
+def _fake_model(id_: str, caps: list[str]) -> SimpleNamespace:
+    return SimpleNamespace(id=id_, capabilities=caps)
+
+
+class _FakeLoadedProvider:
+    def __init__(self, pid: str, capabilities: list[str], models: list[SimpleNamespace]) -> None:
+        self.manifest = SimpleNamespace(id=pid, capabilities=capabilities, models=models)
+
+
+class _FakeV2VRegistry:
+    def __init__(self, providers: list[_FakeLoadedProvider]) -> None:
+        self._providers = providers
+
+    def find(self, capability: str, **_: Any) -> list[_FakeLoadedProvider]:
+        return [p for p in self._providers if capability in p.manifest.capabilities]
+
+    def get(self, provider_id: str) -> _FakeLoadedProvider | None:
+        return next((p for p in self._providers if p.manifest.id == provider_id), None)
+
+
+def _v2v_container(*, available: set[str], providers: list[_FakeLoadedProvider]) -> SimpleNamespace:
+    return SimpleNamespace(
+        available_provider_names=lambda: available,
+        provider_registry=lambda: _FakeV2VRegistry(providers),
+    )
+
+
+class TestResolveRecreationV2V:
+    def test_picks_gemini_omni_flash_when_present(self) -> None:
+        rec = _recreation(provider=None)
+        higgs = _FakeLoadedProvider("higgsfield", ["video_to_video"], [
+            _fake_model("kling-3.0", ["text_to_video"]),
+            _fake_model("gemini-omni-flash", ["video_to_video", "image_to_video"]),
+        ])
+        container = _v2v_container(available={"higgsfield"}, providers=[higgs])
+
+        provider, model = _resolve_recreation_v2v(container, rec)
+
+        assert provider == "higgsfield"
+        assert model == "gemini-omni-flash"
+
+    def test_falls_back_to_first_v2v_capable_model_without_omni(self) -> None:
+        rec = _recreation(provider=None)
+        prov = _FakeLoadedProvider("otherprovider", ["video_to_video"], [
+            _fake_model("some-editor", ["video_to_video"]),
+        ])
+        container = _v2v_container(available={"otherprovider"}, providers=[prov])
+
+        provider, model = _resolve_recreation_v2v(container, rec)
+
+        assert provider == "otherprovider"
+        assert model == "some-editor"
+
+    def test_pinned_model_is_respected_without_consulting_the_registry(self) -> None:
+        rec = _recreation(provider="higgsfield")
+        rec.model = "custom-model"
+        higgs = _FakeLoadedProvider("higgsfield", ["video_to_video"], [
+            _fake_model("gemini-omni-flash", ["video_to_video"]),
+        ])
+        container = _v2v_container(available={"higgsfield"}, providers=[higgs])
+
+        provider, model = _resolve_recreation_v2v(container, rec)
+
+        assert provider == "higgsfield"
+        assert model == "custom-model"
+
+    def test_no_provider_declares_video_to_video_raises_422(self) -> None:
+        rec = _recreation(provider=None)
+        container = _v2v_container(available=set(), providers=[])
+
+        with pytest.raises(Exception) as exc_info:
+            _resolve_recreation_v2v(container, rec)
 
         assert getattr(exc_info.value, "status_code", None) == 422
 

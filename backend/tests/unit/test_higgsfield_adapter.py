@@ -57,6 +57,9 @@ def _manifest() -> ProviderManifest:
                       capabilities=["text_to_video", "image_to_video"],
                       max_duration_s=8, valid_durations=(4, 6, 8)),
             ModelSpec(id="no-cli", capabilities=["text_to_video"]),  # no cli_type
+            ModelSpec(id="gemini-omni-flash", cli_type="gemini_omni",
+                      capabilities=["video_to_video", "image_to_video", "text_to_video"],
+                      max_duration_s=10, valid_durations=(4, 6, 8, 10)),
         ],
     )
 
@@ -159,6 +162,55 @@ class TestGenerate:
         assert "--start-image" in args and "https://ref/c.png" in args
         assert "--aspect_ratio" in args and "9:16" in args
         assert res.has_audio is True
+
+    @pytest.mark.asyncio
+    async def test_video_to_video_uses_video_flag(self, tmp_path: Path) -> None:
+        mod = _load_module()
+        adapter = _adapter(mod, tmp_path)
+        cap = _stub_io(adapter, stdout=json.dumps({"result_url": "https://cdn.hf/edited.mp4"}))
+
+        res = await adapter.generate(GenRequest(
+            prompt="make it rain", duration_s=8, width=1080, height=1920,
+            model_id="gemini-omni-flash", extra={"input_video": "/tmp/clip.mp4"},
+        ))
+
+        args = cap["args"]
+        assert args[1:4] == ["generate", "create", "gemini_omni"]
+        assert "--video" in args and "/tmp/clip.mp4" in args
+        assert "--start-image" not in args
+        assert res.has_audio is True
+
+    @pytest.mark.asyncio
+    async def test_input_video_wins_over_input_image_for_v2v_model(self, tmp_path: Path) -> None:
+        mod = _load_module()
+        adapter = _adapter(mod, tmp_path)
+        cap = _stub_io(adapter, stdout=json.dumps({"result_url": "https://cdn.hf/edited.mp4"}))
+
+        await adapter.generate(GenRequest(
+            prompt="x", duration_s=8, model_id="gemini-omni-flash",
+            extra={"input_video": "/tmp/clip.mp4", "input_image": "https://ref/c.png"},
+        ))
+
+        args = cap["args"]
+        assert "--video" in args and "/tmp/clip.mp4" in args
+        assert "--start-image" not in args
+
+    @pytest.mark.asyncio
+    async def test_input_image_used_when_model_lacks_video_to_video(self, tmp_path: Path) -> None:
+        mod = _load_module()
+        adapter = _adapter(mod, tmp_path)
+        cap = _stub_io(adapter, stdout=json.dumps({"result_url": "https://cdn.hf/v.mp4"}))
+
+        # wan-2.6 has no video_to_video capability — an input_video that snuck
+        # into extra must not silently override the intended start-image.
+        await adapter.generate(GenRequest(
+            prompt="x", duration_s=5, model_id="wan-2.6",
+            extra={"input_video": "/tmp/clip.mp4", "input_image": "https://ref/c.png"},
+        ))
+
+        args = cap["args"]
+        assert "--start-image" in args and "https://ref/c.png" in args
+        assert "--video" not in args
 
     @pytest.mark.asyncio
     async def test_video_snaps_duration_to_discrete_values(self, tmp_path: Path) -> None:

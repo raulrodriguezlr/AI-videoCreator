@@ -1,14 +1,16 @@
-import { useState, useEffect, type DragEvent } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   planRecreation, sceneTrendMatch, runRecreation, getRecreations, updateRecreation, getRecreation,
-  getSdkProviders, ingestAltUpload, ingestAltYoutube, runAlternateEnding, mediaUrl,
+  getSdkProviders, runAlternateEnding, mediaUrl,
   type FairUse, type SceneCandidate, type RecreationBeat,
   type UpdateRecreationRequest, type SdkProvider, type IngestResponse, type AlternateEndingResponse,
+  type AlternateEndingMode,
 } from "../api/client";
 import { Badge, Button, Empty, ErrorState, Field, Loading, useToast, Tabs } from "../ui/primitives";
-import { IcAlertTriangle, IcRadar, IcSparkles, IcWand, IcEdit, IcUpload } from "../ui/icons";
+import { IcAlertTriangle, IcRadar, IcSparkles, IcWand, IcEdit } from "../ui/icons";
+import { SourceIngest } from "../components/SourceIngest";
 
 const RISK_TONE: Record<FairUse["risk"] | string, "ok" | "warn" | "err"> = {
   low: "ok", medium: "warn", high: "err",
@@ -54,87 +56,57 @@ export function RecreationPage() {
 function AlternateEndingTab() {
   const toast = useToast();
   const [source, setSource] = useState<IngestResponse | null>(null);
-  const [url, setUrl] = useState("");
-  const [rightsAck, setRightsAck] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
   const [cutAt, setCutAt] = useState(2);
   const [prompt, setPrompt] = useState("");
   const [tailDur, setTailDur] = useState(5);
+  const [mode, setMode] = useState<AlternateEndingMode>("i2v");
+  const [provider, setProvider] = useState("");
+  const [model, setModel] = useState("");
   const [result, setResult] = useState<AlternateEndingResponse | null>(null);
 
-  const ingestFile = useMutation({
-    mutationFn: (f: File) => ingestAltUpload(f),
-    onSuccess: (r) => { setSource(r); setCutAt(Math.min(2, Math.max(0.5, r.duration_s / 2))); toast.ok("Clip cargado", `${r.duration_s.toFixed(1)}s`); },
-    onError: (e) => toast.err("No se pudo cargar", (e as Error).message),
-  });
-  const ingestYt = useMutation({
-    mutationFn: () => ingestAltYoutube(url.trim(), rightsAck),
-    onSuccess: (r) => { setSource(r); setCutAt(Math.min(2, r.duration_s / 2)); toast.ok("Vídeo descargado", `${r.duration_s.toFixed(1)}s`); },
-    onError: (e) => toast.err("No se pudo descargar", (e as Error).message),
-  });
+  const onIngested = (r: IngestResponse) => {
+    setSource(r);
+    setCutAt(Math.min(2, Math.max(0.5, r.duration_s / 2)));
+  };
+
   const run = useMutation({
-    mutationFn: () => runAlternateEnding(source!.source_id, cutAt, prompt.trim(), tailDur),
+    mutationFn: () => runAlternateEnding(source!.source_id, cutAt, prompt.trim(), tailDur, {
+      mode, provider: provider || undefined, model: model || undefined,
+    }),
     onSuccess: (r) => { setResult(r); toast.ok("Final alternativo listo"); },
     onError: (e) => toast.err("Falló la generación", (e as Error).message),
   });
 
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); setDragOver(false);
-    const f = e.dataTransfer.files?.[0];
-    if (f) ingestFile.mutate(f);
-  };
-
   return (
     <div className="stack" style={{ gap: 16, maxWidth: 720 }}>
       <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-        Conserva el principio del clip original y regenera solo el final desde el segundo de corte (image-to-video).
+        Conserva el principio del clip original y cambia solo el final a partir del segundo de corte.
       </p>
 
       {/* 1) Ingesta */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-        style={{
-          border: `2px dashed ${dragOver ? "var(--mint)" : "var(--c-border)"}`,
-          borderRadius: 12, padding: 24, textAlign: "center",
-          background: dragOver ? "rgba(60,200,150,0.06)" : "transparent",
-        }}
-      >
-        <IcUpload />
-        <div style={{ marginTop: 8, fontSize: 14 }}>
-          Arrastra un mp4 aquí{source ? "" : ", o"}{" "}
-          <label style={{ color: "var(--mint)", cursor: "pointer" }}>
-            búscalo
-            <input
-              type="file" accept="video/mp4,video/quicktime,video/webm"
-              style={{ display: "none" }}
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) ingestFile.mutate(f); }}
-            />
-          </label>
-          {ingestFile.isPending && " · subiendo…"}
-        </div>
-      </div>
+      <SourceIngest source={source} onIngested={onIngested} />
 
-      <Field label="…o pega una URL de YouTube" hint="Descargar vídeo de terceros requiere confirmar derechos / uso justo">
-        <div style={{ display: "flex", gap: 8 }}>
-          <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://youtu.be/…" style={{ flex: 1 }} />
-          <Button variant="ghost" loading={ingestYt.isPending} disabled={!url.trim() || !rightsAck} onClick={() => ingestYt.mutate()}>
-            Descargar
-          </Button>
-        </div>
-      </Field>
-      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
-        <input type="checkbox" checked={rightsAck} onChange={(e) => setRightsAck(e.target.checked)} />
-        Confirmo que tengo los derechos o una base de uso justo para este vídeo.
-      </label>
-
-      {/* 2) Corte + prompt */}
+      {/* 2) Modo + corte + prompt */}
       {source && (
         <div className="card">
           <div className="card-pad stack" style={{ gap: 12 }}>
-            <Badge tone="ok">Clip listo · {source.duration_s.toFixed(1)}s</Badge>
-            <Field label={`Cortar en el segundo: ${cutAt.toFixed(1)}s`} hint="Todo lo anterior queda original; a partir de aquí se regenera">
+            <Field label="Modo" hint="Cómo se genera el nuevo final">
+              <div className="row" style={{ gap: 8 }}>
+                <Button
+                  variant={mode === "i2v" ? "primary" : "ghost"}
+                  onClick={() => { setMode("i2v"); setProvider(""); setModel(""); }}
+                >
+                  Regenerar desde imagen (i2v)
+                </Button>
+                <Button
+                  variant={mode === "edit" ? "primary" : "ghost"}
+                  onClick={() => { setMode("edit"); setProvider(""); setModel(""); }}
+                >
+                  Editar el vídeo real (Omni)
+                </Button>
+              </div>
+            </Field>
+            <Field label={`Cortar en el segundo: ${cutAt.toFixed(1)}s`} hint="Todo lo anterior queda original; a partir de aquí cambia">
               <input type="range" min={0.5} max={Math.max(1, source.duration_s - 0.5)} step={0.1}
                 value={cutAt} onChange={(e) => setCutAt(parseFloat(e.target.value))} style={{ width: "100%" }} />
             </Field>
@@ -146,6 +118,11 @@ function AlternateEndingTab() {
               <input type="range" min={3} max={10} step={1} value={tailDur}
                 onChange={(e) => setTailDur(parseInt(e.target.value))} style={{ width: "100%" }} />
             </Field>
+            <ProviderModelPicker
+              provider={provider} model={model}
+              onProvider={setProvider} onModel={setModel}
+              capabilities={mode === "edit" ? ["video_to_video"] : ["image_to_video"]}
+            />
             <Button variant="mint" loading={run.isPending} disabled={!prompt.trim()} onClick={() => run.mutate()}>
               <IcWand /> Generar final alternativo
             </Button>
@@ -499,11 +476,34 @@ function RecreationEditor({ id }: { id: string }) {
           </div>
         </div>
         
+        <div>
+          <h3 style={{ marginBottom: 10 }}>Vídeo base (v2v) — opcional</h3>
+          <p className="sub" style={{ margin: "0 0 10px" }}>
+            Si adjuntas un vídeo real, la ejecución lo EDITA (Gemini Omni Flash u otro modelo
+            video_to_video) en vez de generar el clip desde cero.
+          </p>
+          {rec.source_id ? (
+            <div className="row" style={{ gap: 8, alignItems: "center" }}>
+              <Badge tone="ok">Vídeo base adjunto · {rec.source_id}</Badge>
+              <Button variant="ghost" size="sm" onClick={() => update.mutate({ source_id: "" })}>
+                Quitar
+              </Button>
+            </div>
+          ) : (
+            <SourceIngest
+              source={null}
+              onIngested={(r) => update.mutate({ source_id: r.source_id })}
+              compact
+            />
+          )}
+        </div>
+
         <ProviderModelPicker
           provider={rec.provider || ""}
           model={rec.model || ""}
           onProvider={(v) => update.mutate({ provider: v })}
           onModel={(v) => update.mutate({ video_model: v })}
+          capabilities={rec.source_id ? ["video_to_video"] : ["text_to_video"]}
         />
 
         <div className="stack" style={{ gap: 8, marginTop: 24 }}>
@@ -525,14 +525,20 @@ function RecreationEditor({ id }: { id: string }) {
 
 const _VIDEO_CAPS = ["text_to_video", "image_to_video", "video_to_video"];
 
-function ProviderModelPicker({ provider, model, onProvider, onModel }: {
+function ProviderModelPicker({ provider, model, onProvider, onModel, capabilities = _VIDEO_CAPS }: {
   provider: string; model: string; onProvider: (v: string) => void; onModel: (v: string) => void;
+  /** Narrow the picker to providers/models declaring one of these capabilities
+   * — e.g. `["video_to_video"]` once a real source clip is attached, so the
+   * user is steered toward an editing model (Gemini Omni Flash) instead of a
+   * from-scratch generator that can't use it. Defaults to any video capability. */
+  capabilities?: string[];
 }) {
   const cat = useQuery<SdkProvider[]>({ queryKey: ["sdk-providers"], queryFn: getSdkProviders });
-  // Only providers that can generate/transform video are usable for a recreation.
-  const providers = (cat.data ?? []).filter((p) => p.capabilities.some((c) => _VIDEO_CAPS.includes(c)));
+  // Only providers that can generate/transform video (for the requested
+  // capabilities) are usable here.
+  const providers = (cat.data ?? []).filter((p) => p.capabilities.some((c) => capabilities.includes(c)));
   const selected = providers.find((p) => p.id === provider);
-  const models = (selected?.models ?? []).filter((m) => m.capabilities.some((c) => _VIDEO_CAPS.includes(c)));
+  const models = (selected?.models ?? []).filter((m) => m.capabilities.some((c) => capabilities.includes(c)));
   return (
     <div className="row" style={{ gap: 24, alignItems: "flex-start" }}>
       <div className="field" style={{ flex: 1 }}>

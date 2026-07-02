@@ -302,6 +302,11 @@ class Recreation(BaseModel):
     fair_use: dict[str, Any] = Field(default_factory=dict)
     provider: str | None = None
     model: str | None = None
+    #: Opaque id (minted by the Alternate-Ending ingest endpoints) of a real
+    #: clip ingested for this recreation. When set and the file is still on
+    #: disk, `run_recreation` edits THAT footage through `video_to_video`
+    #: (e.g. Gemini Omni Flash) instead of generating a clip from scratch.
+    source_id: str | None = None
     result: dict[str, Any] | None = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

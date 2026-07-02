@@ -15,6 +15,7 @@ from videocreator.application.use_cases.alternate_ending import (
     AlternateEndingService,
     concat,
     extract_seed_frame,
+    extract_tail,
     probe_duration,
     trim_head,
 )
@@ -71,6 +72,63 @@ def test_run_full_pipeline_with_fake_i2v(tmp_path: Path) -> None:
     assert captured["prompt"].startswith("el héroe")
     # head (2.0) + tail (3.0) ≈ 5.0
     assert abs(probe_duration(final) - 5.0) < 0.4
+
+
+def test_extract_tail_is_the_real_footage_after_the_cut(tmp_path: Path) -> None:
+    src = _make_clip(tmp_path / "src.mp4", 6.0, "blue")
+    tail = extract_tail(src, 2.0, 3.0, tmp_path / "tail_src.mp4")
+    assert abs(probe_duration(tail) - 3.0) < 0.2
+
+
+def test_run_edit_mode_feeds_the_real_tail_to_v2v(tmp_path: Path) -> None:
+    src = _make_clip(tmp_path / "src.mp4", 6.0, "blue")
+
+    captured: dict = {}
+
+    def fake_v2v(*, video: Path, prompt: str, duration_s: float, out: Path) -> Path:
+        # The "model": instead of editing, verify it received the REAL tail
+        # (not a still frame) and drop in a synthetic edited tail.
+        captured["video_duration"] = probe_duration(video)
+        captured["prompt"] = prompt
+        return _make_clip(out, duration_s, "magenta")
+
+    def fail_i2v(**_: object) -> Path:
+        raise AssertionError("mode='edit' must not call the i2v continuation")
+
+    svc = AlternateEndingService(fail_i2v, work_dir=tmp_path / "work", v2v=fake_v2v)
+    final = svc.run(
+        src, cut_at_s=2.0, prompt="ahora llueve fuego",
+        tail_duration_s=3.0, mode="edit",
+    )
+
+    assert final.exists()
+    assert abs(captured["video_duration"] - 3.0) < 0.3
+    assert captured["prompt"].startswith("ahora")
+    # head (2.0) + edited tail (3.0) ≈ 5.0
+    assert abs(probe_duration(final) - 5.0) < 0.4
+
+
+def test_run_edit_mode_without_v2v_continuation_raises(tmp_path: Path) -> None:
+    src = _make_clip(tmp_path / "src.mp4", 4.0)
+    svc = AlternateEndingService(lambda **k: k["out"], work_dir=tmp_path / "w")
+    with pytest.raises(ValidationError, match="video_to_video"):
+        svc.run(src, cut_at_s=1.0, prompt="x", mode="edit")
+
+
+def test_run_edit_mode_rejects_tail_past_clip_end(tmp_path: Path) -> None:
+    src = _make_clip(tmp_path / "src.mp4", 4.0)
+    svc = AlternateEndingService(
+        lambda **k: k["out"], work_dir=tmp_path / "w", v2v=lambda **k: k["out"],
+    )
+    with pytest.raises(ValidationError, match="past"):
+        svc.run(src, cut_at_s=2.0, prompt="x", tail_duration_s=5.0, mode="edit")
+
+
+def test_run_rejects_unknown_mode(tmp_path: Path) -> None:
+    src = _make_clip(tmp_path / "src.mp4", 4.0)
+    svc = AlternateEndingService(lambda **k: k["out"], work_dir=tmp_path / "w")
+    with pytest.raises(ValidationError, match="unknown mode"):
+        svc.run(src, cut_at_s=1.0, prompt="x", mode="bogus")  # type: ignore[arg-type]
 
 
 def test_run_rejects_cut_outside_clip(tmp_path: Path) -> None:

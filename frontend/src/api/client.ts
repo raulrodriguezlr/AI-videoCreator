@@ -622,6 +622,7 @@ export interface Recreation {
   fair_use: FairUse;
   provider: string | null;
   model: string | null;
+  source_id: string | null;
   result: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
@@ -639,6 +640,9 @@ export interface UpdateRecreationRequest {
   audio_note?: string;
   provider?: string;
   video_model?: string;
+  /** Attach/replace the real clip (ingested via the Alternate-Ending upload/
+   * YouTube endpoints) this recreation edits via video_to_video. */
+  source_id?: string;
 }
 
 export interface SceneCandidate {
@@ -678,10 +682,18 @@ export const ingestAltUpload = (file: File) =>
   api.upload<IngestResponse>("/brain/recreations/ingest/upload", [file], "file");
 export const ingestAltYoutube = (url: string, rights_ack: boolean) =>
   api.post<IngestResponse>("/brain/recreations/ingest/youtube", { url, rights_ack });
+
+/** "i2v" (default, back-compat): regenerate the tail from a still frame via
+ * image_to_video. "edit": feed the real tail clip to a video_to_video editing
+ * model (e.g. Gemini Omni Flash) instead of regenerating it from scratch. */
+export type AlternateEndingMode = "i2v" | "edit";
+
 export const runAlternateEnding = (
   source_id: string, cut_at_s: number, prompt: string, tail_duration_s = 5,
+  opts: { mode?: AlternateEndingMode; provider?: string; model?: string } = {},
 ) => api.post<AlternateEndingResponse>("/brain/recreations/alternate-ending", {
   source_id, cut_at_s, prompt, tail_duration_s,
+  mode: opts.mode ?? "i2v", provider: opts.provider, model: opts.model,
 });
 
 // ---------------------------------------------------------------------------

@@ -638,6 +638,7 @@ class SqlRecreationRepository(SqlBase):
                     "fair_use": recreation.fair_use,
                     "provider": recreation.provider,
                     "model": recreation.model,
+                    "source_id": recreation.source_id,
                     "result": recreation.result,
                 }
                 row.updated_at = utcnow()
@@ -670,6 +671,7 @@ def _recreation_from_row(row: RecreationRow) -> Recreation:
         fair_use=payload.get("fair_use", {}),
         provider=payload.get("provider"),
         model=payload.get("model"),
+        source_id=payload.get("source_id"),
         result=payload.get("result"),
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -694,6 +696,7 @@ def _row_from_recreation(rec: Recreation) -> RecreationRow:
             "fair_use": rec.fair_use,
             "provider": rec.provider,
             "model": rec.model,
+            "source_id": rec.source_id,
             "result": rec.result,
         },
         created_at=rec.created_at,

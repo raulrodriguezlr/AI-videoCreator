@@ -132,13 +132,25 @@ class CapabilityExecutor:
         _reserved = {"provider", "model", "prompt", "duration_s", "seed",
                      "negative_prompt"}
         model = node.params.get("model")
+        extra = {k: v for k, v in node.params.items() if k not in _reserved}
+        if node.capability == "video_to_video":
+            # video_to_video callers pass a local filesystem path as
+            # `input_video_path` (mirrors the input_image/input_image_path
+            # dual-write the Alternate-Ending i2v continuation uses — see
+            # infrastructure/publish/i2v_continuation.py). Alias it to
+            # `input_video`, the key the CLI-backed adapters read
+            # (providers.d/higgsfield/adapter.py:_build_args).
+            path = extra.get("input_video_path") or extra.get("input_video")
+            if path:
+                extra["input_video"] = path
+                extra["input_video_path"] = path
         request = GenRequest(
             prompt=prompt,
             duration_s=float(node.params.get("duration_s", 5.0) or 5.0),
             seed=node.params.get("seed"),  # type: ignore[arg-type]
             model_id=str(model) if model else None,
             negative_prompt=node.params.get("negative_prompt"),
-            extra={k: v for k, v in node.params.items() if k not in _reserved},
+            extra=extra,
         )
         last_error: Exception | None = None
         for lp in candidates:
