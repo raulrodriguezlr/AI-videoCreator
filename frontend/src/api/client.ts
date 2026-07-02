@@ -647,6 +647,16 @@ export interface SceneCandidate {
   why_trending: string;
 }
 
+/** Where the trend terms behind a trend-match came from — "live" when Google
+ * Trends answered, "cache" when a same-day cached fetch was reused, and
+ * "fallback" when neither was available (generic evergreen terms). */
+export type TrendsSource = "live" | "cache" | "fallback";
+
+export interface SceneTrendMatchResponse {
+  candidates: SceneCandidate[];
+  trends_source: TrendsSource;
+}
+
 export const planRecreation = (original: string, niche: string, twist: string) =>
   api.post<RecreationPlan>("/brain/recreations/plan", { original, niche, twist });
 
@@ -658,7 +668,7 @@ export const runRecreation = (id: string) => api.post<{ run_id: string }>(`/brai
 export const deleteRecreation = (id: string) => api.delete<void>(`/brain/recreations/${id}`);
 
 export const sceneTrendMatch = (terms: string[]) =>
-  api.post<SceneCandidate[]>("/brain/recreations/trend-match", { terms });
+  api.post<SceneTrendMatchResponse>("/brain/recreations/trend-match", { terms });
 
 // ---- Alternate Ending (keep clip head, regenerate tail via i2v) ------------
 export interface IngestResponse { source_id: string; duration_s: number; }

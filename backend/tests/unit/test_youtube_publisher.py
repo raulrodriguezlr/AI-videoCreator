@@ -9,6 +9,7 @@ import pytest
 from videocreator.infrastructure.publish.youtube_publisher import (
     UploadResult,
     YouTubePublisher,
+    build_credentials,
 )
 from videocreator.shared.errors import ProviderError
 
@@ -129,3 +130,34 @@ class TestMetricsQuery:
         assert rows == [{"video": "abc", "day": "2026-06-01", "views": 500}]
         assert recorder["filters"] == "video==abc"
         assert "audienceWatchRatio" in recorder["metrics"]
+
+
+class TestBuildCredentials:
+    """Token hygiene: `build_credentials` eagerly refreshes on construction so
+    a revoked/expired refresh token surfaces here, not deep inside an upload.
+    `Credentials.refresh` is monkeypatched — no real Google network call."""
+
+    def test_refreshes_and_returns_fresh_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from google.oauth2.credentials import Credentials
+
+        def fake_refresh(self: Credentials, request: Any) -> None:
+            self.token = "fresh-access-token"  # noqa: S105 - test fixture value
+
+        monkeypatch.setattr(Credentials, "refresh", fake_refresh)
+
+        creds = build_credentials(refresh_token="rt", client_id="cid", client_secret="cs")
+
+        assert creds.token == "fresh-access-token"
+
+    def test_refresh_failure_wrapped_in_provider_error(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from google.oauth2.credentials import Credentials
+
+        def fake_refresh(self: Credentials, request: Any) -> None:
+            raise RuntimeError("invalid_grant: token revoked")
+
+        monkeypatch.setattr(Credentials, "refresh", fake_refresh)
+
+        with pytest.raises(ProviderError, match="refresh failed"):
+            build_credentials(refresh_token="rt", client_id="cid", client_secret="cs")

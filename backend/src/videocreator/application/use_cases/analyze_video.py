@@ -1,14 +1,13 @@
-"""Video Analyst use case — URL/file → ViralGenome.
+"""Video Analyst use case — URL/context → ViralGenome.
 
-Sends the video to an LLM with multimodal capability to extract the viral
-genome (format, hook, beats, sound, remixability). Falls back to a
-text-only analysis if multimodal is unavailable.
+Textual analysis only: the LLM never sees the video itself, it reasons over
+the caller-supplied `context` (a URL, transcript, or free-text description) to
+extract the viral genome (format, hook, beats, sound, remixability). There is
+no multimodal video ingestion in this build.
 """
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any
 
 from videocreator.domain.ports import LLMPort
 from videocreator.domain.value_objects import ViralGenome
@@ -38,17 +37,16 @@ Video description/transcript:
 
 
 class AnalyzeVideoUseCase:
-    """Analyze a video and extract its viral genome."""
+    """Analyze a video's textual context and extract its viral genome.
+
+    No video bytes are read or sent anywhere — this is pure text reasoning
+    over whatever context the caller has (a URL, a transcript, a description).
+    """
 
     def __init__(self, llm: LLMPort) -> None:
         self._llm = llm
 
-    async def execute(
-        self,
-        *,
-        context: str,
-        video_path: Path | None = None,
-    ) -> ViralGenome:
+    async def execute(self, *, context: str) -> ViralGenome:
         prompt = _GENOME_PROMPT.format(context=context)
 
         raw = await self._llm.complete(prompt, temperature=0.4)

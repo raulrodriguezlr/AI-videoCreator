@@ -224,14 +224,22 @@ function NewRecreationTab({ onGoToHistory }: { onGoToHistory: () => void }) {
 
         {trendMatch.isPending && <Loading />}
         {trendMatch.isError && <ErrorState error={trendMatch.error} />}
-        {trendMatch.isSuccess && trendMatch.data.length === 0 && (
+        {trendMatch.isSuccess && trendMatch.data.trends_source !== "live" && (
+          <p className="trend-source-notice">
+            <IcAlertTriangle />
+            {trendMatch.data.trends_source === "cache"
+              ? "Google Trends no accesible — mostrando términos en caché."
+              : "Google Trends no accesible — mostrando términos genéricos."}
+          </p>
+        )}
+        {trendMatch.isSuccess && trendMatch.data.candidates.length === 0 && (
           <Empty emoji="📡" title="Sin resultados">
             No se encontraron escenas en tendencia ahora mismo — vuelve a intentarlo más tarde.
           </Empty>
         )}
-        {trendMatch.isSuccess && trendMatch.data.length > 0 && (
+        {trendMatch.isSuccess && trendMatch.data.candidates.length > 0 && (
           <div className="scene-candidates">
-            {trendMatch.data.map((candidate, i) => (
+            {trendMatch.data.candidates.map((candidate, i) => (
               <article key={i} className="card card-pad scene-candidate">
                 <div>
                   <span className="term mono">{candidate.term}</span>

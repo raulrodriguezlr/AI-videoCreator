@@ -157,12 +157,20 @@ class YouTubePublisher:
 def build_credentials(
     *, refresh_token: str, client_id: str, client_secret: str,
 ) -> Any:
-    """Rebuild OAuth2 Credentials from a stored refresh token (vault)."""
+    """Rebuild OAuth2 Credentials from a stored refresh token (vault).
+
+    Eagerly refreshes the access token on construction (token hygiene): a
+    revoked/expired refresh token then surfaces here as a clear ProviderError
+    instead of failing deep inside a googleapiclient upload call. Callers that
+    persist tokens (e.g. `OAuthAccountService.credentials`) should read the
+    fresh `.token` off the returned Credentials and store it.
+    """
     try:
+        from google.auth.transport.requests import Request  # type: ignore[import-untyped]
         from google.oauth2.credentials import Credentials  # type: ignore[import-untyped]
     except ImportError as e:
         raise ProviderError("google-auth not installed") from e
-    return Credentials(
+    creds = Credentials(
         token=None,
         refresh_token=refresh_token,
         client_id=client_id,
@@ -173,6 +181,12 @@ def build_credentials(
             "https://www.googleapis.com/auth/yt-analytics.readonly",
         ],
     )
+    try:
+        creds.refresh(Request())
+    except Exception as e:
+        log.error("youtube.token_refresh.failed", error=str(e))
+        raise ProviderError(f"YouTube token refresh failed: {e}") from e
+    return creds
 
 
 __all__ = ["UploadResult", "YouTubePublisher", "build_credentials"]

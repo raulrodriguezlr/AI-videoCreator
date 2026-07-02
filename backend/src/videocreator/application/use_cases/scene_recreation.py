@@ -15,10 +15,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 from videocreator.domain.ports import LLMPort
-from videocreator.domain.value_objects import DagNode, DagSpec
 from videocreator.shared.logging import get_logger
 
 log = get_logger(__name__)
@@ -176,31 +175,6 @@ class SceneTrendMatchUseCase:
         return candidates
 
 
-def build_recreation_dag(episode_id: str, *, risk: RiskLevel) -> DagSpec:
-    """Recreation pipeline as a DAG. HIGH risk inserts a blocking human gate."""
-    nodes: list[DagNode] = [
-        DagNode(id="plan", capability="llm_text",
-                params={"episode_id": episode_id, "task": "recreation_plan"}),
-    ]
-    transform_deps: tuple[str, ...] = ("plan",)
-    if risk == "high":
-        nodes.append(DagNode(
-            id="fair-use-gate", capability="human_approval",
-            params={"episode_id": episode_id, "reason": "fair_use_high_risk"},
-            depends_on=("plan",), max_retries=0,
-        ))
-        transform_deps = ("fair-use-gate",)
-    nodes.extend((
-        DagNode(id="v2v", capability="video_to_video",
-                params={"episode_id": episode_id}, depends_on=transform_deps),
-        DagNode(id="voice", capability="tts",
-                params={"episode_id": episode_id}, depends_on=("plan",)),
-        DagNode(id="compose", capability="compose_short",
-                params={"episode_id": episode_id}, depends_on=("v2v", "voice")),
-    ))
-    return DagSpec(nodes=tuple(nodes))
-
-
 # ---- parsers ---------------------------------------------------------------
 def _strip_fences(raw: str) -> str:
     raw = raw.strip()
@@ -275,5 +249,4 @@ __all__ = [
     "RecreationPlan",
     "SceneCandidate",
     "SceneTrendMatchUseCase",
-    "build_recreation_dag",
 ]

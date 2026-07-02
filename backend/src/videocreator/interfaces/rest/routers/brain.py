@@ -19,8 +19,10 @@ from videocreator.interfaces.rest.schemas import (
     UpdateRecreationRequest,
     SceneCandidateResponse,
     SceneTrendMatchRequest,
+    SceneTrendMatchResponse,
     ViralGenomeResponse,
 )
+from videocreator.infrastructure.trends.google_trends import GoogleTrendsRss
 from videocreator.domain.entities import Recreation
 from videocreator.domain.value_objects import RecreationState
 from videocreator.domain.services.provider_hints import filter_available
@@ -35,7 +37,7 @@ router = APIRouter(prefix="/brain", tags=["brain"])
 @router.post(
     "/analyze",
     response_model=ViralGenomeResponse,
-    summary="Analyze a video and extract its viral genome",
+    summary="Analyze a video's context/URL as text and extract its viral genome (no video ingestion)",
 )
 async def analyze_video(
     body: AnalyzeVideoRequest,
@@ -188,6 +190,37 @@ async def update_recreation(
     return _to_recreation_response(rec)
 
 
+def _resolve_recreation_provider(container: ContainerDep, rec: Recreation) -> str:
+    """Resolve the actual text_to_video provider for a recreation run.
+
+    Never silently defaults to "veo" — that provider has no registered handler
+    in this build (§ engine→DAG migration in progress) and would fail opaquely
+    once the DAG actually executes. An explicit `rec.provider` is validated
+    against what this build knows about; otherwise the first provider that
+    declares the `text_to_video` capability in the SDK registry is picked.
+    Raises 422 (listing what's available) when neither resolves.
+    """
+    available = container.available_provider_names()
+    if rec.provider:
+        if rec.provider not in available:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Provider '{rec.provider}' no está disponible. "
+                    f"Disponibles: {sorted(available)}"
+                ),
+            )
+        return rec.provider
+
+    capable = [lp.manifest.id for lp in container.provider_registry().find("text_to_video")]
+    if not capable:
+        raise HTTPException(
+            status_code=422,
+            detail="No hay ningún provider disponible con la capability 'text_to_video'.",
+        )
+    return capable[0]
+
+
 @router.post(
     "/recreations/{recreation_id}/run",
     summary="Execute a recreation draft",
@@ -203,6 +236,8 @@ async def run_recreation(
     from videocreator.domain.value_objects import DagSpec, DagNode
     from videocreator.infrastructure.queue.dag_executor import DagRun, DagExecutor
 
+    provider = _resolve_recreation_provider(container, rec)
+
     # BASIC recreation: generate one clip from the plan's prompt via text_to_video
     # (a real, registry-backed capability). This is the "from scratch" path.
     # For keeping a real clip's head and regenerating only its ending from a cut
@@ -213,11 +248,11 @@ async def run_recreation(
         capability="text_to_video",
         params={
             "prompt": rec.v2v_prompt,
-            "provider": rec.provider or "veo",
+            "provider": provider,
             "model": rec.model,
         },
     )]
-    
+
     spec = DagSpec(nodes=tuple(nodes))
     run_id = f"run_{uuid.uuid4().hex[:12]}"
     run = DagRun(run_id=run_id, spec=spec)
@@ -402,7 +437,7 @@ def _to_recreation_response(rec: Recreation) -> RecreationResponse:
 
 @router.post(
     "/recreations/trend-match",
-    response_model=list[SceneCandidateResponse],
+    response_model=SceneTrendMatchResponse,
     summary="Match trend terms to famous scenes worth recreating",
 )
 async def scene_trend_match(
@@ -410,14 +445,25 @@ async def scene_trend_match(
     uc: UseCasesDep,
     container: ContainerDep,
     user_id: UserIdDep,
-) -> list[SceneCandidateResponse]:
+) -> SceneTrendMatchResponse:
     terms = body.terms
+    # "live" is also the right label when the caller supplied their own terms
+    # (no auto-fetch happened, so there's nothing stale/generic to flag).
+    trends_source: str = "live"
     if not terms:
-        terms = await container.trend_source().fetch(limit=15)
+        trend_source = container.trend_source()
+        if isinstance(trend_source, GoogleTrendsRss):
+            fetched = await trend_source.fetch_with_source(limit=15)
+            terms, trends_source = fetched.terms, fetched.source
+        else:
+            terms = await trend_source.fetch(limit=15)
     candidates = await uc.brain.scene_trend_match.execute(terms)
-    return [SceneCandidateResponse(
-        term=c.term, scene=c.scene, why_trending=c.why_trending,
-    ) for c in candidates]
+    return SceneTrendMatchResponse(
+        candidates=[SceneCandidateResponse(
+            term=c.term, scene=c.scene, why_trending=c.why_trending,
+        ) for c in candidates],
+        trends_source=trends_source,  # type: ignore[arg-type]
+    )
 
 
 __all__ = ["router"]

@@ -12,18 +12,28 @@ Browser login:
 
 Distribution is local, so client_id/secret are the user's own app credentials,
 passed into ``connect`` and stored alongside the tokens.
+
+Token hygiene: `credentials()` eagerly refreshes the access token before an
+upload uses it (YouTube via `youtube_publisher.build_credentials`, TikTok via
+its `/oauth/token/` refresh endpoint), persisting the fresh token in the vault.
+A refresh failure (revoked/expired token) marks the account
+``AccountStatus.EXPIRED`` and raises a clear `ProviderError` — instead of the
+upload failing opaquely with whatever the platform API happened to return.
 """
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any, Callable
 
 from videocreator.domain.entities import PublishAccount
 from videocreator.domain.ports import PublishAccountRepository, SecretVaultPort
 from videocreator.domain.value_objects import AccountStatus, PublishPlatform
+from videocreator.infrastructure.publish.youtube_publisher import build_credentials
 from videocreator.shared.errors import ProviderError
 from videocreator.shared.ids import UserId, new_publish_account_id
 from videocreator.shared.logging import get_logger
+from videocreator.shared.time import utcnow
 
 log = get_logger(__name__)
 
@@ -32,6 +42,9 @@ SECRET_REFRESH = "refresh_token"
 SECRET_ACCESS = "access_token"
 SECRET_CLIENT_ID = "client_id"
 SECRET_CLIENT_SECRET = "client_secret"
+
+#: TikTok's refresh-token endpoint (grant_type=refresh_token).
+TIKTOK_TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/"
 
 
 @dataclass(frozen=True)
@@ -64,6 +77,16 @@ TokenBundle = dict[str, Any]
 YouTubeFlow = Callable[[str, str], TokenBundle]
 AuthCodeFlow = Callable[[PublishPlatform, str, str, PlatformOAuth], TokenBundle]
 
+#: (refresh_token, client_id, client_secret) -> an object with a `.token`
+#: attribute (a `google.oauth2.credentials.Credentials` in production).
+#: Injectable so tests never touch Google.
+YouTubeCredentialsBuilder = Callable[..., Any]
+
+#: (refresh_token, client_id, client_secret) -> the raw token-endpoint JSON
+#: (at least `access_token`; TikTok also rotates `refresh_token`). Injectable
+#: so tests never touch the network.
+TikTokRefreshFlow = Callable[[str, str, str], dict[str, Any]]
+
 
 def _key(platform: PublishPlatform, account_id: str, secret: str) -> str:
     return f"{platform.value}:{account_id}:{secret}"
@@ -79,11 +102,15 @@ class OAuthAccountService:
         *,
         youtube_flow: YouTubeFlow | None = None,
         auth_code_flow: AuthCodeFlow | None = None,
+        youtube_credentials_builder: YouTubeCredentialsBuilder | None = None,
+        tiktok_refresh_flow: TikTokRefreshFlow | None = None,
     ) -> None:
         self._vault = vault
         self._repo = account_repo
         self._youtube_flow = youtube_flow
         self._auth_code_flow = auth_code_flow
+        self._youtube_credentials_builder = youtube_credentials_builder
+        self._tiktok_refresh_flow = tiktok_refresh_flow
 
     async def connect(
         self,
@@ -133,7 +160,12 @@ class OAuthAccountService:
         log.info("channel.disconnected", platform=account.platform.value, account_id=aid)
 
     async def credentials(self, account: PublishAccount) -> TokenBundle:
-        """Return the stored token bundle for an account (for upload)."""
+        """Return the stored token bundle for an account (for upload).
+
+        For platforms with a refresh flow (YouTube, TikTok), eagerly refreshes
+        the access token first — a revoked/expired refresh token is caught
+        here (account marked EXPIRED) instead of failing opaquely mid-upload.
+        """
         aid = str(account.id)
         bundle: TokenBundle = {}
         for secret in (SECRET_REFRESH, SECRET_ACCESS, SECRET_CLIENT_ID, SECRET_CLIENT_SECRET):
@@ -142,7 +174,92 @@ class OAuthAccountService:
                 bundle[secret] = val
         if not bundle:
             raise ProviderError(f"{account.platform.value} account not connected")
+
+        if bundle.get(SECRET_REFRESH):
+            if account.platform is PublishPlatform.YOUTUBE:
+                await self._refresh_youtube_access_token(account, bundle)
+            elif account.platform is PublishPlatform.TIKTOK:
+                await self._refresh_tiktok_access_token(account, bundle)
         return bundle
+
+    # -- token refresh (token hygiene) ---------------------------------------
+    async def _refresh_youtube_access_token(
+        self, account: PublishAccount, bundle: TokenBundle,
+    ) -> None:
+        builder = self._youtube_credentials_builder or build_credentials
+        try:
+            # builder performs a blocking OAuth network call (creds.refresh) —
+            # run it in a worker thread so the event loop stays responsive.
+            creds = await asyncio.to_thread(
+                builder,
+                refresh_token=bundle[SECRET_REFRESH],
+                client_id=bundle.get(SECRET_CLIENT_ID, ""),
+                client_secret=bundle.get(SECRET_CLIENT_SECRET, ""),
+            )
+            token = getattr(creds, "token", None)
+            if not token:
+                raise ProviderError("YouTube refresh returned no access token")
+        except Exception as e:
+            await self._mark_expired(account)
+            raise ProviderError(
+                f"YouTube token refresh failed — reconnect the account: {e}"
+            ) from e
+        bundle[SECRET_ACCESS] = token
+        await self._vault.set_secret(
+            account.user_id, _key(account.platform, str(account.id), SECRET_ACCESS), token,
+        )
+
+    async def _refresh_tiktok_access_token(
+        self, account: PublishAccount, bundle: TokenBundle,
+    ) -> None:
+        try:
+            # The refresh flow does a blocking httpx.post — off the event loop.
+            fields = await asyncio.to_thread(
+                self._run_tiktok_refresh,
+                bundle[SECRET_REFRESH],
+                bundle.get(SECRET_CLIENT_ID, ""),
+                bundle.get(SECRET_CLIENT_SECRET, ""),
+            )
+            access = fields.get("access_token")
+            if not access:
+                raise ProviderError("TikTok refresh returned no access token")
+        except Exception as e:
+            await self._mark_expired(account)
+            raise ProviderError(
+                f"TikTok token refresh failed — reconnect the account: {e}"
+            ) from e
+        bundle[SECRET_ACCESS] = access
+        aid = str(account.id)
+        await self._vault.set_secret(
+            account.user_id, _key(account.platform, aid, SECRET_ACCESS), access,
+        )
+        # TikTok rotates the refresh token on every use — persist it too, or
+        # the *next* refresh will fail with a stale token.
+        new_refresh = fields.get("refresh_token")
+        if new_refresh:
+            bundle[SECRET_REFRESH] = new_refresh
+            await self._vault.set_secret(
+                account.user_id, _key(account.platform, aid, SECRET_REFRESH), new_refresh,
+            )
+
+    def _run_tiktok_refresh(
+        self, refresh_token: str, client_id: str, client_secret: str,
+    ) -> dict[str, Any]:
+        if self._tiktok_refresh_flow is not None:
+            return self._tiktok_refresh_flow(refresh_token, client_id, client_secret)
+        return _default_tiktok_refresh(refresh_token, client_id, client_secret)
+
+    async def _mark_expired(self, account: PublishAccount) -> None:
+        if account.status is AccountStatus.EXPIRED:
+            return
+        expired = account.model_copy(update={
+            "status": AccountStatus.EXPIRED, "updated_at": utcnow(),
+        })
+        await self._repo.save(expired)
+        log.warning(
+            "channel.token_expired",
+            platform=account.platform.value, account_id=str(account.id),
+        )
 
     # -- flow runners --------------------------------------------------------
     def _run_youtube_flow(self, client_id: str, client_secret: str) -> TokenBundle:
@@ -276,6 +393,25 @@ def _default_auth_code_flow(
     }
 
 
+def _default_tiktok_refresh(  # pragma: no cover - network, exercised via injected fake
+    refresh_token: str, client_id: str, client_secret: str,
+) -> dict[str, Any]:
+    """POST the refresh_token grant to TikTok's token endpoint.
+
+    https://developers.tiktok.com/doc/oauth-user-access-token-management
+    """
+    import httpx  # lazy
+
+    resp = httpx.post(TIKTOK_TOKEN_URL, data={
+        "client_key": client_id,
+        "client_secret": client_secret,
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+    }, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
 __all__ = [
     "OAuthAccountService",
     "PlatformOAuth",
@@ -284,4 +420,5 @@ __all__ = [
     "SECRET_CLIENT_ID",
     "SECRET_CLIENT_SECRET",
     "SECRET_REFRESH",
+    "TIKTOK_TOKEN_URL",
 ]

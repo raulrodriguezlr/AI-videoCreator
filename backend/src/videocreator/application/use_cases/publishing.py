@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from videocreator.domain.entities import PublishAccount, PublishJob
-from videocreator.domain.value_objects import PublishPlatform, PublishStatus
+from videocreator.domain.value_objects import AccountStatus, PublishPlatform, PublishStatus
 from videocreator.shared.errors import NotFoundError, ValidationError
 from videocreator.shared.ids import (
     EpisodeId,
@@ -30,6 +30,25 @@ log = get_logger(__name__)
 
 EPISODE_BUCKET = "episodes"
 SHORTS_BUCKET = "shorts"
+
+#: Substrings that flag an upload failure as an auth problem rather than a
+#: transient/content error. Publishers raise a mix of ProviderError, raw
+#: httpx errors, and plain exceptions — there's no single type to catch — so
+#: this matches on HTTP status (when the exception carries one) and common
+#: auth-failure wording.
+_AUTH_ERROR_MARKERS = (
+    "401", "403", "unauthorized", "forbidden", "expired",
+    "invalid_grant", "invalid_token", "invalid credentials",
+)
+
+
+def _is_auth_error(exc: Exception) -> bool:
+    """Best-effort detection of an auth-failure signal from a publisher upload."""
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status in (401, 403):
+        return True
+    text = str(exc).lower()
+    return any(marker in text for marker in _AUTH_ERROR_MARKERS)
 
 
 class PublishService:
@@ -119,6 +138,8 @@ class PublishService:
             )
         except Exception as e:  # noqa: BLE001 - surface any upload failure on the job
             log.error("publish.failed", job_id=str(job.id), error=str(e))
+            if _is_auth_error(e):
+                await self._expire_account(account)
             return await self._fail(job, str(e))
 
         job = job.model_copy(update={
@@ -160,6 +181,24 @@ class PublishService:
             if episode is not None:
                 episode.youtube_video_id = result.video_id
                 await self._episodes.save(episode)
+
+    async def _expire_account(self, account: PublishAccount) -> None:
+        """Flag a connected account as needing reconnection (token hygiene).
+
+        Called when an upload fails with an auth signal (401/403, revoked/
+        expired token) so the Channels Hub UI can prompt a reconnect instead
+        of silently retrying a dead credential on the next scheduled run.
+        """
+        if account.status is AccountStatus.EXPIRED:
+            return
+        account = account.model_copy(update={
+            "status": AccountStatus.EXPIRED, "updated_at": utcnow(),
+        })
+        await self._accounts.save(account)
+        log.warning(
+            "publish.account_expired",
+            account_id=str(account.id), platform=account.platform.value,
+        )
 
     async def _mark(self, job: PublishJob, status: PublishStatus) -> PublishJob:
         job = job.model_copy(update={"status": status, "updated_at": utcnow()})

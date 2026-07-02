@@ -10,7 +10,6 @@ from videocreator.application.use_cases.scene_recreation import (
     FairUseAdvisorUseCase,
     PlanSceneRecreationUseCase,
     SceneTrendMatchUseCase,
-    build_recreation_dag,
 )
 
 
@@ -117,25 +116,3 @@ class TestTrendMatch:
     async def test_unparseable_returns_empty(self) -> None:
         uc = SceneTrendMatchUseCase(FakeLLM(["not json"]))  # type: ignore[arg-type]
         assert await uc.execute(["term"]) == []
-
-
-class TestRecreationDag:
-    def test_low_risk_no_gate(self) -> None:
-        spec = build_recreation_dag("ep1", risk="low")
-        ids = {n.id for n in spec.nodes}
-        assert "fair-use-gate" not in ids
-        by_id = {n.id: n for n in spec.nodes}
-        assert by_id["v2v"].depends_on == ("plan",)
-
-    def test_high_risk_inserts_blocking_gate(self) -> None:
-        spec = build_recreation_dag("ep1", risk="high")
-        by_id = {n.id: n for n in spec.nodes}
-        assert "fair-use-gate" in by_id
-        assert by_id["v2v"].depends_on == ("fair-use-gate",)
-        assert by_id["fair-use-gate"].max_retries == 0
-
-    def test_dag_is_valid_and_composes(self) -> None:
-        spec = build_recreation_dag("ep1", risk="medium")
-        order = [n.id for n in spec.topo_order()]
-        assert order.index("compose") > order.index("v2v")
-        assert order.index("compose") > order.index("voice")

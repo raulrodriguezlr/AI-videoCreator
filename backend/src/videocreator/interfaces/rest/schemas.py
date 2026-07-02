@@ -935,6 +935,21 @@ class SceneCandidateResponse(BaseModel):
     why_trending: str
 
 
+class SceneTrendMatchResponse(BaseModel):
+    """Trend-match results plus where the trend terms actually came from.
+
+    `trends_source` is "live" when Google Trends answered, "cache" when a
+    same-day cached fetch was reused, and "fallback" when neither was
+    available and a generic evergreen term list was used instead — the
+    frontend surfaces a discreet notice for the latter two.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidates: list[SceneCandidateResponse]
+    trends_source: Literal["live", "cache", "fallback"] = "live"
+
+
 # ---------------------------------------------------------------------------
 # Publishing — YouTube OAuth (§16.14)
 # ---------------------------------------------------------------------------
@@ -1107,4 +1122,5 @@ __all__ = [
     "UpdateRecreationRequest",
     "SceneTrendMatchRequest",
     "SceneCandidateResponse",
+    "SceneTrendMatchResponse",
 ]

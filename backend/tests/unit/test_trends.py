@@ -1,6 +1,10 @@
 """Tests for the web trends source + its use in topic generation."""
 from __future__ import annotations
 
+import json
+import time
+from pathlib import Path
+
 import httpx
 import respx
 
@@ -62,25 +66,108 @@ async def test_fetch_sends_browser_user_agent() -> None:
 
 
 @respx.mock
-async def test_fetch_returns_empty_on_error() -> None:
+async def test_fetch_falls_back_to_evergreen_on_error_with_no_cache() -> None:
+    """Trending is never empty: no cache configured + live fetch fails →
+    the evergreen fallback list, never []."""
     respx.get(_RSS).mock(side_effect=httpx.ConnectError("down"))
-    assert await GoogleTrendsRss().fetch(language="en") == []
+    terms = await GoogleTrendsRss().fetch(language="en")
+    assert terms != []
 
 
 @respx.mock
-async def test_fetch_returns_empty_on_unexpected_parse_error(monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    """Best-effort source: even a non-HTTP failure must degrade to []."""
+async def test_fetch_returns_empty_on_unexpected_parse_error_with_no_cache() -> None:
+    """A non-HTTP failure also degrades to the fallback list, not []."""
     import videocreator.infrastructure.trends.google_trends as mod
 
     respx.get(_RSS).mock(return_value=httpx.Response(200, text="<rss></rss>"))
-    monkeypatch.setattr(mod, "_TITLE_RE", _BoomRegex())
 
-    assert await GoogleTrendsRss().fetch(language="en") == []
+    class _BoomRegex:
+        def findall(self, _text: str) -> list[str]:
+            raise ValueError("boom")
+
+    rss = GoogleTrendsRss()
+    orig = mod._TITLE_RE
+    mod._TITLE_RE = _BoomRegex()  # type: ignore[assignment]
+    try:
+        terms = await rss.fetch(language="en")
+    finally:
+        mod._TITLE_RE = orig
+    assert terms != []
 
 
-class _BoomRegex:
-    def findall(self, _text: str) -> list[str]:
-        raise ValueError("boom")
+# --------------------------------------------------------------------------
+# Resilience: on-disk cache (TTL 24h) + evergreen fallback + trends_source
+# --------------------------------------------------------------------------
+@respx.mock
+async def test_live_fetch_writes_cache_and_reports_live_source(tmp_path: Path) -> None:
+    respx.get(_RSS).mock(return_value=httpx.Response(
+        200, text="<rss><channel><item><title>Eclipse solar</title></item></channel></rss>",
+    ))
+    rss = GoogleTrendsRss(cache_dir=tmp_path)
+
+    result = await rss.fetch_with_source(language="en", limit=10)
+
+    assert result.source == "live"
+    assert result.terms == ["Eclipse solar"]
+    cache_file = tmp_path / "google_trends.json"
+    assert cache_file.exists()
+    cached = json.loads(cache_file.read_text(encoding="utf-8"))
+    assert cached["US"]["terms"] == ["Eclipse solar"]
+
+
+@respx.mock
+async def test_fetch_uses_fresh_cache_when_live_fails(tmp_path: Path) -> None:
+    cache_file = tmp_path / "google_trends.json"
+    cache_file.write_text(json.dumps({
+        "US": {"terms": ["Cached term"], "fetched_at": time.time()},
+    }), encoding="utf-8")
+    respx.get(_RSS).mock(side_effect=httpx.ConnectError("down"))
+    rss = GoogleTrendsRss(cache_dir=tmp_path)
+
+    result = await rss.fetch_with_source(language="en")
+
+    assert result.source == "cache"
+    assert result.terms == ["Cached term"]
+
+
+@respx.mock
+async def test_fetch_ignores_stale_cache_and_uses_fallback(tmp_path: Path) -> None:
+    cache_file = tmp_path / "google_trends.json"
+    stale = time.time() - 25 * 3600  # >24h TTL
+    cache_file.write_text(json.dumps({
+        "US": {"terms": ["Stale term"], "fetched_at": stale},
+    }), encoding="utf-8")
+    respx.get(_RSS).mock(side_effect=httpx.ConnectError("down"))
+    rss = GoogleTrendsRss(cache_dir=tmp_path)
+
+    result = await rss.fetch_with_source(language="en")
+
+    assert result.source == "fallback"
+    assert "Stale term" not in result.terms
+    assert len(result.terms) > 0
+
+
+@respx.mock
+async def test_fetch_falls_back_when_no_cache_dir_configured() -> None:
+    respx.get(_RSS).mock(side_effect=httpx.ConnectError("down"))
+    rss = GoogleTrendsRss()  # no cache_dir at all
+
+    result = await rss.fetch_with_source(language="en")
+
+    assert result.source == "fallback"
+    assert len(result.terms) > 0
+
+
+@respx.mock
+async def test_fetch_survives_corrupt_cache_file(tmp_path: Path) -> None:
+    cache_file = tmp_path / "google_trends.json"
+    cache_file.write_text("not json{{{", encoding="utf-8")
+    respx.get(_RSS).mock(side_effect=httpx.ConnectError("down"))
+    rss = GoogleTrendsRss(cache_dir=tmp_path)
+
+    result = await rss.fetch_with_source(language="en")
+
+    assert result.source == "fallback"
 
 
 # --------------------------------------------------------------------------

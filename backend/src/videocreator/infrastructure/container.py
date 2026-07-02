@@ -500,7 +500,10 @@ class Container:
         return self._get("higgsfield_anchor", _build)
 
     def trend_source(self) -> TrendSourcePort:
-        return self._get("trend_source", GoogleTrendsRss)
+        return self._get(
+            "trend_source",
+            lambda: GoogleTrendsRss(cache_dir=self.settings.var_dir / "cache"),
+        )
 
     def voice_search(self) -> ElevenLabsVoiceSearch:
         return self._get("voice_search", lambda: ElevenLabsVoiceSearch(self.settings, self.llm()))
