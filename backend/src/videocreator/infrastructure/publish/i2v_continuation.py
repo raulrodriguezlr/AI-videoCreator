@@ -37,11 +37,19 @@ class ProviderI2VContinuation:
             raise ProviderError(
                 "no provider declares 'image_to_video' — install one (providers.d)"
             )
+        # Pass the path string, not bytes — CLI-backed providers (Higgsfield) need
+        # a file path for --start-image; passing raw bytes produces a str() blob
+        # that exceeds Windows CreateProcess limits and triggers FileNotFoundError.
+        # API-backed providers that need bytes can read the file themselves via
+        # the "input_image_path" key.
         request = GenRequest(
             prompt=prompt,
             duration_s=duration_s,
             model_id=self._model,
-            extra={"input_image": seed_frame.read_bytes()},
+            extra={
+                "input_image": str(seed_frame),
+                "input_image_path": str(seed_frame),
+            },
         )
         last_error: Exception | None = None
         for lp in candidates:

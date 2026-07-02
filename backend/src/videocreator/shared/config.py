@@ -116,7 +116,7 @@ class Settings(BaseSettings):
     image_model: str = "gemini-2.5-flash-image"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:14b-instruct"
-    ollama_timeout_seconds: float = 300.0
+    ollama_timeout_seconds: float = 600.0
 
     # --- providers ---
     google_api_key: str | None = None

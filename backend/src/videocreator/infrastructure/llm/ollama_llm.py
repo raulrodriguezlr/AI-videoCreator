@@ -63,9 +63,12 @@ class OllamaLLM:
             "model": model or self._default_model,
             "prompt": self._build_prompt(prompt, response_schema),
             "stream": False,
+            # Disable Qwen3 extended thinking — it emits <think>…</think> blocks
+            # before JSON, which breaks structured-output parsing downstream.
+            "think": False,
             "options": {
                 "temperature": temperature,
-                "num_ctx": 8192,
+                "num_ctx": 4096,
                 "num_predict": -1,
             },
         }
