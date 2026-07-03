@@ -46,6 +46,13 @@ class FfmpegShortComposer:
 
     def __init__(self, ffmpeg_bin: str = _FFMPEG_BIN) -> None:
         self._bin = ffmpeg_bin
+        # Non-silent-degradation ledger: populated fresh on every `compose()`
+        # call whenever a requested feature falls back to something lesser
+        # (smart-reframe unavailable, no music bed, split→fill for missing
+        # b-roll, ASR captions unavailable...). The handler reads this right
+        # after awaiting `compose()` and surfaces it to the caller/response —
+        # see `short_render.py` / `shorts.py`.
+        self.warnings: list[str] = []
 
     async def compose(
         self,
@@ -57,12 +64,20 @@ class FfmpegShortComposer:
         crop_x: dict[int, str] | None = None,
         broll_path: Path | None = None,
         music_path: Path | None = None,
+        asr_audio_path: Path | None = None,
+        script_lines: list[str] | None = None,
     ) -> Path:
+        self.warnings = []
         if timeline.is_empty:
             raise ProviderError("short-composer: timeline has no segments")
         if shutil.which(self._bin) is None:
             raise ProviderError(
                 f"short-composer: '{self._bin}' not found on PATH — install FFmpeg"
+            )
+
+        if getattr(timeline, "layout", "fill") == "split" and broll_path is None:
+            self.warnings.append(
+                "split layout requested but no b-roll available — degraded to full-frame fill"
             )
 
         if beat_grid and beat_grid.is_reliable:
@@ -72,7 +87,11 @@ class FfmpegShortComposer:
         caption_files = self._write_caption_files(timeline, output_path.parent)
         # Prefer the Hormozi-style word-by-word .ass overlay; when it's built it
         # replaces the per-segment boxed `drawtext` caption entirely.
-        subtitle_ass = self._build_ass_subtitle(timeline, output_path.parent)
+        subtitle_ass = self._build_ass_subtitle(
+            timeline, output_path.parent,
+            asr_audio_path=asr_audio_path, script_lines=script_lines,
+            warnings=self.warnings,
+        )
         if subtitle_ass:
             caption_files = {}
         args = self._build_args(
@@ -84,25 +103,61 @@ class FfmpegShortComposer:
 
     # ---- word-by-word .ass subtitle (Hormozi look) ------------------------
     @staticmethod
-    def _build_ass_subtitle(timeline: EditingTimeline, workdir: Path) -> str | None:
+    def _build_ass_subtitle(
+        timeline: EditingTimeline,
+        workdir: Path,
+        *,
+        asr_audio_path: Path | None = None,
+        script_lines: list[str] | None = None,
+        warnings: list[str] | None = None,
+    ) -> str | None:
         """Build a single word-by-word `.ass` for the whole short, or `None`.
 
-        Spreads each segment's caption text evenly across that segment's slot in
-        the OUTPUT timeline (cumulative segment durations, since segments are
-        hard-cut/concatenated) and renders it with the timeline's template style.
-        Returns an ffmpeg-escaped path, or `None` when no segment has a caption.
-        Timings are estimates (no per-word alignment persisted at short time);
-        good enough for the reveal, and a real alignment can replace it later.
+        Two timing sources, in priority order:
+
+        1. **Real ASR** (`teaser` pipeline): when `asr_audio_path` is given, run
+           local Whisper on the actual rendered audio and correct its text
+           against `script_lines` (see `ass_captions.build_captions_from_asr`).
+           This is the fix for caption/voice desync — real timing instead of an
+           estimate. Any failure (missing `faster-whisper`, transcription
+           error) records a warning and falls through to the estimate below
+           rather than breaking the render.
+        2. **Estimated timing** (`legacy` pipeline / ASR fallback): spreads each
+           segment's caption text evenly across that segment's slot in the
+           OUTPUT timeline (cumulative segment durations, since segments are
+           hard-cut/concatenated). Timings are estimates — good enough for the
+           reveal, but the reason the `teaser` pipeline replaces this path.
+
+        Returns an ffmpeg-escaped path, or `None` when no segment has a caption
+        and no ASR audio was supplied.
         """
         from videocreator.infrastructure.video.ass_captions import (  # noqa: PLC0415
             WordTiming,
             build_ass,
+            build_captions_from_asr,
             extract_keywords_from_script,
             style_for,
         )
 
+        style = style_for(getattr(timeline, "template", None))
+
+        if asr_audio_path is not None and script_lines:
+            asr_words = build_captions_from_asr(asr_audio_path, script_lines)
+            if asr_words:
+                keywords: set[str] = set()
+                for line in script_lines:
+                    keywords |= extract_keywords_from_script(line)
+                out = workdir / "subs.ass"
+                build_ass(asr_words, keywords, out, style=style)
+                return _escape_path(str(out))
+            if warnings is not None:
+                warnings.append(
+                    "ASR captions unavailable (faster-whisper missing or "
+                    "transcription failed) — fell back to estimated timing"
+                )
+
         words: list[WordTiming] = []
-        keywords: set[str] = set()
+        keywords = set()
         offset = 0.0
         for seg in timeline.segments:
             text = (seg.caption or "").strip()
@@ -120,7 +175,6 @@ class FfmpegShortComposer:
         if not words:
             return None
         out = workdir / "subs.ass"
-        style = style_for(getattr(timeline, "template", None))
         build_ass(words, keywords, out, style=style)
         return _escape_path(str(out))
 

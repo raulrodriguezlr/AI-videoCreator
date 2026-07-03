@@ -89,7 +89,10 @@ from videocreator.application.use_cases.shorts import (
     GetShort,
     ListShorts,
 )
-from videocreator.application.use_cases.shorts_planning import SelectShortHighlights
+from videocreator.application.use_cases.shorts_planning import (
+    SelectShortHighlights,
+    SelectTeaserStructure,
+)
 from videocreator.application.use_cases.topics import (
     DeleteTopic,
     GenerateTopics,
@@ -307,6 +310,7 @@ class Container:
                 settings=self.settings,
                 assembler=self.video_assembler(),
                 highlight_selector=self.short_highlight_selector(),
+                teaser_selector=self.short_teaser_selector(),
                 broll_library=self.broll_library(),
                 music_library=self.music_library(),
             ),
@@ -439,6 +443,12 @@ class Container:
         return self._get(
             "short_highlight_selector",
             lambda: SelectShortHighlights(llm=self.llm()),
+        )
+
+    def short_teaser_selector(self) -> SelectTeaserStructure:
+        return self._get(
+            "short_teaser_selector",
+            lambda: SelectTeaserStructure(llm=self.llm()),
         )
 
     def shorts_rules(self) -> ShortsRules:

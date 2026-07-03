@@ -24,9 +24,12 @@ from videocreator.domain.ports import (
     StoragePort,
     VideoAssemblerPort,
 )
-from videocreator.application.use_cases.shorts_planning import SelectShortHighlights
+from videocreator.application.use_cases.shorts_planning import (
+    SelectShortHighlights,
+    SelectTeaserStructure,
+)
 from videocreator.domain.services.short_planner import ShortPlanner
-from videocreator.domain.value_objects import EditingTimeline, ShortsRules
+from videocreator.domain.value_objects import EditingTimeline, ShortsRules, TeaserStructure
 from videocreator.infrastructure.queue.inprocess import JobContext
 from videocreator.shared.config import Settings
 from videocreator.shared.errors import (
@@ -43,6 +46,12 @@ log = get_logger(__name__)
 SHORTS_BUCKET = "shorts"
 
 
+#: Recognized `pipeline` values. `teaser` is the hand-validated hook →
+#: desarrollo → cliffhanger recipe (V4 default); `legacy` is the prior flat
+#: highlight-montage/single-cut behavior, kept as a selectable fallback.
+_PIPELINES = ("teaser", "legacy")
+
+
 @dataclass(frozen=True, slots=True)
 class _PolishOptions:
     """Layer-2 visual-polish toggles, resolved from the job payload.
@@ -51,35 +60,50 @@ class _PolishOptions:
     caller can disable any effect via the render payload (e.g. {"captions": false}).
     """
 
+    pipeline: str = "teaser"
     captions: bool = True
     ken_burns: bool = True
     transition: str | None = None
     transition_duration_s: float = 0.0
-    layout: str = "fill"
-    template: str = "hormozi1"
+    layout: str = "fit_blur"
+    template: str = "teaser"
     broll_query: str = "satisfying"
     background_music: bool = False
     music_vibe: str = "energetic"
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> _PolishOptions:
+        raw_pipeline = str(payload.get("pipeline", "teaser") or "teaser").lower()
+        pipeline = raw_pipeline if raw_pipeline in _PIPELINES else "teaser"
+        is_teaser = pipeline == "teaser"
+
         raw_transition = payload.get("transition", None)
         transition = str(raw_transition) if raw_transition else None
         # Reframe strategy: "fill" (crop to 9:16), "fit_blur" (whole frame +
         # blurred margins) or "split" (main video over b-roll). The legacy
-        # `game_video` toggle is sugar for layout="split". Unknown → "fill".
-        raw_layout = str(payload.get("layout", "fill") or "fill").lower()
-        layout = raw_layout if raw_layout in ("fill", "fit_blur", "split") else "fill"
+        # `game_video` toggle is sugar for layout="split". Unknown → the
+        # pipeline's own default (`fit_blur` for `teaser` — the validated
+        # "blur bands" look — `fill` for `legacy`, unchanged from before).
+        default_layout = "fit_blur" if is_teaser else "fill"
+        raw_layout = str(payload.get("layout", default_layout) or default_layout).lower()
+        layout = raw_layout if raw_layout in ("fill", "fit_blur", "split") else default_layout
         if bool(payload.get("game_video", False)):
             layout = "split"
-        # Caption template (ssemble-style preset). Unknown → default look.
-        raw_tpl = str(payload.get("template", "hormozi1") or "hormozi1").lower()
-        template = raw_tpl if raw_tpl in ("hormozi1", "hormozi2", "karaoke") else "hormozi1"
+        # Caption template (ssemble-style preset). Unknown → the pipeline's own
+        # default (`teaser`'s hand-validated look vs `legacy`'s `hormozi1`).
+        default_template = "teaser" if is_teaser else "hormozi1"
+        raw_tpl = str(payload.get("template", default_template) or default_template).lower()
+        template = (
+            raw_tpl
+            if raw_tpl in ("hormozi1", "hormozi2", "karaoke", "teaser")
+            else default_template
+        )
         broll_query = str(
             payload.get("broll_query") or payload.get("game_query") or "satisfying"
         ).strip() or "satisfying"
         music_vibe = str(payload.get("music_vibe") or "energetic").strip() or "energetic"
         return cls(
+            pipeline=pipeline,
             captions=bool(payload.get("captions", True)),
             ken_burns=bool(payload.get("ken_burns", True)),
             transition=transition,
@@ -131,6 +155,7 @@ class ShortRenderHandler:
         settings: Settings,
         assembler: VideoAssemblerPort,
         highlight_selector: SelectShortHighlights | None = None,
+        teaser_selector: SelectTeaserStructure | None = None,
         broll_library: Any = None,
         music_library: Any = None,
     ) -> None:
@@ -144,10 +169,13 @@ class ShortRenderHandler:
         self._rules = rules
         self._settings = settings
         self._assembler = assembler
-        # Optional LLM "brain": when present (and the source has a script) it
-        # picks a highlight montage; otherwise we fall back to the heuristic
-        # single-cut planner so the engine still works offline / for legacy eps.
+        # Optional LLM "brains": when present (and the source has a script)
+        # `_teaser_selector` picks the hook/desarrollo/cliffhanger structure for
+        # the `teaser` pipeline, `_selector` picks a flat highlight montage for
+        # the `legacy` pipeline; either absent (or an empty pick) falls back to
+        # the heuristic single-cut planner so the engine still works offline.
         self._selector = highlight_selector
+        self._teaser_selector = teaser_selector
         # Optional CC0 b-roll library for the split-screen layout; absent →
         # split degrades to a normal full-frame reframe.
         self._broll = broll_library
@@ -162,25 +190,37 @@ class ShortRenderHandler:
         rule = self._rules.rule_for(short.target_platform)
         start_s = float(job.payload.get("start_s", 0.0))
         style = _PolishOptions.from_payload(job.payload)
-        timeline = await self._plan_timeline(short, script, rule, start_s, style)
+        # Non-silent-degradation ledger for this render — every fallback along
+        # the way (brain unavailable, smart-reframe off, no music, ASR
+        # unavailable...) appends a human-readable line here instead of just
+        # quietly downgrading, so the caller/response can show it.
+        warnings: list[str] = []
+        timeline = await self._plan_timeline(short, script, rule, start_s, style, warnings)
         log.info(
             "short.timeline",
             short_id=short.id,
+            pipeline=style.pipeline,
             segments=len(timeline.segments),
             duration_s=timeline.total_duration_s,
             frame=f"{timeline.width}x{timeline.height}",
             brain=len(timeline.segments) > 1,
         )
 
+        if not self._settings.smart_reframe_enabled:
+            warnings.append("smart-reframe disabled by config — using centered crop")
+
         broll = await self._fetch_broll(timeline, style)
         music = self._fetch_music(style)
+        if style.background_music and music is None:
+            warnings.append("background music requested but unavailable — rendered without it")
         credits = _required_credits([broll, music])
         key = await self._compose_and_store(
             short, episode, timeline, ctx,
             broll.path if broll else None,
             music.path if music else None,
+            style, script, warnings,
         )
-        
+
         import shutil
         import asyncio
         workdir = self._workdir(short)
@@ -198,9 +238,14 @@ class ShortRenderHandler:
             "rendered_video_key": key,
             "duration_s": timeline.total_duration_s,
             "platform": short.target_platform,
+            "pipeline": style.pipeline,
             # Attribution lines for any asset whose licence requires credit
             # (e.g. CC-BY music). Empty when everything used is CC0/public domain.
             "credits": credits,
+            # Every silent-degradation point hit during this render (brain
+            # unwired, smart-reframe off, no b-roll/music, ASR unavailable...).
+            # Empty when the render used everything it was asked for.
+            "warnings": warnings,
         }
 
     # ---- steps ------------------------------------------------------------
@@ -243,54 +288,37 @@ class ShortRenderHandler:
 
     async def _plan_timeline(
         self, short: Short, script: Any, rule: Any, start_s: float,
-        style: _PolishOptions,
+        style: _PolishOptions, warnings: list[str],
     ) -> EditingTimeline:
-        """Plan the short's timeline — LLM highlight montage, else single cut.
+        """Plan the short's timeline for the requested pipeline.
 
-        When a brain (selector) is wired AND the source has a script, ask it for
-        a highlight montage (with layer-2 polish: captions/zoom/transitions); an
-        empty pick or any error degrades to the heuristic single-highlight
-        planner so a short is always produced.
+        `teaser` (default): ask the teaser brain for a hook→desarrollo→
+        cliffhanger `TeaserStructure` and map it via `plan_teaser`. `legacy`:
+        ask the flat highlight-montage brain and map it via `plan_montage`
+        (the prior behavior, unchanged). Either pipeline degrades to the
+        heuristic single-highlight `plan()` when its brain is unwired, returns
+        an empty pick, or errors — a short is always produced, and every
+        degradation is recorded in `warnings` instead of failing silently.
         """
-        if self._selector is not None and script is not None and script.scenes:
-            try:
-                selection = await self._selector.execute(
-                    scenes=script.scenes,
-                    target_duration_s=short.duration_s,
-                    platform=short.target_platform,
-                )
-            except Exception as exc:  # noqa: BLE001 — never fail render on brain
-                log.warning("short.brain_error", short_id=short.id, error=str(exc))
-                selection = None
-            if selection is not None and not selection.is_empty:
-                captions = (
-                    [s.audio_text for s in script.scenes] if style.captions else None
-                )
-                timeline = self._planner.plan_montage(
-                    scene_durations=[s.duration_s for s in script.scenes],
-                    selected_indices=list(selection.scene_indices),
-                    rule=rule,
-                    scene_captions=captions,
-                    ken_burns=style.ken_burns,
-                    transition=style.transition,
-                    transition_duration_s=style.transition_duration_s,
-                    requested_duration_s=short.duration_s,
-                    layout=style.layout,
-                )
-                if not timeline.is_empty:
-                    if selection.hook_text and not short.hook_text:
-                        short.hook_text = selection.hook_text
-                    log.info(
-                        "short.brain_pick",
-                        short_id=short.id,
-                        scenes=list(selection.scene_indices),
-                        captions=style.captions,
-                        ken_burns=style.ken_burns,
-                        transition=style.transition,
-                    )
-                    return timeline.model_copy(
-                        update={"template": style.template}
-                    )
+        has_script = script is not None and script.scenes
+        if style.pipeline == "teaser":
+            if self._teaser_selector is None:
+                warnings.append("teaser brain not configured — using heuristic single cut")
+            elif not has_script:
+                warnings.append("source has no script — using heuristic single cut")
+            else:
+                timeline = await self._plan_teaser_timeline(short, script, rule, style, warnings)
+                if timeline is not None:
+                    return timeline
+        else:
+            if self._selector is None:
+                warnings.append("highlight brain not configured — using heuristic single cut")
+            elif not has_script:
+                warnings.append("source has no script — using heuristic single cut")
+            else:
+                timeline = await self._plan_montage_timeline(short, script, rule, style)
+                if timeline is not None:
+                    return timeline
 
         return self._planner.plan(
             source_duration_s=self._duration_from_script(script),
@@ -301,6 +329,100 @@ class ShortRenderHandler:
             ken_burns=style.ken_burns,
         ).model_copy(update={"template": style.template})
 
+    async def _plan_teaser_timeline(
+        self, short: Short, script: Any, rule: Any, style: _PolishOptions,
+        warnings: list[str],
+    ) -> EditingTimeline | None:
+        """`teaser` pipeline: hook→desarrollo→cliffhanger, or `None` to fall back."""
+        assert self._teaser_selector is not None
+        try:
+            structure = await self._teaser_selector.execute(
+                scenes=script.scenes,
+                target_duration_s=short.duration_s,
+                platform=short.target_platform,
+            )
+        except Exception as exc:  # noqa: BLE001 — never fail render on brain
+            log.warning("short.teaser_brain_error", short_id=short.id, error=str(exc))
+            warnings.append("teaser brain failed — using heuristic single cut")
+            return None
+        if structure.is_empty:
+            warnings.append("teaser brain returned no pick — using heuristic single cut")
+            return None
+
+        captions = [s.audio_text for s in script.scenes] if style.captions else None
+        timeline = self._planner.plan_teaser(
+            scene_durations=[s.duration_s for s in script.scenes],
+            structure=structure,
+            rule=rule,
+            scene_captions=captions,
+            ken_burns=style.ken_burns,
+            transition=style.transition,
+            transition_duration_s=style.transition_duration_s,
+            requested_duration_s=short.duration_s,
+            layout=style.layout,
+        )
+        if timeline.is_empty:
+            warnings.append("teaser structure mapped to no valid segments — using heuristic single cut")
+            return None
+
+        if structure.hook_text and not short.hook_text:
+            short.hook_text = structure.hook_text
+        log.info(
+            "short.teaser_pick",
+            short_id=short.id,
+            hook=structure.hook_scene_index,
+            desarrollo=list(structure.desarrollo_scene_indices),
+            cliffhanger=structure.cliffhanger_scene_index,
+            captions=style.captions,
+            ken_burns=style.ken_burns,
+            transition=style.transition,
+        )
+        return timeline.model_copy(update={"template": style.template})
+
+    async def _plan_montage_timeline(
+        self, short: Short, script: Any, rule: Any, style: _PolishOptions,
+    ) -> EditingTimeline | None:
+        """`legacy` pipeline: flat highlight montage, or `None` to fall back."""
+        assert self._selector is not None
+        try:
+            selection = await self._selector.execute(
+                scenes=script.scenes,
+                target_duration_s=short.duration_s,
+                platform=short.target_platform,
+            )
+        except Exception as exc:  # noqa: BLE001 — never fail render on brain
+            log.warning("short.brain_error", short_id=short.id, error=str(exc))
+            return None
+        if selection.is_empty:
+            return None
+
+        captions = [s.audio_text for s in script.scenes] if style.captions else None
+        timeline = self._planner.plan_montage(
+            scene_durations=[s.duration_s for s in script.scenes],
+            selected_indices=list(selection.scene_indices),
+            rule=rule,
+            scene_captions=captions,
+            ken_burns=style.ken_burns,
+            transition=style.transition,
+            transition_duration_s=style.transition_duration_s,
+            requested_duration_s=short.duration_s,
+            layout=style.layout,
+        )
+        if timeline.is_empty:
+            return None
+
+        if selection.hook_text and not short.hook_text:
+            short.hook_text = selection.hook_text
+        log.info(
+            "short.brain_pick",
+            short_id=short.id,
+            scenes=list(selection.scene_indices),
+            captions=style.captions,
+            ken_burns=style.ken_burns,
+            transition=style.transition,
+        )
+        return timeline.model_copy(update={"template": style.template})
+
     async def _compose_and_store(
         self,
         short: Short,
@@ -309,10 +431,13 @@ class ShortRenderHandler:
         ctx: JobContext,
         broll_path: Path | None = None,
         music_path: Path | None = None,
+        style: _PolishOptions | None = None,
+        script: Any = None,
+        warnings: list[str] | None = None,
     ) -> str:
         source_local = await self._resolve_source(short, episode)
         out_local = self._workdir(short) / f"{short.id}.mp4"
-        crop_map = self._analyze_crop(short, source_local, timeline)
+        crop_map = self._analyze_crop(short, source_local, timeline, warnings)
         await ctx.progress(0.4, "reframing to 9:16")
         # Only pass the optional kwargs when present so composers that predate
         # them (e.g. test fakes) keep working unchanged.
@@ -321,9 +446,23 @@ class ShortRenderHandler:
             extra["broll_path"] = broll_path
         if music_path is not None:
             extra["music_path"] = music_path
+        # `teaser` pipeline: hand the composer the REAL rendered audio + the
+        # script lines so it can run ASR + script-correction for captions
+        # (see `ass_captions.build_captions_from_asr`) instead of the estimated
+        # per-segment timing. Best-effort — the composer itself degrades to
+        # estimated timing (with a warning) if ASR isn't available.
+        if style is not None and style.pipeline == "teaser" and style.captions and script is not None:
+            extra["asr_audio_path"] = source_local
+            extra["script_lines"] = [
+                (s.audio_text or "") for s in script.scenes if s.audio_text
+            ]
         await self._composer.compose(
             source_local, timeline, out_local, crop_x=crop_map, **extra
         )
+        if warnings is not None:
+            composer_warnings = getattr(self._composer, "warnings", None)
+            if composer_warnings:
+                warnings.extend(composer_warnings)
         await ctx.progress(0.9, "storing short")
         return await self._store(short, out_local)
 
@@ -364,18 +503,21 @@ class ShortRenderHandler:
         return asset
 
     def _analyze_crop(
-        self, short: Short, source_local: Path, timeline: EditingTimeline
+        self, short: Short, source_local: Path, timeline: EditingTimeline,
+        warnings: list[str] | None = None,
     ) -> dict[int, str] | None:
         """Best-effort Auto-Reframe: per-segment crop x-expressions, or `None`.
 
         Smart reframe must NEVER break a render — any failure (missing
-        OpenCV/MediaPipe, a corrupt source, ...) is logged and degrades to the
+        OpenCV/MediaPipe, a corrupt source, ...) is logged (and, when a
+        `warnings` ledger is passed, recorded there) and degrades to the
         composer's existing centered crop.
         """
         if not self._settings.smart_reframe_enabled:
             return None
         # Only the "fill" (crop) layout uses a subject-tracking crop window;
-        # "fit_blur" shows the whole frame, so face analysis would be wasted.
+        # "fit_blur" shows the whole frame, so face analysis would be wasted —
+        # not a degradation, just an inapplicable feature for this layout.
         if getattr(timeline, "layout", "fill") != "fill":
             return None
         try:
@@ -386,6 +528,8 @@ class ShortRenderHandler:
             return analyze_timeline(source_local, timeline)
         except Exception as exc:  # noqa: BLE001 — never fail render on reframe
             log.warning("short.smart_reframe_error", short_id=short.id, error=str(exc))
+            if warnings is not None:
+                warnings.append(f"smart-reframe unavailable ({exc}) — using centered crop")
             return None
 
     # ---- source resolution ------------------------------------------------

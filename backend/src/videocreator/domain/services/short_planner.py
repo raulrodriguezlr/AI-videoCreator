@@ -14,6 +14,7 @@ from __future__ import annotations
 from videocreator.domain.value_objects import (
     EditingTimeline,
     PlatformRule,
+    TeaserStructure,
     TimelineSegment,
 )
 
@@ -147,6 +148,142 @@ class ShortPlanner:
             
             if used >= budget:
                 break
+
+        return EditingTimeline(
+            segments=tuple(segments),
+            width=rule.width,
+            height=rule.height,
+            transition=transition,
+            transition_duration_s=transition_duration_s,
+            layout=layout,
+        )
+
+    #: Hard cap on the hook segment's own length — the teaser recipe wants the
+    #: hook to land in the first ~3s, even when the source scene runs longer
+    #: (a long hook scene is trimmed from the front, keeping its opening beat).
+    HOOK_MAX_S = 3.0
+
+    def plan_teaser(
+        self,
+        *,
+        scene_durations: list[float],
+        structure: TeaserStructure,
+        rule: PlatformRule,
+        scene_captions: list[str | None] | None = None,
+        ken_burns: bool = False,
+        transition: str | None = None,
+        transition_duration_s: float = 0.0,
+        requested_duration_s: float = 0.0,
+        layout: str = "fill",
+    ) -> EditingTimeline:
+        """Build the teaser's `EditingTimeline`: hook → desarrollo → cliffhanger.
+
+        Unlike `plan_montage` (which just concatenates a flat "best of" list in
+        the order given), this honors the narrative shape: the hook segment is
+        clamped to `HOOK_MAX_S` regardless of the source scene's own length (a
+        hook must land in ~3s, even if the underlying scene runs longer — we
+        keep its opening beat and drop the tail), the desarrollo scenes fill the
+        middle budget, and the cliffhanger always gets its full scene (never
+        trimmed) so it cuts on a real beat rather than mid-sentence.
+
+        Returns an empty timeline when the structure is empty or nothing maps to
+        a valid segment — the caller then falls back to `plan_montage` or the
+        heuristic single-highlight `plan()`.
+        """
+        if structure.is_empty:
+            return EditingTimeline(width=rule.width, height=rule.height, layout=layout)
+
+        offsets: list[float] = []
+        acc = 0.0
+        for dur in scene_durations:
+            offsets.append(acc)
+            acc += max(0.0, dur)
+
+        if requested_duration_s > 0.0:
+            target = requested_duration_s
+        else:
+            target = min(ShortPlanner.DEFAULT_TARGET_S, rule.max_duration_s)
+        budget = min(target, rule.max_duration_s)
+
+        def _caption(idx: int) -> str | None:
+            if scene_captions is not None and 0 <= idx < len(scene_captions):
+                return scene_captions[idx]
+            return None
+
+        def _valid(idx: int) -> bool:
+            return 0 <= idx < len(scene_durations)
+
+        segments: list[TimelineSegment] = []
+        used = 0.0
+
+        # 1) Hook — always included first, clamped to HOOK_MAX_S so a long
+        # source scene still opens the teaser fast.
+        hook_idx = structure.hook_scene_index
+        if hook_idx is not None and _valid(hook_idx):
+            hook_span = min(max(0.0, scene_durations[hook_idx]), self.HOOK_MAX_S)
+            if hook_span > 0.01:
+                segments.append(
+                    TimelineSegment(
+                        source_start_s=offsets[hook_idx],
+                        duration_s=hook_span,
+                        label="hook",
+                        caption=structure.hook_text or _caption(hook_idx),
+                        ken_burns=ken_burns,
+                    )
+                )
+                used += hook_span
+
+        # 2) Desarrollo — fill the middle, but always leave room for the
+        # cliffhanger's full span so the teaser never gets cut short of its
+        # payoff-teasing beat.
+        cliff_idx = structure.cliffhanger_scene_index
+        cliff_span = 0.0
+        if cliff_idx is not None and _valid(cliff_idx):
+            cliff_span = max(0.0, scene_durations[cliff_idx])
+
+        seen = {hook_idx} if hook_idx is not None else set()
+        if cliff_idx is not None:
+            seen.add(cliff_idx)
+        for idx in structure.desarrollo_scene_indices:
+            if not _valid(idx) or idx in seen:
+                continue
+            seen.add(idx)
+            full_span = max(0.0, scene_durations[idx])
+            if full_span <= 0.01:
+                continue
+            remaining_for_dev = budget - used - cliff_span
+            if remaining_for_dev <= 0.01:
+                break
+            span = full_span if full_span <= remaining_for_dev + 1.5 else remaining_for_dev
+            if span <= 0.01:
+                continue
+            segments.append(
+                TimelineSegment(
+                    source_start_s=offsets[idx],
+                    duration_s=span,
+                    label=f"desarrollo_{idx + 1}",
+                    caption=_caption(idx),
+                    ken_burns=ken_burns,
+                )
+            )
+            used += span
+
+        # 3) Cliffhanger — always its FULL span (never trimmed mid-sentence),
+        # even if that pushes slightly past budget; only the platform hard
+        # limit below can still clip it.
+        if cliff_idx is not None and _valid(cliff_idx) and cliff_span > 0.01:
+            remaining_hard = rule.max_duration_s - used
+            span = min(cliff_span, remaining_hard) if remaining_hard > 0.01 else 0.0
+            if span > 0.01:
+                segments.append(
+                    TimelineSegment(
+                        source_start_s=offsets[cliff_idx],
+                        duration_s=span,
+                        label="cliffhanger",
+                        caption=structure.cliffhanger_text or _caption(cliff_idx),
+                        ken_burns=ken_burns,
+                    )
+                )
 
         return EditingTimeline(
             segments=tuple(segments),

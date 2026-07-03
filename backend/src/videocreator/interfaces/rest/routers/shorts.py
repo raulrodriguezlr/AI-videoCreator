@@ -78,6 +78,16 @@ async def delete_short(
     "/{short_id}/render", response_model=EnqueueRenderResponse,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Enqueue vertical reframe/render for the short",
+    description=(
+        "Body's `pipeline` selects the brain: `teaser` (default) is the "
+        "hook→desarrollo→cliffhanger recipe with real ASR-timed, "
+        "script-corrected captions; `legacy` is the prior flat "
+        "highlight-montage/single-cut behavior. Any degradation during the "
+        "render (brain unavailable, smart-reframe off, no b-roll/music, ASR "
+        "unavailable...) is never silent — it's collected into `warnings` on "
+        "the job's `result` once rendering completes (poll/SSE via the jobs "
+        "endpoint), alongside `pipeline` and `credits`."
+    ),
 )
 async def enqueue_render(
     pod_id: str, short_id: str, uc: UseCasesDep, user_id: UserIdDep,

@@ -261,9 +261,16 @@ class RenderShortRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    # Which brain/structure builds the timeline: `teaser` (V4 default) is the
+    # hand-validated hook→desarrollo→cliffhanger recipe with real ASR-timed,
+    # script-corrected captions and the `fit_blur` layout; `legacy` is the
+    # prior flat highlight-montage/single-cut behavior, kept selectable as a
+    # fallback. `_PolishOptions.from_payload` also defaults `layout`/`template`
+    # differently per pipeline when the caller doesn't set them explicitly.
+    pipeline: Literal["teaser", "legacy"] = "teaser"
     captions: bool = True
-    template: Literal["hormozi1", "hormozi2", "karaoke"] = "hormozi1"
-    layout: Literal["fill", "fit_blur", "split"] = "fill"
+    template: Literal["hormozi1", "hormozi2", "karaoke", "teaser"] = "teaser"
+    layout: Literal["fill", "fit_blur", "split"] = "fit_blur"
     ken_burns: bool = True
     transition: str | None = None
     transition_duration_s: float = Field(0.0, ge=0.0, le=2.0)

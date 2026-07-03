@@ -21,7 +21,7 @@ from typing import Any
 
 from videocreator.domain.entities import Scene
 from videocreator.domain.ports import LLMPort
-from videocreator.domain.value_objects import HighlightSelection
+from videocreator.domain.value_objects import HighlightSelection, TeaserStructure
 from videocreator.shared.logging import get_logger
 
 log = get_logger(__name__)
@@ -34,6 +34,35 @@ _HIGHLIGHT_SCHEMA: dict[str, Any] = {
         "rationale": {"type": "string"},
     },
     "required": ["scene_numbers"],
+}
+
+# Structured-output schema for the `teaser` pipeline: an explicit 3-act shape
+# instead of a flat "best scenes" list. Scene numbers are 1-based (matched to
+# the digest below) so the model reasons in the same numbering a human editor
+# would read off the scene list.
+_TEASER_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "hook": {
+            "type": "object",
+            "properties": {
+                "scene_number": {"type": "integer"},
+                "text": {"type": "string"},
+            },
+            "required": ["scene_number"],
+        },
+        "desarrollo": {"type": "array", "items": {"type": "integer"}},
+        "cliffhanger": {
+            "type": "object",
+            "properties": {
+                "scene_number": {"type": "integer"},
+                "text": {"type": "string"},
+            },
+            "required": ["scene_number"],
+        },
+        "rationale": {"type": "string"},
+    },
+    "required": ["hook", "desarrollo", "cliffhanger"],
 }
 
 # Hard cap on how much scene context we send so the prompt stays small even for
@@ -134,6 +163,118 @@ class SelectShortHighlights:
         )
 
 
+def _render_teaser_prompt(
+    *, scenes: list[Scene], target_duration_s: float, platform: str
+) -> str:
+    return (
+        f"You are a viral short-form video editor. From the scenes of a longer "
+        f"episode below, build a TEASER for {platform}: a hook→development→"
+        f"cliffhanger structure, NOT a chronological recap and NOT arbitrary "
+        f"cuts. Target total length ~{target_duration_s:.0f}s.\n\n"
+        f"## SCENES (number. [phase/mood, length] dialogue)\n"
+        f"{_scene_digest(scenes)}\n\n"
+        f"## STRUCTURE\n"
+        f"- `hook`: ONE scene that grabs attention in the first 3 seconds — the "
+        f"punchiest, most surprising or intriguing beat. Write a short on-screen "
+        f"hook caption for it (a question or shocking claim, <= 60 chars).\n"
+        f"- `desarrollo`: an ORDERED list of scene numbers that develop the "
+        f"story between the hook and the cliffhanger. Keep it tight — only the "
+        f"beats that build tension toward the cliffhanger.\n"
+        f"- `cliffhanger`: ONE scene that cuts the story WITHOUT resolving it — "
+        f"leaves the viewer wanting the payoff. Write a short on-screen caption "
+        f"for it that teases what's coming (<= 60 chars) but does NOT reveal it.\n"
+        f"- The hook and cliffhanger scenes must be DIFFERENT scenes, and must "
+        f"NOT appear again inside `desarrollo`.\n"
+        f"- Keep the total (hook + desarrollo + cliffhanger scene lengths) close "
+        f"to {target_duration_s:.0f}s. Better slightly under than way over.\n\n"
+        f"## OUTPUT (strict JSON)\n"
+        f"- `hook`: {{scene_number, text}}\n"
+        f"- `desarrollo`: ordered array of scene numbers\n"
+        f"- `cliffhanger`: {{scene_number, text}}\n"
+        f"- `rationale`: one sentence on why this cut works.\n"
+        f"Return strict JSON matching the supplied schema."
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class SelectTeaserStructure:
+    """LLM use case: build the hook→desarrollo→cliffhanger teaser structure.
+
+    This is the `teaser` pipeline's "brain" — it replaces the flat highlight
+    montage (`SelectShortHighlights`) with an explicit narrative shape. Like its
+    sibling, it never raises: any LLM/parse failure or a structurally invalid
+    pick (missing hook/cliffhanger, hook==cliffhanger) yields an empty
+    `TeaserStructure` so the handler falls back to the montage/heuristic path
+    instead of failing the whole render job.
+    """
+
+    llm: LLMPort
+
+    async def execute(
+        self,
+        *,
+        scenes: list[Scene],
+        target_duration_s: float,
+        platform: str = "shorts",
+    ) -> TeaserStructure:
+        if not scenes:
+            return TeaserStructure()
+        prompt = _render_teaser_prompt(
+            scenes=scenes, target_duration_s=target_duration_s, platform=platform
+        )
+        try:
+            raw = await self.llm.complete(
+                prompt, response_schema=_TEASER_SCHEMA, temperature=0.7
+            )
+            data = json.loads(raw)
+        except Exception as exc:  # noqa: BLE001 — degrade gracefully, never fail render
+            log.warning("shorts.teaser_select_failed", error=str(exc))
+            return TeaserStructure()
+
+        scene_count = len(scenes)
+        hook_idx = _parse_index(_get(data, "hook", "scene_number"), scene_count=scene_count)
+        cliff_idx = _parse_index(
+            _get(data, "cliffhanger", "scene_number"), scene_count=scene_count
+        )
+        if hook_idx is None or cliff_idx is None or hook_idx == cliff_idx:
+            return TeaserStructure()
+
+        desarrollo = _parse_indices(
+            data.get("desarrollo"), scene_count=scene_count
+        )
+        # Hook/cliffhanger scenes are reserved for their own slots — strip them
+        # out of desarrollo so plan_teaser never plays a scene twice.
+        desarrollo = [i for i in desarrollo if i not in (hook_idx, cliff_idx)]
+
+        return TeaserStructure(
+            hook_scene_index=hook_idx,
+            hook_text=_opt(_get(data, "hook", "text")),
+            desarrollo_scene_indices=tuple(desarrollo),
+            cliffhanger_scene_index=cliff_idx,
+            cliffhanger_text=_opt(_get(data, "cliffhanger", "text")),
+            rationale=_opt(data.get("rationale")),
+        )
+
+
+def _get(data: object, *path: str) -> object:
+    """Nested dict lookup that tolerates a missing/non-dict intermediate."""
+    cur: object = data
+    for key in path:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(key)
+    return cur
+
+
+def _parse_index(raw: object, *, scene_count: int) -> int | None:
+    """Coerce a single 1-based LLM scene number to a valid 0-based index."""
+    try:
+        idx = int(raw) - 1  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return idx if 0 <= idx < scene_count else None
+
+
 def heuristic_highlight_indices(
     scenes: list[Scene], target_duration_s: float
 ) -> list[int]:
@@ -187,4 +328,8 @@ def _opt(value: object) -> str | None:
     return text or None
 
 
-__all__ = ["SelectShortHighlights", "heuristic_highlight_indices"]
+__all__ = [
+    "SelectShortHighlights",
+    "SelectTeaserStructure",
+    "heuristic_highlight_indices",
+]

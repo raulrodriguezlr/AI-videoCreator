@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from videocreator.domain.services.short_planner import ShortPlanner
-from videocreator.domain.value_objects import PlatformRule
+from videocreator.domain.value_objects import PlatformRule, TeaserStructure
 
 
 def _rule(**overrides: object) -> PlatformRule:
@@ -91,3 +91,83 @@ def test_plan_rejects_nonpositive_source() -> None:
         ShortPlanner().plan(
             source_duration_s=0.0, requested_duration_s=10.0, rule=_rule()
         )
+
+
+# ---- plan_teaser (pure) ----------------------------------------------------
+def test_plan_teaser_orders_hook_desarrollo_cliffhanger() -> None:
+    # 5 scenes of 10s each; hook=0 (clamped to HOOK_MAX_S), desarrollo=[1,2],
+    # cliffhanger=4 kept at its full 10s span.
+    planner = ShortPlanner()
+    structure = TeaserStructure(
+        hook_scene_index=0, hook_text="hook!",
+        desarrollo_scene_indices=(1, 2),
+        cliffhanger_scene_index=4, cliffhanger_text="wait for it",
+    )
+    timeline = planner.plan_teaser(
+        scene_durations=[10.0] * 5, structure=structure, rule=_rule(),
+        requested_duration_s=30.0,
+    )
+    labels = [s.label for s in timeline.segments]
+    assert labels == ["hook", "desarrollo_2", "desarrollo_3", "cliffhanger"]
+    # Hook clamped to HOOK_MAX_S even though the source scene is 10s.
+    assert timeline.segments[0].duration_s == pytest.approx(ShortPlanner.HOOK_MAX_S)
+    assert timeline.segments[0].caption == "hook!"
+    assert timeline.segments[0].source_start_s == pytest.approx(0.0)
+    # Cliffhanger keeps its FULL span (never trimmed mid-sentence).
+    assert timeline.segments[-1].duration_s == pytest.approx(10.0)
+    assert timeline.segments[-1].caption == "wait for it"
+    assert timeline.segments[-1].source_start_s == pytest.approx(40.0)
+
+
+def test_plan_teaser_empty_structure_yields_empty_timeline() -> None:
+    timeline = ShortPlanner().plan_teaser(
+        scene_durations=[10.0, 10.0], structure=TeaserStructure(), rule=_rule()
+    )
+    assert timeline.is_empty
+
+
+def test_plan_teaser_cliffhanger_never_trimmed_for_desarrollo_budget() -> None:
+    # Desarrollo scenes are dropped once they'd eat into the cliffhanger's
+    # reserved full span, so the payoff-teasing beat always lands whole.
+    planner = ShortPlanner()
+    structure = TeaserStructure(
+        hook_scene_index=0,
+        desarrollo_scene_indices=(1, 2, 3),
+        cliffhanger_scene_index=4,
+    )
+    timeline = planner.plan_teaser(
+        scene_durations=[2.0, 10.0, 10.0, 10.0, 8.0],
+        structure=structure, rule=_rule(max_duration_s=60.0),
+        requested_duration_s=20.0,
+    )
+    cliff = next(s for s in timeline.segments if s.label == "cliffhanger")
+    assert cliff.duration_s == pytest.approx(8.0)
+
+
+def test_plan_teaser_desarrollo_excludes_hook_and_cliffhanger_scenes() -> None:
+    # Even if desarrollo lists the hook/cliffhanger index, it must not repeat.
+    planner = ShortPlanner()
+    structure = TeaserStructure(
+        hook_scene_index=0,
+        desarrollo_scene_indices=(0, 1, 2),
+        cliffhanger_scene_index=2,
+    )
+    timeline = planner.plan_teaser(
+        scene_durations=[5.0, 5.0, 5.0], structure=structure, rule=_rule(),
+    )
+    labels = [s.label for s in timeline.segments]
+    assert labels == ["hook", "desarrollo_2", "cliffhanger"]
+
+
+def test_plan_teaser_invalid_hook_index_is_skipped() -> None:
+    planner = ShortPlanner()
+    structure = TeaserStructure(
+        hook_scene_index=99,  # out of range
+        desarrollo_scene_indices=(0,),
+        cliffhanger_scene_index=1,
+    )
+    timeline = planner.plan_teaser(
+        scene_durations=[5.0, 5.0], structure=structure, rule=_rule(),
+    )
+    labels = [s.label for s in timeline.segments]
+    assert labels == ["desarrollo_1", "cliffhanger"]

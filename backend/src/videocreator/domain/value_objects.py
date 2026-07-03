@@ -330,6 +330,54 @@ class HighlightSelection(BaseModel):
         return not self.scene_indices
 
 
+class TeaserStructure(BaseModel):
+    """LLM-chosen hook→desarrollo→cliffhanger narrative for the `teaser` pipeline.
+
+    Unlike `HighlightSelection` (a flat montage of "best" scenes), this holds an
+    explicit 3-act shape: a single punchy `hook` scene shown first (with its own
+    on-screen hook line), a `desarrollo` (development) run of scenes in between,
+    and a single `cliffhanger` scene that closes WITHOUT resolving — the "wait,
+    what happens next" beat that drives follow/click-through. All indices are
+    0-based into the source script's scenes. An empty structure (no hook and no
+    cliffhanger) means "no opinion" — the caller falls back to the heuristic
+    montage or single-cut planner.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    hook_scene_index: int | None = None
+    hook_text: str | None = None
+    desarrollo_scene_indices: tuple[int, ...] = ()
+    cliffhanger_scene_index: int | None = None
+    cliffhanger_text: str | None = None
+    rationale: str | None = None
+
+    @property
+    def is_empty(self) -> bool:
+        return self.hook_scene_index is None and self.cliffhanger_scene_index is None
+
+    @property
+    def ordered_scene_indices(self) -> tuple[int, ...]:
+        """Full playback order: hook, then desarrollo, then cliffhanger — deduped.
+
+        Later occurrences of an index already used are dropped so a scene the
+        LLM picked twice (e.g. as both hook and desarrollo) is kept only once, in
+        its earliest (highest-priority) slot.
+        """
+        ordered: list[int] = []
+        seen: set[int] = set()
+        candidates = (
+            ([self.hook_scene_index] if self.hook_scene_index is not None else [])
+            + list(self.desarrollo_scene_indices)
+            + ([self.cliffhanger_scene_index] if self.cliffhanger_scene_index is not None else [])
+        )
+        for idx in candidates:
+            if idx not in seen:
+                seen.add(idx)
+                ordered.append(idx)
+        return tuple(ordered)
+
+
 class PlatformRule(BaseModel):
     """Per-platform delivery constraints for a short (TikTok/Reels/Shorts)."""
 

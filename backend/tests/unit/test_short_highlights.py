@@ -12,7 +12,10 @@ import json
 
 import pytest
 
-from videocreator.application.use_cases.shorts_planning import SelectShortHighlights
+from videocreator.application.use_cases.shorts_planning import (
+    SelectShortHighlights,
+    SelectTeaserStructure,
+)
 from videocreator.domain.entities import Scene
 from videocreator.domain.services.short_planner import ShortPlanner
 from videocreator.domain.value_objects import PlatformRule
@@ -146,3 +149,74 @@ async def test_selector_drops_out_of_range_numbers() -> None:
         scenes=_scenes(4), target_duration_s=20.0
     )
     assert selection.scene_indices == (1, 2)
+
+
+# ---- SelectTeaserStructure (LLM use case, `teaser` pipeline) --------------
+async def test_teaser_selector_parses_hook_desarrollo_cliffhanger() -> None:
+    llm = _FakeLLM({
+        "hook": {"scene_number": 2, "text": "¿Sabías esto?"},
+        "desarrollo": [3, 4],
+        "cliffhanger": {"scene_number": 6, "text": "Pero entonces..."},
+        "rationale": "builds tension",
+    })
+    structure = await SelectTeaserStructure(llm=llm).execute(  # type: ignore[arg-type]
+        scenes=_scenes(6), target_duration_s=30.0
+    )
+    assert structure.hook_scene_index == 1
+    assert structure.hook_text == "¿Sabías esto?"
+    assert structure.desarrollo_scene_indices == (2, 3)
+    assert structure.cliffhanger_scene_index == 5
+    assert structure.cliffhanger_text == "Pero entonces..."
+    assert structure.ordered_scene_indices == (1, 2, 3, 5)
+
+
+async def test_teaser_selector_empty_on_invalid_json() -> None:
+    structure = await SelectTeaserStructure(llm=_FakeLLM("not json")).execute(  # type: ignore[arg-type]
+        scenes=_scenes(4), target_duration_s=20.0
+    )
+    assert structure.is_empty
+
+
+async def test_teaser_selector_empty_on_no_scenes() -> None:
+    llm = _FakeLLM({"hook": {"scene_number": 1}, "desarrollo": [], "cliffhanger": {"scene_number": 2}})
+    structure = await SelectTeaserStructure(llm=llm).execute(  # type: ignore[arg-type]
+        scenes=[], target_duration_s=20.0
+    )
+    assert structure.is_empty
+    assert llm.prompts == []  # short-circuits before calling the LLM
+
+
+async def test_teaser_selector_empty_when_hook_equals_cliffhanger() -> None:
+    # A degenerate pick (same scene for both roles) is structurally invalid —
+    # degrade rather than produce a teaser with no real cliffhanger.
+    llm = _FakeLLM({
+        "hook": {"scene_number": 3},
+        "desarrollo": [1, 2],
+        "cliffhanger": {"scene_number": 3},
+    })
+    structure = await SelectTeaserStructure(llm=llm).execute(  # type: ignore[arg-type]
+        scenes=_scenes(4), target_duration_s=20.0
+    )
+    assert structure.is_empty
+
+
+async def test_teaser_selector_empty_when_hook_or_cliffhanger_missing() -> None:
+    llm = _FakeLLM({"hook": {"scene_number": 99}, "desarrollo": [1], "cliffhanger": {"scene_number": 2}})
+    structure = await SelectTeaserStructure(llm=llm).execute(  # type: ignore[arg-type]
+        scenes=_scenes(4), target_duration_s=20.0
+    )
+    assert structure.is_empty
+
+
+async def test_teaser_selector_strips_hook_and_cliffhanger_from_desarrollo() -> None:
+    # If the LLM lists the hook/cliffhanger scene again inside desarrollo,
+    # plan_teaser must never play it twice — strip duplicates here.
+    llm = _FakeLLM({
+        "hook": {"scene_number": 1},
+        "desarrollo": [1, 2, 4],
+        "cliffhanger": {"scene_number": 4},
+    })
+    structure = await SelectTeaserStructure(llm=llm).execute(  # type: ignore[arg-type]
+        scenes=_scenes(4), target_duration_s=20.0
+    )
+    assert structure.desarrollo_scene_indices == (1,)

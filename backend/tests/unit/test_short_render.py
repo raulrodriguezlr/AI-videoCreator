@@ -90,6 +90,7 @@ class _FakeComposer:
 
     def __init__(self) -> None:
         self.calls: list[tuple[Path, EditingTimeline, Path]] = []
+        self.warnings: list[str] = []
 
     async def compose(
         self,
@@ -98,6 +99,10 @@ class _FakeComposer:
         output_path: Path,
         *,
         crop_x: dict[int, str] | None = None,
+        broll_path: Path | None = None,
+        music_path: Path | None = None,
+        asr_audio_path: Path | None = None,
+        script_lines: list[str] | None = None,
     ) -> Path:
         self.calls.append((source_path, timeline, output_path))
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -257,6 +262,7 @@ def _handler(
     episode: Episode | None,
     script: Script | None = None,
     selector: Any = None,
+    teaser_selector: Any = None,
 ) -> tuple[ShortRenderHandler, _FakeComposer, dict[str, Short]]:
     composer = _FakeComposer()
     saved: dict[str, Short] = {}
@@ -272,6 +278,7 @@ def _handler(
         settings=_settings(tmp),
         assembler=_FakeAssembler(),  # type: ignore[arg-type]
         highlight_selector=selector,
+        teaser_selector=teaser_selector,
     )
     return handler, composer, saved
 
@@ -361,6 +368,8 @@ async def test_render_raises_when_short_missing(tmp_path: Path) -> None:
 
 async def test_render_uses_brain_montage_when_selector_present(tmp_path: Path) -> None:
     # Arrange — 4 scenes × 20s; brain picks scenes 1 and 3 (non-contiguous).
+    # Explicit pipeline="legacy": the flat highlight-montage brain only runs
+    # under the legacy pipeline now that `teaser` is the default.
     from videocreator.domain.value_objects import HighlightSelection
 
     selector = _FakeSelector(
@@ -372,7 +381,7 @@ async def test_render_uses_brain_montage_when_selector_present(tmp_path: Path) -
     )
 
     # Act
-    await handler(_job(), _FakeCtx())  # type: ignore[arg-type]
+    await handler(_job(pipeline="legacy"), _FakeCtx())  # type: ignore[arg-type]
 
     # Assert — two segments at the chosen offsets, hook persisted on the short.
     _, timeline, _ = composer.calls[0]
@@ -391,7 +400,7 @@ async def test_render_falls_back_to_single_cut_on_empty_brain(tmp_path: Path) ->
     )
 
     # Act
-    await handler(_job(), _FakeCtx())  # type: ignore[arg-type]
+    await handler(_job(pipeline="legacy"), _FakeCtx())  # type: ignore[arg-type]
 
     # Assert — single segment from the heuristic planner.
     _, timeline, _ = composer.calls[0]

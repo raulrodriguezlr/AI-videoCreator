@@ -272,6 +272,10 @@ def _handler(
             var_dir=tmp / "var", project_root=tmp, smart_reframe_enabled=False
         ),
         assembler=None,  # type: ignore[arg-type]  # final_video_key present → unused
+        # `selector` here is the flat highlight-montage brain, which only
+        # drives the timeline under `pipeline="legacy"` now that `teaser` is
+        # the handler's default — callers exercising the montage path must
+        # pass `RenderShortRequest(pipeline="legacy", ...)`.
         highlight_selector=selector,
     )
     return handler, composer, short_repo
@@ -343,13 +347,16 @@ async def test_layout_template_zoom_reach_composer_single_cut(tmp_path: Path) ->
 
 
 async def test_layout_template_zoom_reach_composer_montage(tmp_path: Path) -> None:
-    # Arrange — brain picks scenes 0 & 2 → montage path.
+    # Arrange — brain picks scenes 0 & 2 → montage path (legacy pipeline: the
+    # flat highlight-montage brain only drives the timeline under "legacy"
+    # now that "teaser" is the default).
     selector = _Selector(HighlightSelection(scene_indices=(0, 2)))
     handler, composer, _ = _handler(
         tmp_path, short=_short(duration_s=20.0), selector=selector
     )
     req = RenderShortRequest(
-        layout="fit_blur", template="karaoke", ken_burns=True, captions=True
+        pipeline="legacy",
+        layout="fit_blur", template="karaoke", ken_burns=True, captions=True,
     )
 
     # Act
@@ -407,13 +414,16 @@ async def test_requested_duration_is_honored_montage(tmp_path: Path) -> None:
     # Arrange — 6 scenes × 10s; brain picks 0,2,4 (30s of source available),
     # but the creator requested only 20s. The montage must stop near 20s rather
     # than grow to the 60s platform ceiling (the reported duration bug).
+    # Legacy pipeline: this exercises the flat highlight-montage brain.
     selector = _Selector(HighlightSelection(scene_indices=(0, 2, 4)))
     handler, composer, _ = _handler(
         tmp_path, short=_short(duration_s=20.0), selector=selector
     )
 
     # Act
-    await handler(_job_from_request(RenderShortRequest()), _Ctx())  # type: ignore[arg-type]
+    await handler(
+        _job_from_request(RenderShortRequest(pipeline="legacy")), _Ctx()  # type: ignore[arg-type]
+    )
 
     # Assert — sums to ~20s (two 10s scenes), not 30s+, and well under 60s.
     total = composer.last_timeline.total_duration_s
