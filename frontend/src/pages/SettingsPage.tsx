@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api, streamOllamaPull, getAppConfig, setAppConfig,
-  type LlmConfig, type RecommendedModels, type AppConfig,
+  getBrollLibrary, populateBroll,
+  type LlmConfig, type RecommendedModels, type AppConfig, type BrollLibrary,
 } from "../api/client";
 import {
   Badge, Button, ErrorState, Field, Loading, useToast,
 } from "../ui/primitives";
-import { IcCloud, IcCpu, IcDownload, IcFile, IcRefresh, IcServer } from "../ui/icons";
+import { IcCloud, IcCpu, IcDownload, IcFile, IcRefresh, IcServer, IcSparkles } from "../ui/icons";
 import { JsonEditor } from "../components/JsonEditor";
 
 export function SettingsPage() {
@@ -28,9 +29,79 @@ export function SettingsPage() {
       <div style={{ height: 22 }} />
       <SecretsSection />
       <div style={{ height: 22 }} />
+      <BrollSection />
+      <div style={{ height: 22 }} />
       <FeaturesSection />
       <div style={{ height: 22 }} />
       <RulesSection />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- B-roll / gameplay
+function BrollSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [count, setCount] = useState(5);
+  const lib = useQuery<BrollLibrary>({ queryKey: ["broll"], queryFn: getBrollLibrary });
+
+  const populate = useMutation({
+    mutationFn: () => populateBroll(count),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["broll"] });
+      toast.ok("Clips descargados", `${r.downloaded.length} clip(s) de Pexels`);
+    },
+    onError: (e) => toast.err("No se pudo poblar", (e as Error).message),
+  });
+
+  const clips = lib.data?.clips ?? [];
+
+  return (
+    <div className="card">
+      <div className="card-head between">
+        <h2>B-roll / Gameplay</h2>
+        <Button variant="ghost" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ["broll"] })}>
+          <IcRefresh /> Actualizar
+        </Button>
+      </div>
+      <div className="card-pad stack">
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+          El layout <b>Split-screen</b> de los shorts pone tu vídeo arriba y un
+          clip de gameplay (Minecraft parkour, GTA, satisfying…) abajo. Deja tus
+          propios mp4 en <span className="mono">{lib.data?.folder ?? "backend/var/broll/gameplay/"}</span>
+          {" "}— se indexan solos y rotan sin repetirse entre shorts consecutivos.
+          Si la carpeta está vacía, puedes poblarla con clips libres (CC0/Pexels).
+        </p>
+
+        {lib.isLoading && <Loading />}
+        {!lib.isLoading && clips.length === 0 && (
+          <div className="muted" style={{ fontSize: 13 }}>
+            Sin clips indexados todavía.
+          </div>
+        )}
+        {clips.length > 0 && (
+          <div className="stack" style={{ gap: 6 }}>
+            {clips.map((c) => (
+              <div key={c.name} className="between" style={{ fontSize: 13 }}>
+                <span className="mono">{c.name}</span>
+                <span className="dim" style={{ fontSize: 12 }}>
+                  {c.duration_s ? `${c.duration_s.toFixed(1)}s` : "—"}
+                  {c.author ? ` · ${c.author}` : ""}
+                  {c.source ? ` · ${c.source}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="btn-row" style={{ alignItems: "center" }}>
+          <input className="input" type="number" min={1} max={10} value={count}
+            style={{ width: 70 }} onChange={(e) => setCount(Number(e.target.value))} />
+          <Button variant="primary" size="sm" loading={populate.isPending} onClick={() => populate.mutate()}>
+            <IcSparkles /> Poblar con clips libres (Pexels)
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -255,7 +326,7 @@ function LlmSection({ cfg }: { cfg: LlmConfig }) {
 }
 
 // ---------------------------------------------------------------- Secrets
-const KNOWN = ["google", "elevenlabs", "artlist"];
+const KNOWN = ["google", "elevenlabs", "artlist", "pexels", "pixabay"];
 
 function SecretsSection() {
   const qc = useQueryClient();

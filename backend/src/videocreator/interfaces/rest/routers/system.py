@@ -25,12 +25,16 @@ from videocreator.infrastructure.system.model_catalog import detect_vram_gb, rec
 from videocreator.infrastructure.system.ollama_admin import is_valid_model_name
 from videocreator.interfaces.rest.deps import ContainerDep, SettingsDep
 from videocreator.interfaces.rest.schemas import (
+    BrollClipResponse,
+    BrollLibraryResponse,
     LlmConfigResponse,
     OllamaModelOption,
     OllamaPullRequest,
     OllamaStatusResponse,
     PodFileContentResponse,
     PodFileListResponse,
+    PopulateBrollRequest,
+    PopulateBrollResponse,
     RecommendedModelsResponse,
     SetLlmConfigRequest,
     WritePodFileRequest,
@@ -342,6 +346,64 @@ async def reload_sdk_providers(container: ContainerDep) -> dict:
 )
 async def higgsfield_balance(settings: SettingsDep) -> dict:
     return await account_balance(settings)
+
+
+# --------------------------------------------------------------------------
+# Gameplay b-roll (local folder for the shorts "split" layout)
+# --------------------------------------------------------------------------
+@router.get(
+    "/broll",
+    response_model=BrollLibraryResponse,
+    summary="List locally indexed gameplay b-roll clips",
+)
+async def list_broll(container: ContainerDep) -> BrollLibraryResponse:
+    lib = container.gameplay_broll_library()
+    clips = [
+        BrollClipResponse(
+            name=c.name,
+            duration_s=c.duration_s,
+            author=(c.attribution or {}).get("author"),
+            source=(c.attribution or {}).get("source"),
+            source_url=(c.attribution or {}).get("source_url"),
+        )
+        for c in lib.list_clips()
+    ]
+    return BrollLibraryResponse(folder=str(lib.folder), clips=clips)
+
+
+@router.post(
+    "/broll/populate",
+    response_model=PopulateBrollResponse,
+    summary="Download a handful of free vertical gameplay/satisfying clips from Pexels",
+)
+async def populate_broll(
+    body: PopulateBrollRequest, container: ContainerDep, settings: SettingsDep,
+) -> PopulateBrollResponse:
+    from videocreator.infrastructure.media.gameplay_broll import populate_from_pexels
+
+    if not settings.pexels_api_key:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "PEXELS_API_KEY no configurada. Consigue una gratis en "
+            "https://www.pexels.com/api/ (Sign up > Your API Key) y añádela a "
+            "backend/.env como PEXELS_API_KEY=... — luego reinicia el backend.",
+        )
+    lib = container.gameplay_broll_library()
+    try:
+        downloaded = await populate_from_pexels(
+            lib.folder, api_key=settings.pexels_api_key, count=body.count,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    return PopulateBrollResponse(
+        downloaded=[
+            BrollClipResponse(
+                name=c.filename, duration_s=0.0, author=c.author,
+                source="pexels", source_url=c.source_url,
+            )
+            for c in downloaded
+        ]
+    )
 
 
 __all__ = ["router"]

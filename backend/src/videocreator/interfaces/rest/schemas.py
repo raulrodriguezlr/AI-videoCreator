@@ -621,6 +621,38 @@ class RecommendedModelsResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Gameplay b-roll (local folder for the "split" short layout)
+# ---------------------------------------------------------------------------
+class BrollClipResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    duration_s: float
+    author: str | None = None
+    source: str | None = None
+    source_url: str | None = None
+
+
+class BrollLibraryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    folder: str
+    clips: list[BrollClipResponse] = Field(default_factory=list)
+
+
+class PopulateBrollRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    count: int = Field(5, ge=1, le=10)
+
+
+class PopulateBrollResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    downloaded: list[BrollClipResponse] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Raw pod JSON files (config.json / prompts.json / video_rules.json)
 # ---------------------------------------------------------------------------
 class PodFileListResponse(BaseModel):

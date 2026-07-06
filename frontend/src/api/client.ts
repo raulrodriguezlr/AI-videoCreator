@@ -737,6 +737,26 @@ export const getAppConfig = () => api.get<AppConfig>("/system/config");
 export const setAppConfig = (channels_feature_enabled: boolean) =>
   api.put<AppConfig>("/system/config", { channels_feature_enabled });
 
+// ---------------------------------------------------------------------------
+// Gameplay b-roll (local "split" layout folder)
+// ---------------------------------------------------------------------------
+export interface BrollClip {
+  name: string;
+  duration_s: number;
+  author: string | null;
+  source: string | null;
+  source_url: string | null;
+}
+
+export interface BrollLibrary {
+  folder: string;
+  clips: BrollClip[];
+}
+
+export const getBrollLibrary = () => api.get<BrollLibrary>("/system/broll");
+export const populateBroll = (count = 5) =>
+  api.post<{ downloaded: BrollClip[] }>("/system/broll/populate", { count });
+
 export const listChannels = () => api.get<Channel[]>("/channels");
 export const connectChannel = (platform: ChannelPlatform, client_id: string, client_secret: string) =>
   api.post<Channel>(`/channels/${platform}/connect`, { client_id, client_secret });

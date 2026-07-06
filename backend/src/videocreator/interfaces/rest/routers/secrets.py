@@ -28,11 +28,15 @@ _SETTINGS_ATTR = {
     "artlist": "artlist_api_token",
     # Higgsfield key is a single "KEY_ID:KEY_SECRET" string.
     "higgsfield": "higgsfield_credentials",
+    # Free stock-video APIs for the "split" short layout's b-roll fallback.
+    "pexels": "pexels_api_key",
+    "pixabay": "pixabay_api_key",
 }
 
 #: container singletons rebuilt lazily so they pick up the new key.
 _KEY_CONSUMERS = ("llm", "image_provider", "voice_search",
-                  "video_provider:artlist", "video_provider:elevenlabs_studio")
+                  "video_provider:artlist", "video_provider:elevenlabs_studio",
+                  "cc0_broll_library", "broll_library")
 
 
 def _apply_key_to_runtime(container, provider: str, value: str | None) -> None:  # type: ignore[no-untyped-def]

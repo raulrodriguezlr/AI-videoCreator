@@ -178,15 +178,27 @@ async def test_db_vault_missing_secret_returns_none() -> None:
 async def test_env_vault_lists_only_configured_providers() -> None:
     settings = SimpleNamespace(
         google_api_key="x", elevenlabs_api_key=None, artlist_api_token="y",
+        pexels_api_key=None, pixabay_api_key=None,
     )
     vault = EnvSecretVault(settings)  # type: ignore[arg-type]
 
     assert await vault.list_providers(USER) == ["google", "artlist"]
 
 
+async def test_env_vault_lists_pexels_and_pixabay_when_configured() -> None:
+    settings = SimpleNamespace(
+        google_api_key=None, elevenlabs_api_key=None, artlist_api_token=None,
+        pexels_api_key="px-key", pixabay_api_key="pb-key",
+    )
+    vault = EnvSecretVault(settings)  # type: ignore[arg-type]
+
+    assert await vault.list_providers(USER) == ["pexels", "pixabay"]
+
+
 async def test_env_vault_writes_are_noops() -> None:
     settings = SimpleNamespace(
         google_api_key=None, elevenlabs_api_key=None, artlist_api_token=None,
+        pexels_api_key=None, pixabay_api_key=None,
     )
     vault = EnvSecretVault(settings)  # type: ignore[arg-type]
 
@@ -205,6 +217,17 @@ async def test_set_provider_key_normalizes_and_trims() -> None:
     await uc.execute(owner_id=USER, provider="  GOOGLE ", value="  sk-123  ")
 
     assert vault.store[("usr_1", "google")] == "sk-123"
+
+
+async def test_set_provider_key_accepts_pexels_and_pixabay() -> None:
+    vault = _FakeVault()
+    uc = SetProviderKey(vault)  # type: ignore[arg-type]
+
+    await uc.execute(owner_id=USER, provider="pexels", value="px-key")
+    await uc.execute(owner_id=USER, provider="pixabay", value="pb-key")
+
+    assert vault.store[("usr_1", "pexels")] == "px-key"
+    assert vault.store[("usr_1", "pixabay")] == "pb-key"
 
 
 async def test_set_provider_key_rejects_unknown_provider() -> None:

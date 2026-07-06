@@ -10,7 +10,7 @@ import {
 import {
   Badge, Button, Empty, ErrorState, Field, Loading, Modal, StateBadge, Tabs, useToast,
 } from "../ui/primitives";
-import { IcEdit, IcFile, IcImage, IcPlus, IcRocket, IcSparkles, IcTrash, IcUpload, IcWand } from "../ui/icons";
+import { IcAlertTriangle, IcEdit, IcFile, IcImage, IcPlus, IcRocket, IcSparkles, IcTrash, IcUpload, IcWand } from "../ui/icons";
 import { JsonEditor } from "../components/JsonEditor";
 import { prettyStyle } from "./PodsListPage";
 
@@ -283,11 +283,14 @@ function ShortsTab({ podId, q, episodes }: {
   const toast = useToast();
   const [creating, setCreating] = useState(false);
   const [renderFor, setRenderFor] = useState<Short | null>(null);
+  // Non-silent-degradation warnings from the last render job, per short id —
+  // e.g. "ASR captions unavailable", "split layout requested but no b-roll".
+  const [warningsByShort, setWarningsByShort] = useState<Record<string, string[]>>({});
 
   const render = useMutation({
     mutationFn: ({ shortId, opts }: { shortId: string; opts: RenderOpts }) =>
       api.post<{ job_id: string }>(`/pods/${podId}/shorts/${shortId}/render`, opts),
-    onSuccess: (r) => {
+    onSuccess: (r, vars) => {
       toast.ok("Render de short en curso", `Job ${r.job_id.slice(0, 12)}…`);
       // Live-refresh the list when the render job reaches a terminal state.
       const stop = subscribeToJob(r.job_id, {
@@ -297,6 +300,8 @@ function ShortsTab({ podId, q, episodes }: {
           if (!done) return;
           qc.invalidateQueries({ queryKey: ["shorts", podId] });
           if (e.error) toast.err("El render falló", e.error);
+          const warnings = (e.result?.warnings as string[] | undefined) ?? [];
+          setWarningsByShort((prev) => ({ ...prev, [vars.shortId]: warnings }));
           stop();
         },
       });
@@ -348,6 +353,16 @@ function ShortsTab({ podId, q, episodes }: {
               </div>
             )}
             {s.hook_text && <p className="muted" style={{ fontSize: 13, margin: 0 }}>“{s.hook_text}”</p>}
+            {!!warningsByShort[s.id]?.length && (
+              <div className="stack" style={{ gap: 4 }}>
+                {warningsByShort[s.id].map((w, i) => (
+                  <div key={i} className="row" style={{ gap: 6, alignItems: "flex-start", color: "#b8860b", fontSize: 12 }}>
+                    <IcAlertTriangle style={{ flexShrink: 0, marginTop: 1, width: 14, height: 14 }} />
+                    <span>{w}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="between">
               <Badge tone={s.rendered_video_key ? "ok" : "default"}>{s.rendered_video_key ? "renderizado" : "pendiente"}</Badge>
               <Button size="sm" loading={render.isPending && render.variables?.shortId === s.id} onClick={() => setRenderFor(s)}>
@@ -378,6 +393,7 @@ function ShortsTab({ podId, q, episodes }: {
 // Render options panel — mirrors ssemble's "Advanced Options" (template, layout,
 // captions, game-video b-roll, music). Forwarded as the /render request body.
 type RenderOpts = {
+  pipeline: "teaser" | "legacy";
   template: string;
   layout: string;
   captions: boolean;
@@ -391,8 +407,9 @@ type RenderOpts = {
 function RenderShortModal({ short, busy, onClose, onRender }: {
   short: Short; busy: boolean; onClose: () => void; onRender: (o: RenderOpts) => void;
 }) {
-  const [template, setTemplate] = useState("hormozi1");
-  const [layout, setLayout] = useState("fill");
+  const [pipeline, setPipeline] = useState<"teaser" | "legacy">("teaser");
+  const [template, setTemplate] = useState("teaser");
+  const [layout, setLayout] = useState("fit_blur");
   const [captions, setCaptions] = useState(true);
   const [kenBurns, setKenBurns] = useState(true);
   const [gameVideo, setGameVideo] = useState(false);
@@ -407,15 +424,28 @@ function RenderShortModal({ short, busy, onClose, onRender }: {
       <>
         <Button variant="ghost" onClick={onClose}>Cancelar</Button>
         <Button variant="mint" loading={busy} onClick={() => onRender({
-          template, layout: effLayout, captions, ken_burns: kenBurns,
+          pipeline, template, layout: effLayout, captions, ken_burns: kenBurns,
           game_video: gameVideo, broll_query: brollQuery,
           background_music: music, music_vibe: musicVibe,
         })}><IcRocket /> Renderizar</Button>
       </>
     }>
+      <Field label="Pipeline" hint="Cómo se construye el timeline del short">
+        <div className="btn-row" role="radiogroup" aria-label="Pipeline">
+          <Button type="button" size="sm" variant={pipeline === "teaser" ? "mint" : "ghost"}
+            onClick={() => setPipeline("teaser")} aria-pressed={pipeline === "teaser"}>
+            Teaser (recomendado)
+          </Button>
+          <Button type="button" size="sm" variant={pipeline === "legacy" ? "mint" : "ghost"}
+            onClick={() => setPipeline("legacy")} aria-pressed={pipeline === "legacy"}>
+            Clásico (legacy)
+          </Button>
+        </div>
+      </Field>
       <div className="row">
         <Field label="Plantilla">
           <select className="select" value={template} onChange={(e) => setTemplate(e.target.value)}>
+            <option value="teaser">Teaser (validada)</option>
             <option value="hormozi1">Hormozi 1 (oro)</option>
             <option value="hormozi2">Hormozi 2 (verde)</option>
             <option value="karaoke">Karaoke (cian)</option>

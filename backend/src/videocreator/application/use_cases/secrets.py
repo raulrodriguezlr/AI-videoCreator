@@ -15,7 +15,9 @@ from videocreator.shared.ids import UserId
 
 #: Provider names a user may store a key for. Kept tight to catch typos that
 #: would otherwise silently store an unusable key.
-KNOWN_PROVIDERS: frozenset[str] = frozenset({"google", "elevenlabs", "artlist"})
+KNOWN_PROVIDERS: frozenset[str] = frozenset(
+    {"google", "elevenlabs", "artlist", "pexels", "pixabay"}
+)
 
 
 def _normalize_provider(provider: str) -> str:

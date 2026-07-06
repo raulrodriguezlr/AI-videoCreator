@@ -148,6 +148,50 @@ def test_filtergraph_single_segment_ignores_transition() -> None:
     assert "xfade" not in graph
 
 
+def test_filtergraph_music_ducks_via_sidechaincompress() -> None:
+    # Arrange — music requested (music_idx=1, right after the source input).
+    timeline = _timeline((0.0, 5.0))
+
+    # Act
+    graph, _, out_a = FfmpegShortComposer._build_filtergraph(timeline, music_idx=1)
+
+    # Assert — voice keys the sidechain compressor that ducks the music bed,
+    # then the ducked music is mixed back under the (unducked) voice.
+    assert "sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300" in graph
+    assert "[musv][vkey]sidechaincompress" in graph
+    assert "asplit=2[vkey][vmix]" in graph
+    assert "[vmix][musduck]amix=inputs=2:duration=first:dropout_transition=2[mixa]" in graph
+    assert out_a == "[mixa]"
+
+
+def test_filtergraph_no_music_no_ducking() -> None:
+    timeline = _timeline((0.0, 5.0))
+    graph, _, out_a = FfmpegShortComposer._build_filtergraph(timeline)
+    assert "sidechaincompress" not in graph
+    assert "amix" not in graph
+    assert out_a == "[outa]"
+
+
+def test_split_without_broll_warns_with_gameplay_folder_hint() -> None:
+    import asyncio
+    from unittest.mock import patch
+
+    composer = FfmpegShortComposer()
+    timeline = EditingTimeline(
+        segments=(TimelineSegment(source_start_s=0.0, duration_s=3.0),),
+        width=1080, height=1920, layout="split",
+    )
+
+    async def _fake_run(self, args, output_path):  # noqa: ANN001 — test stub
+        output_path.write_bytes(b"fake")
+
+    with patch.object(FfmpegShortComposer, "_run", _fake_run), \
+         patch("shutil.which", return_value="/usr/bin/ffmpeg"):
+        asyncio.run(composer.compose(Path("/src/in.mp4"), timeline, Path("/tmp/out_test.mp4")))
+
+    assert any("backend/var/broll/gameplay/" in w for w in composer.warnings)
+
+
 def test_wrap_caption_wraps_and_ellipsizes() -> None:
     wrapped = _wrap_caption(
         "esta es una frase bastante larga que debe partirse en varias lineas y "

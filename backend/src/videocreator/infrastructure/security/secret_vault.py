@@ -37,6 +37,10 @@ class EnvSecretVault:
                 return self._settings.elevenlabs_api_key
             case "artlist":
                 return self._settings.artlist_api_token
+            case "pexels":
+                return self._settings.pexels_api_key
+            case "pixabay":
+                return self._settings.pixabay_api_key
             case _:
                 return None
 
@@ -56,6 +60,10 @@ class EnvSecretVault:
             present.append("elevenlabs")
         if self._settings.artlist_api_token:
             present.append("artlist")
+        if self._settings.pexels_api_key:
+            present.append("pexels")
+        if self._settings.pixabay_api_key:
+            present.append("pixabay")
         return present
 
 

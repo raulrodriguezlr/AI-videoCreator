@@ -38,6 +38,16 @@ _FPS = 30
 _CAPTION_WRAP_CHARS = 28
 _CAPTION_MAX_LINES = 3
 
+# Background-music ducking (sidechaincompress keyed off the voice track). The
+# music plays at `_MUSIC_BASE_VOLUME` and gets compressed down whenever the
+# voice crosses `_DUCK_THRESHOLD`, so it audibly steps out of the way while
+# someone's talking and comes back up in the gaps.
+_MUSIC_BASE_VOLUME = 0.35
+_DUCK_THRESHOLD = 0.03
+_DUCK_RATIO = 8
+_DUCK_ATTACK_MS = 20
+_DUCK_RELEASE_MS = 300
+
 
 class FfmpegShortComposer:
     """`ShortComposerPort` adapter that shells out to a local FFmpeg binary."""
@@ -77,7 +87,9 @@ class FfmpegShortComposer:
 
         if getattr(timeline, "layout", "fill") == "split" and broll_path is None:
             self.warnings.append(
-                "split layout requested but no b-roll available — degraded to full-frame fill"
+                "split layout requested but no b-roll available — degraded to "
+                "full-frame fill. Deja mp4s en backend/var/broll/gameplay/ "
+                "(o usa 'Poblar con clips libres' en Ajustes) para activar el split."
             )
 
         if beat_grid and beat_grid.is_reliable:
@@ -352,12 +364,23 @@ class FfmpegShortComposer:
             v_out = "[subv]"
 
         # Royalty-free background music ([music_idx:a], looped via -stream_loop)
-        # mixed UNDER the voice at low volume; `duration=first` clamps the mix to
-        # the (main) voice track length. (Sidechain ducking is a future upgrade.)
+        # mixed UNDER the voice, DUCKED via sidechaincompress so it drops out of
+        # the way whenever the voice speaks (keyed off the voice track) instead
+        # of playing at one fixed low volume the whole time; `duration=first`
+        # clamps the mix to the (main) voice track length.
         if music_idx is not None:
-            chains.append(f"[{music_idx}:a]volume=0.18[mus]")
+            chains.append(f"[{music_idx}:a]volume={_MUSIC_BASE_VOLUME}[musv]")
+            # `asplit` because the voice track feeds BOTH the sidechain key
+            # input and the final mix; a filter output can only be consumed
+            # once otherwise.
+            chains.append(f"{a_out}asplit=2[vkey][vmix]")
             chains.append(
-                f"{a_out}[mus]amix=inputs=2:duration=first:dropout_transition=2[mixa]"
+                f"[musv][vkey]sidechaincompress=threshold={_DUCK_THRESHOLD}:"
+                f"ratio={_DUCK_RATIO}:attack={_DUCK_ATTACK_MS}:"
+                f"release={_DUCK_RELEASE_MS}[musduck]"
+            )
+            chains.append(
+                "[vmix][musduck]amix=inputs=2:duration=first:dropout_transition=2[mixa]"
             )
             a_out = "[mixa]"
         return ";".join(chains), v_out, a_out

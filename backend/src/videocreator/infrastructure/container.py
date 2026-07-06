@@ -139,6 +139,10 @@ from videocreator.infrastructure.handlers.short_render import ShortRenderHandler
 from videocreator.infrastructure.llm.gemini_llm import GeminiLLM
 from videocreator.infrastructure.llm.ollama_llm import OllamaLLM
 from videocreator.infrastructure.media.cc0_library import CC0BrollLibrary, MusicLibrary
+from videocreator.infrastructure.media.gameplay_broll import (
+    CompositeBrollLibrary,
+    GameplayBrollLibrary,
+)
 from videocreator.infrastructure.media.library import LocalMediaLibrary
 from videocreator.infrastructure.persistence.database import get_sessionmaker
 from videocreator.infrastructure.providers.artlist_provider import ArtlistProvider
@@ -458,15 +462,33 @@ class Container:
     def media_library(self) -> MediaLibraryPort:
         return self._get("media_library", lambda: LocalMediaLibrary(self.storage()))
 
-    def broll_library(self) -> CC0BrollLibrary:
-        """CC0 b-roll library for the split-screen short layout."""
+    def cc0_broll_library(self) -> CC0BrollLibrary:
+        """Remote CC0 b-roll library (Pexels/Pixabay), fallback when the local
+        gameplay folder is empty."""
         def _build() -> CC0BrollLibrary:
             return CC0BrollLibrary(
                 self.settings.var_dir / "cache" / "broll",
                 pexels_key=self.settings.pexels_api_key,
                 pixabay_key=self.settings.pixabay_api_key,
             )
-        return self._get("broll_library", _build)
+        return self._get("cc0_broll_library", _build)
+
+    def gameplay_broll_library(self) -> GameplayBrollLibrary:
+        """Local gameplay mp4 folder (Minecraft parkour, GTA, ...) the user
+        drops clips into — indexed + round-robin rotated for the `split`
+        layout."""
+        return self._get(
+            "gameplay_broll_library",
+            lambda: GameplayBrollLibrary(self.settings.var_dir / "broll" / "gameplay"),
+        )
+
+    def broll_library(self) -> CompositeBrollLibrary:
+        """B-roll for the split-screen short layout: local gameplay clips
+        first, remote CC0 catalog as a fallback."""
+        return self._get(
+            "broll_library",
+            lambda: CompositeBrollLibrary(self.gameplay_broll_library(), self.cc0_broll_library()),
+        )
 
     def music_library(self) -> MusicLibrary:
         """Local royalty-free music catalog for the shorts background bed."""
