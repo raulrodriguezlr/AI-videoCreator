@@ -8,7 +8,7 @@ import {
   type UpdateRecreationRequest, type SdkProvider, type IngestResponse, type AlternateEndingResponse,
   type AlternateEndingMode,
 } from "../api/client";
-import { Badge, Button, Empty, ErrorState, Field, Loading, useToast, Tabs } from "../ui/primitives";
+import { Badge, Button, Combobox, Empty, ErrorState, Field, Loading, useToast, Tabs } from "../ui/primitives";
 import { IcAlertTriangle, IcRadar, IcSparkles, IcWand, IcEdit } from "../ui/icons";
 import { SourceIngest } from "../components/SourceIngest";
 
@@ -18,6 +18,12 @@ const RISK_TONE: Record<FairUse["risk"] | string, "ok" | "warn" | "err"> = {
 const RISK_LABEL: Record<FairUse["risk"] | string, string> = {
   low: "Riesgo bajo", medium: "Riesgo medio", high: "Riesgo alto",
 };
+
+const NICHE_SUGGESTIONS = [
+  "gaming", "cocina", "fitness", "humor absurdo", "ciencia", "cine", "mascotas",
+  "música", "DIY", "terror", "finanzas personales", "viajes", "moda", "tecnología",
+  "true crime", "motivación", "belleza", "deportes",
+];
 
 export function RecreationPage() {
   const [activeTab, setActiveTab] = useState<"new" | "alt" | "history">("new");
@@ -210,8 +216,8 @@ function NewRecreationTab({ onGoToHistory }: { onGoToHistory: () => void }) {
           </p>
         )}
         {trendMatch.isSuccess && trendMatch.data.candidates.length === 0 && (
-          <Empty emoji="📡" title="Sin resultados">
-            No se encontraron escenas en tendencia ahora mismo — vuelve a intentarlo más tarde.
+          <Empty emoji="📡" title="El radar no capta nada ahora mismo">
+            No se encontraron escenas en tendencia — inténtalo de nuevo en un rato.
           </Empty>
         )}
         {trendMatch.isSuccess && trendMatch.data.candidates.length > 0 && (
@@ -251,12 +257,12 @@ function NewRecreationTab({ onGoToHistory }: { onGoToHistory: () => void }) {
         </Field>
 
         <div className="row">
-          <Field label="Nicho" hint="Temática o canal donde se publicará.">
-            <input
-              className="input"
-              placeholder="p. ej. finanzas personales"
+          <Field label="Nicho" hint="Temática o canal donde se publicará — elige una sugerencia o escribe la tuya.">
+            <Combobox
               value={niche}
-              onChange={(e) => setNiche(e.target.value)}
+              onChange={setNiche}
+              options={NICHE_SUGGESTIONS}
+              placeholder="p. ej. finanzas personales"
             />
           </Field>
         </div>
@@ -294,7 +300,7 @@ function HistoryTab() {
   if (error) return <ErrorState error={error} />;
   
   if (!data?.recreations || data.recreations.length === 0) {
-    return <Empty emoji="📝" title="Aún no hay recreaciones">Planifica tu primera recreación para verla aquí.</Empty>;
+    return <Empty emoji="📝" title="El historial está en blanco">Planifica tu primera recreación desde la pestaña "Nueva recreación" y aparecerá aquí.</Empty>;
   }
 
   if (editingId) {

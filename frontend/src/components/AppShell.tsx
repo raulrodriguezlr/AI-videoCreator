@@ -1,10 +1,28 @@
+import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
 import { api, type HealthResponse, type LlmConfig, type AppConfig } from "../api/client";
-import { IcActivity, IcCloud, IcCpu, IcFilm, IcLaugh, IcLayout, IcMessageCircle, IcRadar, IcSliders, IcSparkles } from "../ui/icons";
+import {
+  IcActivity, IcCloud, IcCpu, IcFilm, IcLaugh, IcLayout, IcMenu, IcMessageCircle,
+  IcMoon, IcRadar, IcSliders, IcSparkles, IcSun, IcX,
+} from "../ui/icons";
+import { useTheme } from "../ui/useTheme";
+
+const NAV_ITEMS: { to: string; end?: boolean; label: string; icon: JSX.Element }[] = [
+  { to: "/", end: true, label: "Inicio", icon: <IcSparkles /> },
+  { to: "/pods", label: "Pods", icon: <IcFilm /> },
+  { to: "/templates", label: "Plantillas", icon: <IcLayout /> },
+  { to: "/director", label: "Director", icon: <IcMessageCircle /> },
+  { to: "/memes", label: "Memes", icon: <IcLaugh /> },
+  { to: "/recreations", label: "Recreaciones", icon: <IcRadar /> },
+  { to: "/jobs", label: "Trabajos", icon: <IcActivity /> },
+];
 
 export function AppShell() {
   const location = useLocation();
+  const { theme, toggle } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
   const health = useQuery<HealthResponse>({
     queryKey: ["health"], queryFn: () => api.get("/health"), refetchInterval: 20_000,
   });
@@ -19,60 +37,91 @@ export function AppShell() {
     queryKey: ["app-config"], queryFn: () => api.get("/system/config"),
   });
 
+  const items = appConfig.data?.channels_feature_enabled
+    ? [...NAV_ITEMS, { to: "/channels", label: "Canales", icon: <IcCloud width={16} height={16} /> }]
+    : NAV_ITEMS;
+
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <header className="topnav">
         <div className="brand">
           <span className="brand-mark">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M9 6.5c0-.9 1-1.5 1.8-1l7 4.5c.7.5.7 1.5 0 2l-7 4.5c-.8.5-1.8-.1-1.8-1z" fill="#0A0B0F"/></svg>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M9 6.5c0-.9 1-1.5 1.8-1l7 4.5c.7.5.7 1.5 0 2l-7 4.5c-.8.5-1.8-.1-1.8-1z" fill="#fff"/></svg>
           </span>
           <div>
-            <div className="brand-name">Aurora</div>
+            <div className="brand-name">Estudio</div>
             <div className="brand-sub">AI Video Studio</div>
           </div>
         </div>
 
-        <div className="nav-section">Estudio</div>
-        <NavLink to="/" end className={navCls}><IcSparkles /> Inicio</NavLink>
-        <NavLink to="/pods" className={navCls}><IcFilm /> Pods</NavLink>
-        <NavLink to="/templates" className={navCls}><IcLayout /> Plantillas</NavLink>
-        <NavLink to="/director" className={navCls}><IcMessageCircle /> Director</NavLink>
-        <NavLink to="/memes" className={navCls}><IcLaugh /> Memes</NavLink>
-        <NavLink to="/recreations" className={navCls}><IcRadar /> Recreaciones</NavLink>
-        <NavLink to="/jobs" className={navCls}><IcActivity /> Trabajos</NavLink>
-        {appConfig.data?.channels_feature_enabled && (
-          <NavLink to="/channels" className={navCls}><IcCloud width={16} height={16} /> Canales</NavLink>
-        )}
+        <nav className="topnav-links">
+          {items.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end} className={navCls}>
+              {({ isActive }) => (
+                <>
+                  {item.icon} {item.label}
+                  {isActive && (
+                    <motion.span layoutId="nav-indicator" className="nav-link-indicator" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+                  )}
+                </>
+              )}
+            </NavLink>
+          ))}
+          <NavLink to="/settings" className={navCls}>
+            {({ isActive }) => (
+              <>
+                <IcSliders /> Ajustes
+                {isActive && (
+                  <motion.span layoutId="nav-indicator" className="nav-link-indicator" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+                )}
+              </>
+            )}
+          </NavLink>
+        </nav>
 
-        <div className="nav-section">Sistema</div>
-        <NavLink to="/settings" className={navCls}><IcSliders /> Ajustes</NavLink>
-
-        <div className="sidebar-foot">
+        <div className="topnav-right">
           <LlmChip llm={llm.data} />
           <HiggsfieldChip data={hf.data} />
-          <div className="muted" style={{ fontSize: 11.5, marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
-            <span className={`badge ${health.data ? "ok" : "err"}`}>
-              <span className="dot" />{health.data ? health.data.status : "offline"}
-            </span>
-            <span className="dim mono">{health.data ? `${health.data.app_mode} · v${health.data.version}` : "—"}</span>
+          <span className={`badge ${health.data ? "ok" : "err"}`} title="Estado del backend">
+            <span className="dot" />{health.data ? health.data.app_mode : "offline"}
+          </span>
+          <button className="theme-toggle" onClick={toggle} aria-label={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"} title={theme === "dark" ? "Tema claro" : "Tema oscuro"}>
+            {theme === "dark" ? <IcSun /> : <IcMoon />}
+          </button>
+          <button className="nav-burger" onClick={() => setMenuOpen((v) => !v)} aria-label="Abrir menú" aria-expanded={menuOpen}>
+            {menuOpen ? <IcX /> : <IcMenu />}
+          </button>
+        </div>
+      </header>
+
+      {menuOpen && (
+        <div className="mobile-menu">
+          <div className="stack" style={{ gap: 4 }}>
+            {items.map((item) => (
+              <NavLink key={item.to} to={item.to} end={item.end} className={navCls} onClick={() => setMenuOpen(false)}>
+                {item.icon} {item.label}
+              </NavLink>
+            ))}
+            <NavLink to="/settings" className={navCls} onClick={() => setMenuOpen(false)}>
+              <IcSliders /> Ajustes
+            </NavLink>
           </div>
         </div>
-      </aside>
+      )}
 
       <main className="main">
-        <div className="topbar">
-          <div className="crumbs"><span className="cur">{routeLabel(location.pathname)}</span></div>
-          <div className="topbar-spacer" />
-          {llm.data && (
-            <span className="badge accent" title={`Proveedor LLM: ${llm.data.provider}`}>
-              {llm.data.provider === "ollama" ? <IcCpu width={13} height={13} /> : <IcCloud width={13} height={13} />}
-              {llm.data.provider === "ollama" ? llm.data.ollama_model : llm.data.gemini_model}
-            </span>
-          )}
-        </div>
-        <div key={location.pathname} className="fade-in" style={{ flex: 1 }}>
-          <Outlet />
-        </div>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            style={{ flex: 1, display: "flex", flexDirection: "column" }}
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );
@@ -83,15 +132,14 @@ function LlmChip({ llm }: { llm?: LlmConfig }) {
   const isOllama = llm.provider === "ollama";
   const healthy = isOllama ? llm.ollama.running && llm.ollama.current_model_installed : llm.gemini_key_present;
   return (
-    <div className="statpill">
-      {isOllama ? <IcCpu width={16} height={16} /> : <IcCloud width={16} height={16} />}
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div className="label">Motor de texto</div>
-        <div className="val" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+    <div className="statpill compact" title="Motor de texto">
+      {isOllama ? <IcCpu width={15} height={15} /> : <IcCloud width={15} height={15} />}
+      <div style={{ minWidth: 0 }}>
+        <div className="val" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 96 }}>
           {isOllama ? "Ollama" : "Gemini"}
         </div>
       </div>
-      <span className="dot" style={{ width: 8, height: 8, borderRadius: "50%", background: healthy ? "var(--mint)" : "var(--amber)" }} />
+      <span className="dot" style={{ width: 7, height: 7, borderRadius: "50%", background: healthy ? "var(--mint)" : "var(--amber)" }} />
     </div>
   );
 }
@@ -103,32 +151,11 @@ type HiggsfieldBalance = {
 function HiggsfieldChip({ data }: { data?: HiggsfieldBalance }) {
   if (!data?.available) return null;  // hide until `hf auth login` is done
   return (
-    <div className="statpill" style={{ marginTop: 8 }} title={data.detail}>
-      <IcCloud width={16} height={16} />
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div className="label">Higgsfield{data.plan ? ` · ${data.plan}` : ""}</div>
-        <div className="val">{data.credits != null ? `${data.credits.toFixed(2)} cr` : "—"}</div>
-      </div>
-      <span className="dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--mint)" }} />
+    <div className="statpill compact" title={data.detail}>
+      <IcCloud width={15} height={15} />
+      <div className="val">{data.credits != null ? `${data.credits.toFixed(0)} cr` : "—"}</div>
     </div>
   );
 }
 
 const navCls = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? "active" : ""}`;
-
-function routeLabel(path: string): string {
-  if (path === "/") return "Inicio";
-  if (path === "/pods") return "Pods";
-  if (path.startsWith("/jobs")) return "Trabajos";
-  if (path.startsWith("/settings")) return "Ajustes";
-  if (path.startsWith("/create")) return "Crear pod";
-  if (path.startsWith("/templates")) return "Plantillas";
-  if (path.startsWith("/director")) return "Director";
-  if (path.startsWith("/memes")) return "Memes";
-  if (path.startsWith("/recreations")) return "Recreaciones";
-  if (path.startsWith("/channels")) return "Canales";
-  if (path.startsWith("/runs/")) return "Ejecución";
-  if (path.includes("/episodes/")) return "Episodio";
-  if (path.startsWith("/pods/")) return "Pod";
-  return "Aurora";
-}

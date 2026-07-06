@@ -20,7 +20,7 @@ export function JobsPage() {
       </div>
       {jobs.isLoading && <Loading />}
       {jobs.isError && <ErrorState error={jobs.error} />}
-      {jobs.data?.length === 0 && <Empty emoji="🛠️" title="Sin trabajos">Cuando lances un render aparecerá aquí.</Empty>}
+      {jobs.data?.length === 0 && <Empty emoji="🛠️" title="Todo tranquilo por aquí">En cuanto lances un render o una tarea, la verás avanzar en vivo.</Empty>}
       <div className="stack">{jobs.data?.map((j) => <JobCard key={j.id} job={j} />)}</div>
     </div>
   );

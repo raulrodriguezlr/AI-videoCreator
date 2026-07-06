@@ -33,9 +33,9 @@ export function PodsListPage() {
       {pods.isLoading && <Loading />}
       {pods.isError && <ErrorState error={pods.error} />}
       {pods.data && pods.data.length === 0 && (
-        <Empty emoji="🎬" title="Aún no hay pods"
+        <Empty emoji="🎬" title="El plató está vacío"
           action={<Button variant="primary" onClick={() => nav("/create")}><IcPlus /> Crear tu primer pod</Button>}>
-          Crea una serie desde una idea y deja que la IA proponga personajes y temas.
+          Escribe una idea y deja que la IA proponga personajes, tono y los primeros episodios.
         </Empty>
       )}
 

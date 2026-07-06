@@ -22,8 +22,8 @@ export function TemplatesPage() {
       {templates.isLoading && <Loading />}
       {templates.isError && <ErrorState error={templates.error} />}
       {templates.data && templates.data.length === 0 && (
-        <Empty emoji="🧩" title="Sin plantillas todavía">
-          Aún no hay recetas publicadas — vuelve más tarde o crea una desde el director.
+        <Empty emoji="🧩" title="Las plantillas están al llegar">
+          Aún no hay recetas publicadas — pide al Director que diseñe la primera.
         </Empty>
       )}
 

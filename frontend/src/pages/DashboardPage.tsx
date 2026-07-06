@@ -48,9 +48,8 @@ export function DashboardPage() {
 
       {isEmpty ? (
         <div style={{ marginTop: 28 }}>
-          <Empty emoji="✨" title="Tu estudio está listo">
-            Crea tu primer pod para empezar a generar episodios y shorts. En segundos tendrás
-            contenido que aparecerá aquí.
+          <Empty emoji="✨" title="Lienzo en blanco, ideas infinitas">
+            Crea tu primer pod y en minutos tendrás episodios y shorts esperando aquí mismo.
           </Empty>
         </div>
       ) : (

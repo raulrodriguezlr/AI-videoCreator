@@ -73,8 +73,8 @@ export function ChannelsPage() {
       {accounts.isLoading && <Loading />}
       {accounts.isError && <ErrorState error={accounts.error} />}
       {accounts.data && accounts.data.length === 0 && (
-        <Empty emoji="🔌" title="Sin cuentas conectadas">
-          Conecta una cuenta arriba para empezar a publicar.
+        <Empty emoji="🔌" title="Ningún canal enchufado aún">
+          Conecta una cuenta arriba y tendrás dónde publicar en un clic.
         </Empty>
       )}
       {accounts.data && accounts.data.length > 0 && (
@@ -108,8 +108,8 @@ export function ChannelsPage() {
       {uploads.isLoading && <Loading />}
       {uploads.isError && <ErrorState error={uploads.error} />}
       {uploads.data && uploads.data.length === 0 && (
-        <Empty emoji="📤" title="Sin subidas todavía">
-          Publica un episodio o short desde su página.
+        <Empty emoji="📤" title="Nada publicado por aquí todavía">
+          Publica un episodio o short desde su página y su rastro aparecerá aquí.
         </Empty>
       )}
       {uploads.data && uploads.data.length > 0 && (

@@ -42,3 +42,6 @@ export const IcRadar = (p: P) => (<svg {...base(p)}><path d="M12 12 19 6"/><path
 export const IcCopy = (p: P) => (<svg {...base(p)}><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>);
 export const IcAlertTriangle = (p: P) => (<svg {...base(p)}><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>);
 export const IcLaugh = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="9.5"/><path d="M8 13.5a4.5 4.5 0 0 0 8 0"/><path d="M8.5 9h.01M15.5 9h.01"/></svg>);
+export const IcSun = (p: P) => (<svg {...base(p)}><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>);
+export const IcMoon = (p: P) => (<svg {...base(p)}><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>);
+export const IcMenu = (p: P) => (<svg {...base(p)}><path d="M3 6h18M3 12h18M3 18h18"/></svg>);

@@ -83,7 +83,7 @@ function EpisodesTab({ podId, q }: { podId: string; q: UseQueryResult<Episode[]>
   });
   if (q.isLoading) return <Loading />;
   if (q.isError) return <ErrorState error={q.error} />;
-  if (!q.data?.length) return <Empty emoji="🎞️" title="Sin episodios">Genera un guión desde un tema y créalo como episodio.</Empty>;
+  if (!q.data?.length) return <Empty emoji="🎞️" title="El primer episodio está por rodarse">Genera un guión desde un tema y créalo como episodio.</Empty>;
   return (
     <div className="stack">
       {q.data.map((ep) => (
@@ -145,7 +145,7 @@ function TopicsTab({ podId, q }: { podId: string; q: UseQueryResult<Topic[]> }) 
         </label>
       </div>
       {q.isLoading && <Loading />}
-      {!q.isLoading && !q.data?.length && <Empty emoji="💡" title="Sin temas">Genera ideas de episodios con la IA.</Empty>}
+      {!q.isLoading && !q.data?.length && <Empty emoji="💡" title="La lluvia de ideas no ha empezado">Pide a la IA una tanda de ideas de episodios.</Empty>}
       {q.data?.map((t) => (
         <div key={t.id} className="card card-pad between">
           <div style={{ minWidth: 0 }}>
@@ -214,7 +214,7 @@ function ScriptsTab({ podId, q }: { podId: string; q: UseQueryResult<Script[]> }
     onError: (e) => toast.err("No se pudo borrar", (e as Error).message),
   });
   if (q.isLoading) return <Loading />;
-  if (!q.data?.length) return <Empty emoji="📝" title="Sin guiones">Genera un guión desde un tema.</Empty>;
+  if (!q.data?.length) return <Empty emoji="📝" title="La página está en blanco">Genera un guión desde un tema y dale voz a tu historia.</Empty>;
   return (
     <div className="stack">
       {q.data.map((s) => (
@@ -328,7 +328,7 @@ function ShortsTab({ podId, q, episodes }: {
       </div>
 
       {q.isLoading && <Loading />}
-      {!q.isLoading && !q.data?.length && <Empty emoji="📱" title="Sin shorts">Crea verticales 9:16 a partir de un episodio.</Empty>}
+      {!q.isLoading && !q.data?.length && <Empty emoji="📱" title="Todavía nada para el móvil">Multiplica un episodio en verticales 9:16 listos para shorts.</Empty>}
 
       <div className="grid cols">
         {q.data?.map((s) => (
