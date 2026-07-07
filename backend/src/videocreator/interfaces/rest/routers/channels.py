@@ -107,6 +107,20 @@ async def disconnect_account(account_id: str, container: ContainerDep, user_id: 
     await container.oauth_account_service().disconnect(account)
 
 
+@router.post(
+    "/{account_id}/verify", response_model=AccountResponse,
+    summary="Health-check an account with a minimal per-platform auth call",
+)
+async def verify_account(account_id: str, container: ContainerDep, user_id: UserIdDep) -> AccountResponse:
+    _ensure_enabled(container)
+    repo = container.publish_account_repo()
+    account = await repo.get(account_id)
+    if account is None or account.user_id != user_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "account not found")
+    verified = await container.oauth_account_service().verify(account)
+    return _account_dto(verified)
+
+
 # ---- uploads ---------------------------------------------------------------
 @router.post("/upload", response_model=list[PublishJobResponse], summary="Enqueue an upload (batch + schedule)")
 async def enqueue_upload(

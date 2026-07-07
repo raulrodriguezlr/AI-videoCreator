@@ -42,6 +42,9 @@ SECRET_REFRESH = "refresh_token"
 SECRET_ACCESS = "access_token"
 SECRET_CLIENT_ID = "client_id"
 SECRET_CLIENT_SECRET = "client_secret"
+#: Instagram Business account id (Graph API `/{ig_user_id}/media`). Populated
+#: from the auth-code flow's bundle when the platform is Instagram.
+SECRET_IG_USER_ID = "ig_user_id"
 
 #: TikTok's refresh-token endpoint (grant_type=refresh_token).
 TIKTOK_TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/"
@@ -87,6 +90,13 @@ YouTubeCredentialsBuilder = Callable[..., Any]
 #: so tests never touch the network.
 TikTokRefreshFlow = Callable[[str, str, str], dict[str, Any]]
 
+#: (platform, bundle) -> True if the credentials are still valid. A minimal,
+#: cheap, platform-specific auth probe (YouTube: channels.list mine=true;
+#: TikTok: user info; Instagram: /me) — raises on a network/HTTP problem,
+#: returns False on a clear auth rejection. Injectable so tests never touch
+#: the network/SDKs.
+VerifyProbe = Callable[[PublishPlatform, "TokenBundle"], bool]
+
 
 def _key(platform: PublishPlatform, account_id: str, secret: str) -> str:
     return f"{platform.value}:{account_id}:{secret}"
@@ -104,6 +114,7 @@ class OAuthAccountService:
         auth_code_flow: AuthCodeFlow | None = None,
         youtube_credentials_builder: YouTubeCredentialsBuilder | None = None,
         tiktok_refresh_flow: TikTokRefreshFlow | None = None,
+        verify_probe: VerifyProbe | None = None,
     ) -> None:
         self._vault = vault
         self._repo = account_repo
@@ -111,6 +122,7 @@ class OAuthAccountService:
         self._auth_code_flow = auth_code_flow
         self._youtube_credentials_builder = youtube_credentials_builder
         self._tiktok_refresh_flow = tiktok_refresh_flow
+        self._verify_probe = verify_probe
 
     async def connect(
         self,
@@ -144,6 +156,9 @@ class OAuthAccountService:
             await self._vault.set_secret(user_id, _key(platform, aid, SECRET_REFRESH), bundle["refresh_token"])
         if bundle.get("access_token"):
             await self._vault.set_secret(user_id, _key(platform, aid, SECRET_ACCESS), bundle["access_token"])
+        if bundle.get(SECRET_IG_USER_ID):
+            ig_key = _key(platform, aid, SECRET_IG_USER_ID)
+            await self._vault.set_secret(user_id, ig_key, bundle[SECRET_IG_USER_ID])
         await self._vault.set_secret(user_id, _key(platform, aid, SECRET_CLIENT_ID), client_id)
         await self._vault.set_secret(user_id, _key(platform, aid, SECRET_CLIENT_SECRET), client_secret)
         log.info("channel.connected", platform=platform.value, account_id=aid)
@@ -168,7 +183,9 @@ class OAuthAccountService:
         """
         aid = str(account.id)
         bundle: TokenBundle = {}
-        for secret in (SECRET_REFRESH, SECRET_ACCESS, SECRET_CLIENT_ID, SECRET_CLIENT_SECRET):
+        for secret in (
+            SECRET_REFRESH, SECRET_ACCESS, SECRET_CLIENT_ID, SECRET_CLIENT_SECRET, SECRET_IG_USER_ID,
+        ):
             val = await self._vault.get_secret(account.user_id, _key(account.platform, aid, secret))
             if val is not None:
                 bundle[secret] = val
@@ -181,6 +198,48 @@ class OAuthAccountService:
             elif account.platform is PublishPlatform.TIKTOK:
                 await self._refresh_tiktok_access_token(account, bundle)
         return bundle
+
+    async def verify(self, account: PublishAccount) -> PublishAccount:
+        """Health-check an account with one minimal per-platform API call.
+
+        Reuses `credentials()` first so a dead refresh token is already caught
+        (and the account marked EXPIRED) before the probe ever runs. The probe
+        itself is a cheap read-only call — YouTube: `channels.list(mine=true)`,
+        TikTok: user info, Instagram: `/me` — that only proves the access token
+        still authenticates; it does not attempt an upload. Returns the
+        (possibly updated) account so the caller can surface fresh status.
+        """
+        try:
+            bundle = await self.credentials(account)
+        except ProviderError:
+            # credentials() already marked EXPIRED on a refresh failure.
+            return await self._repo.get(account.id) or account
+
+        probe = self._verify_probe or _default_verify_probe
+        try:
+            ok = await asyncio.to_thread(probe, account.platform, bundle)
+        except Exception as e:
+            # Per the VerifyProbe contract, an exception means a NETWORK/HTTP
+            # problem (timeout, DNS, 5xx) — not an auth rejection. Leave the
+            # account status untouched: marking EXPIRED here would force users
+            # to reconnect over a transient outage.
+            log.warning(
+                "channel.verify_probe_unreachable",
+                platform=account.platform.value, account_id=str(account.id), error=str(e),
+            )
+            return account
+
+        if not ok:
+            await self._mark_expired(account)
+            return await self._repo.get(account.id) or account
+        if account.status is AccountStatus.EXPIRED:
+            # Recovered — e.g. the user reconnected out of band.
+            restored = account.model_copy(update={
+                "status": AccountStatus.CONNECTED, "updated_at": utcnow(),
+            })
+            await self._repo.save(restored)
+            return restored
+        return account
 
     # -- token refresh (token hygiene) ---------------------------------------
     async def _refresh_youtube_access_token(
@@ -412,6 +471,55 @@ def _default_tiktok_refresh(  # pragma: no cover - network, exercised via inject
     return resp.json()
 
 
+def _default_verify_probe(  # pragma: no cover - network, exercised via injected fake
+    platform: PublishPlatform, bundle: TokenBundle,
+) -> bool:
+    """Minimal read-only auth check per platform. Raises on network errors
+    (caller treats that as inconclusive -> False); returns False on a clear
+    401/403 rejection, True otherwise."""
+    import httpx  # lazy
+
+    access = bundle.get(SECRET_ACCESS)
+    if not access:
+        return False
+
+    if platform is PublishPlatform.YOUTUBE:
+        try:
+            from googleapiclient.discovery import build  # type: ignore[import-untyped]
+            from google.oauth2.credentials import Credentials  # type: ignore[import-untyped]
+        except ImportError as e:
+            raise ProviderError("google-api-python-client not installed") from e
+        creds = Credentials(token=access)
+        service = build("youtube", "v3", credentials=creds)
+        resp = service.channels().list(part="id", mine=True).execute()
+        return bool(resp.get("items"))
+
+    if platform is PublishPlatform.TIKTOK:
+        resp = httpx.post(
+            "https://open.tiktokapis.com/v2/user/info/",
+            headers={"Authorization": f"Bearer {access}"},
+            params={"fields": "open_id"},
+            timeout=15,
+        )
+        if resp.status_code in (401, 403):
+            return False
+        resp.raise_for_status()
+        return "data" in resp.json()
+
+    if platform is PublishPlatform.INSTAGRAM:
+        resp = httpx.get(
+            "https://graph.facebook.com/v19.0/me",
+            params={"fields": "id", "access_token": access},
+            timeout=15,
+        )
+        if resp.status_code in (401, 403):
+            return False
+        resp.raise_for_status()
+        return "id" in resp.json()
+
+    return False
+
+
 __all__ = [
     "OAuthAccountService",
     "PlatformOAuth",
@@ -419,6 +527,8 @@ __all__ = [
     "SECRET_ACCESS",
     "SECRET_CLIENT_ID",
     "SECRET_CLIENT_SECRET",
+    "SECRET_IG_USER_ID",
     "SECRET_REFRESH",
     "TIKTOK_TOKEN_URL",
+    "VerifyProbe",
 ]

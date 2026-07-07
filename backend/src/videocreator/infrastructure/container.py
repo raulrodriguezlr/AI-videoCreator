@@ -600,7 +600,17 @@ class Container:
             job_repo=self.publish_job_repo(),
             oauth=self.oauth_account_service(),
             publisher=self.channel_publisher(),
+            # A callable (not a static value) — `publish_service()` is cached
+            # as a singleton, so this reads the live runtime-config override
+            # (falls back to the `.env` Settings value) on every call instead
+            # of freezing whatever was configured at process boot.
+            public_media_base_url=self._resolve_public_media_base_url,
         )
+
+    def _resolve_public_media_base_url(self) -> str | None:
+        rc = self.runtime_config().get()
+        override = rc.get("public_media_base_url")
+        return override or self.settings.public_media_base_url
 
     # ---- provider SDK (§9.1) -----------------------------------------------
     def provider_registry(self) -> "ProviderRegistry":

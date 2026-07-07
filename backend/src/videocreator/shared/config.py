@@ -91,6 +91,16 @@ class Settings(BaseSettings):
     port: int = 8000
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
+    # --- Channels Hub: Instagram publishing needs a public video URL ---
+    # Instagram's Graph API (container -> publish) only accepts a publicly
+    # reachable `video_url`; it never accepts an uploaded file. Local-first
+    # apps have no public URL by default, so the user runs a tunnel (e.g.
+    # `cloudflared tunnel --url http://127.0.0.1:8000`) and pastes the base
+    # URL here. When unset, Instagram publish jobs are rejected at enqueue
+    # time with a message explaining what to configure — instead of failing
+    # deep inside the upload after the job is already queued.
+    public_media_base_url: str | None = None
+
     # --- secrets (BYO provider keys, encrypted at rest) ---
     # A url-safe base64 32-byte Fernet key. When set, the DB-backed encrypted
     # vault is used; when unset, local mode reads keys from the env (single user).

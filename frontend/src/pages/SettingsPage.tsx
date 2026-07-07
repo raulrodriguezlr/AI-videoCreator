@@ -33,6 +33,8 @@ export function SettingsPage() {
       <div style={{ height: 22 }} />
       <FeaturesSection />
       <div style={{ height: 22 }} />
+      <PublicMediaUrlSection />
+      <div style={{ height: 22 }} />
       <RulesSection />
     </div>
   );
@@ -112,7 +114,7 @@ function FeaturesSection() {
   const toast = useToast();
   const cfg = useQuery<AppConfig>({ queryKey: ["app-config"], queryFn: getAppConfig });
   const toggle = useMutation({
-    mutationFn: (enabled: boolean) => setAppConfig(enabled),
+    mutationFn: (enabled: boolean) => setAppConfig({ channels_feature_enabled: enabled }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["app-config"] });
       toast.ok("Ajuste guardado");
@@ -141,6 +143,50 @@ function FeaturesSection() {
             </div>
           </span>
         </label>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Public media URL (Instagram)
+function PublicMediaUrlSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const cfg = useQuery<AppConfig>({ queryKey: ["app-config"], queryFn: getAppConfig });
+  const [url, setUrl] = useState("");
+
+  const save = useMutation({
+    mutationFn: () => setAppConfig({ public_media_base_url: url.trim() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["app-config"] });
+      toast.ok("URL pública guardada");
+    },
+    onError: (e) => toast.err("No se pudo guardar", (e as Error).message),
+  });
+
+  const current = cfg.data?.public_media_base_url ?? "";
+
+  return (
+    <div className="card">
+      <div className="card-head"><h2>URL pública de medios (Instagram)</h2></div>
+      <div className="card-pad stack">
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+          Instagram (Graph API) solo acepta un <span className="mono">video_url</span> públicamente
+          accesible — nunca un archivo subido. Corre un túnel apuntando a este backend, p. ej.{" "}
+          <span className="mono">cloudflared tunnel --url http://127.0.0.1:8000</span>, y pega aquí su
+          URL https. Sin esto, publicar en Instagram queda bloqueado antes de encolar el vídeo.
+        </p>
+        <Field label="PUBLIC_MEDIA_BASE_URL" hint={current ? `Actual: ${current}` : "Sin configurar"}>
+          <input
+            className="input mono" placeholder="https://tu-tunel.trycloudflare.com"
+            value={url || current} onChange={(e) => setUrl(e.target.value)}
+          />
+        </Field>
+        <div className="btn-row" style={{ justifyContent: "flex-end" }}>
+          <Button variant="primary" size="sm" loading={save.isPending} disabled={!url.trim()} onClick={() => save.mutate()}>
+            Guardar
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -90,28 +90,38 @@ async def set_llm_config(
 
 class AppConfigResponse(BaseModel):
     channels_feature_enabled: bool = False
+    public_media_base_url: str | None = None
 
 
 class SetAppConfigRequest(BaseModel):
-    channels_feature_enabled: bool
+    channels_feature_enabled: bool | None = None
+    public_media_base_url: str | None = None
 
 
-def _app_config(container: ContainerDep) -> AppConfigResponse:
+def _app_config(container: ContainerDep, settings: SettingsDep) -> AppConfigResponse:
     rc = container.runtime_config().get()
     return AppConfigResponse(
         channels_feature_enabled=bool(rc.get("channels_feature_enabled", False)),
+        public_media_base_url=rc.get("public_media_base_url") or settings.public_media_base_url,
     )
 
 
 @router.get("/config", response_model=AppConfigResponse, summary="Runtime feature flags")
-async def get_app_config(container: ContainerDep) -> AppConfigResponse:
-    return _app_config(container)
+async def get_app_config(container: ContainerDep, settings: SettingsDep) -> AppConfigResponse:
+    return _app_config(container, settings)
 
 
 @router.put("/config", response_model=AppConfigResponse, summary="Toggle runtime feature flags")
-async def set_app_config(body: SetAppConfigRequest, container: ContainerDep) -> AppConfigResponse:
-    container.runtime_config().set(channels_feature_enabled=body.channels_feature_enabled)
-    return _app_config(container)
+async def set_app_config(
+    body: SetAppConfigRequest, container: ContainerDep, settings: SettingsDep,
+) -> AppConfigResponse:
+    overrides: dict[str, Any] = {}
+    if body.channels_feature_enabled is not None:
+        overrides["channels_feature_enabled"] = body.channels_feature_enabled
+    if body.public_media_base_url is not None:
+        overrides["public_media_base_url"] = body.public_media_base_url
+    container.runtime_config().set(**overrides)
+    return _app_config(container, settings)
 
 
 @router.get(

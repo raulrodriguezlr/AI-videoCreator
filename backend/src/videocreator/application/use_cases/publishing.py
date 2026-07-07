@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from videocreator.domain.entities import PublishAccount, PublishJob
 from videocreator.domain.value_objects import AccountStatus, PublishPlatform, PublishStatus
@@ -62,6 +62,7 @@ class PublishService:
         job_repo: Any,
         oauth: Any,
         publisher: Any,
+        public_media_base_url: str | Callable[[], str | None] | None = None,
     ) -> None:
         self._episodes = episode_repo
         self._shorts = short_repo
@@ -70,6 +71,17 @@ class PublishService:
         self._jobs = job_repo
         self._oauth = oauth
         self._publisher = publisher
+        # Instagram's Graph API only accepts a public video_url; without this
+        # configured, Instagram jobs are rejected at enqueue time (see below)
+        # rather than failing deep inside the upload. Accepts a plain string
+        # (tests) or a zero-arg callable so the live runtime-config value is
+        # read on every call — `Container` caches this service as a singleton,
+        # so a static string would freeze whatever was configured at boot.
+        self._public_media_base_url = public_media_base_url
+
+    def _resolve_public_media_base_url(self) -> str | None:
+        value = self._public_media_base_url
+        return value() if callable(value) else value
 
     async def enqueue(
         self,
@@ -97,6 +109,14 @@ class PublishService:
             account = await self._accounts.get(account_id)
             if account is None or account.user_id != user_id:
                 raise NotFoundError(f"account {account_id} not found")
+            needs_public_url = account.platform is PublishPlatform.INSTAGRAM
+            if needs_public_url and not self._resolve_public_media_base_url():
+                raise ValidationError(
+                    "Instagram publishing needs a public video URL. Configure "
+                    "PUBLIC_MEDIA_BASE_URL in Settings — run a tunnel (e.g. "
+                    "`cloudflared tunnel --url http://127.0.0.1:8000`) and paste "
+                    "its https URL there — then retry."
+                )
             accounts.append(account)
 
         jobs: list[PublishJob] = []
@@ -131,10 +151,25 @@ class PublishService:
             return await self._fail(job, "account no longer exists")
         job = await self._mark(job, PublishStatus.UPLOADING)
         try:
-            video_path = await self._resolve_video(job.source, job.source_id)
+            video_path, bucket, key = await self._resolve_video_located(job.source, job.source_id)
+            metadata = dict(job.metadata)
+            if account.platform is PublishPlatform.INSTAGRAM:
+                base_url = self._resolve_public_media_base_url()
+                if not base_url:
+                    raise ValidationError(
+                        "Instagram publishing needs PUBLIC_MEDIA_BASE_URL configured "
+                        "in Settings (run a tunnel and paste its URL) — reconfigure "
+                        "and retry."
+                    )
+                base = base_url.rstrip("/")
+                # Users paste anything from a bare origin to the full API root —
+                # normalize so we never produce /api/v1/api/v1/... .
+                if base.endswith("/api/v1"):
+                    base = base[: -len("/api/v1")]
+                metadata["public_video_url"] = f"{base}/api/v1/storage/{bucket}/{key}"
             bundle = await self._oauth.credentials(account)
             result = await asyncio.to_thread(
-                self._publisher.upload, job.platform, video_path, bundle, job.metadata,
+                self._publisher.upload, job.platform, video_path, bundle, metadata,
             )
         except Exception as e:  # noqa: BLE001 - surface any upload failure on the job
             log.error("publish.failed", job_id=str(job.id), error=str(e))
@@ -154,6 +189,12 @@ class PublishService:
 
     # -- helpers -------------------------------------------------------------
     async def _resolve_video(self, source: str, source_id: str) -> Path:
+        path, _bucket, _key = await self._resolve_video_located(source, source_id)
+        return path
+
+    async def _resolve_video_located(self, source: str, source_id: str) -> tuple[Path, str, str]:
+        """Like `_resolve_video` but also returns (bucket, key) — needed to
+        build the public URL Instagram's Graph API requires."""
         if source == "episode":
             episode = await self._episodes.get(EpisodeId(source_id))
             if episode is None:
@@ -171,7 +212,7 @@ class PublishService:
         path: Path = await self._storage.open_path(bucket, key)
         if not path.exists():
             raise NotFoundError(f"video file not found: {key}")
-        return path
+        return path, bucket, key
 
     async def _mark_source_published(
         self, job: PublishJob, account: PublishAccount, result: Any,

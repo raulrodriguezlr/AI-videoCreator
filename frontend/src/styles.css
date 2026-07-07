@@ -483,10 +483,42 @@ p { margin: 0 0 12px; }
 /* ============================ Modal / drawer =========================== */
 .overlay { position: fixed; inset: 0; background: rgba(33,28,23,0.4); backdrop-filter: blur(4px); z-index: 50; display: grid; place-items: center; padding: 24px; animation: fadeIn 0.18s ease; }
 .modal { width: 100%; max-width: 560px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-lg); box-shadow: var(--shadow-lg); animation: pop 0.2s ease; }
+.modal.wide { max-width: 640px; }
 @keyframes pop { from { transform: scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
 .modal-head { padding: 18px 22px; border-bottom: 1px solid var(--border); }
 .modal-body { padding: 22px; max-height: 70vh; overflow: auto; }
 .modal-foot { padding: 16px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+
+/* ============================ Callouts ================================= */
+.callout {
+  display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--surface-2); font-size: 13px; line-height: 1.5;
+}
+.callout svg { flex-shrink: 0; margin-top: 1px; }
+.callout.warn { color: var(--accent-ink); background: var(--amber-soft); border-color: transparent; }
+.callout.warn svg { color: var(--amber); }
+.callout.info { background: var(--accent-soft); border-color: transparent; }
+.callout.info svg { color: var(--accent); }
+.callout.err { background: var(--red-soft); border-color: transparent; }
+.callout.err svg { color: var(--red); }
+.callout b { font-weight: 650; }
+
+/* ============================ Wizard stepper ============================ */
+.wiz-steps { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+.wiz-step {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%; font-size: 12px; font-weight: 700;
+  background: var(--surface-2); border: 1.5px solid var(--border-strong); color: var(--text-3);
+  flex-shrink: 0; transition: all 0.15s ease;
+}
+.wiz-step.done { background: var(--mint); border-color: transparent; color: #fff; }
+.wiz-step.active { background: var(--accent); border-color: transparent; color: #fff; box-shadow: var(--ring); }
+.wiz-step-line { flex: 1; height: 2px; background: var(--border-strong); border-radius: 2px; }
+.wiz-step-line.done { background: var(--mint); }
+.wiz-substep { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 14px 16px; background: var(--surface-2); }
+.wiz-substep .num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); font-size: 11.5px; font-weight: 700; margin-right: 8px; }
+.field-ok { color: var(--mint); }
+.field-bad { color: var(--red); }
 
 /* ============================ Toasts =================================== */
 .toasts { position: fixed; right: 22px; bottom: 22px; z-index: 80; display: flex; flex-direction: column; gap: 10px; }

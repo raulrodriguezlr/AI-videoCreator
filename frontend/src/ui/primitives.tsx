@@ -254,12 +254,12 @@ export function Combobox({ value, onChange, options, placeholder, icon }: {
 // --------------------------------------------------------------------------
 // Modal
 // --------------------------------------------------------------------------
-export function Modal({ title, onClose, children, footer }: {
-  title: string; onClose: () => void; children: ReactNode; footer?: ReactNode;
+export function Modal({ title, onClose, children, footer, wide }: {
+  title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean;
 }) {
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal>
+      <div className={`modal ${wide ? "wide" : ""}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal>
         <div className="modal-head between">
           <h2>{title}</h2>
           <Button variant="ghost" size="sm" className="icon" onClick={onClose} aria-label="Cerrar"><IcX /></Button>
@@ -267,6 +267,20 @@ export function Modal({ title, onClose, children, footer }: {
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Callout — inline warning/info/error banner (wizard steps, guardrails)
+// --------------------------------------------------------------------------
+export function Callout({ tone = "info", icon, children }: {
+  tone?: "info" | "warn" | "err"; icon?: ReactNode; children: ReactNode;
+}) {
+  return (
+    <div className={`callout ${tone}`}>
+      {icon}
+      <div>{children}</div>
     </div>
   );
 }

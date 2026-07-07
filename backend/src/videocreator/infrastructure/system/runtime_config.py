@@ -19,7 +19,7 @@ log = get_logger(__name__)
 # from drifting into a second, untracked config surface.
 _ALLOWED = frozenset({
     "llm_provider", "gemini_model", "ollama_model", "ollama_base_url",
-    "channels_feature_enabled",
+    "channels_feature_enabled", "public_media_base_url",
 })
 
 

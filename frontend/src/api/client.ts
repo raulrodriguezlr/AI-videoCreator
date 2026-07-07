@@ -703,6 +703,7 @@ export type ChannelPlatform = "youtube" | "tiktok" | "instagram";
 
 export interface AppConfig {
   channels_feature_enabled: boolean;
+  public_media_base_url: string | null;
 }
 
 export interface Channel {
@@ -734,8 +735,8 @@ export interface EnqueueUploadRequest {
 }
 
 export const getAppConfig = () => api.get<AppConfig>("/system/config");
-export const setAppConfig = (channels_feature_enabled: boolean) =>
-  api.put<AppConfig>("/system/config", { channels_feature_enabled });
+export const setAppConfig = (patch: Partial<AppConfig>) =>
+  api.put<AppConfig>("/system/config", patch);
 
 // ---------------------------------------------------------------------------
 // Gameplay b-roll (local "split" layout folder)
@@ -761,6 +762,7 @@ export const listChannels = () => api.get<Channel[]>("/channels");
 export const connectChannel = (platform: ChannelPlatform, client_id: string, client_secret: string) =>
   api.post<Channel>(`/channels/${platform}/connect`, { client_id, client_secret });
 export const disconnectChannel = (accountId: string) => api.delete<void>(`/channels/${accountId}`);
+export const verifyChannel = (accountId: string) => api.post<Channel>(`/channels/${accountId}/verify`);
 export const enqueueUpload = (body: EnqueueUploadRequest) =>
   api.post<PublishJob[]>("/channels/upload", body);
 export const listUploads = () => api.get<PublishJob[]>("/channels/uploads");
