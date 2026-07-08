@@ -19,6 +19,7 @@ export const IcMusic = (p: P) => (<svg {...base(p)}><path d="M9 18V5l12-2v13"/><
 export const IcWand = (p: P) => (<svg {...base(p)}><path d="m3 21 12-12M15 5l1.5-1.5M19 9l1.5-1.5M14.5 9.5 18 6M9 3l.7 2L12 5.7 9.7 6.4 9 9l-.7-2.6L6 5.7 8.3 5z" /></svg>);
 export const IcCpu = (p: P) => (<svg {...base(p)}><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>);
 export const IcCloud = (p: P) => (<svg {...base(p)}><path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6-1.5A4 4 0 0 0 6.5 19z"/></svg>);
+export const IcCalendar = (p: P) => (<svg {...base(p)}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>);
 export const IcCheck = (p: P) => (<svg {...base(p)}><path d="m5 12 5 5L20 6"/></svg>);
 export const IcX = (p: P) => (<svg {...base(p)}><path d="M6 6l12 12M18 6 6 18"/></svg>);
 export const IcEdit = (p: P) => (<svg {...base(p)}><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>);

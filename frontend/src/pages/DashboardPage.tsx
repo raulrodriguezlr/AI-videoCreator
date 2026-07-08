@@ -1,13 +1,14 @@
 import { useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  getDashboard, mediaUrl,
+  getDashboard, mediaUrl, getAppConfig, listUploads,
   type DashboardEpisode, type DashboardResponse, type DashboardShort,
+  type AppConfig, type PublishJob,
 } from "../api/client";
-import { Button, Empty, ErrorState, Loading } from "../ui/primitives";
+import { Badge, Button, Empty, ErrorState, Loading } from "../ui/primitives";
 import {
-  IcArrowRight, IcFilm, IcLayout, IcPlay, IcPlus, IcRocket, IcSparkles, IcWand,
+  IcArrowRight, IcCalendar, IcFilm, IcLayout, IcPlay, IcPlus, IcRocket, IcSparkles, IcWand,
 } from "../ui/icons";
 
 export function DashboardPage() {
@@ -38,6 +39,8 @@ export function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <TodaySection />
 
       <div className="dash-stats">
         <StatCard label="Pods" value={counts.pods} tone="accent" icon={<IcFilm width={18} height={18} />} onClick={() => nav("/pods")} />
@@ -148,5 +151,64 @@ function ShortCard({ short, onOpen }: { short: DashboardShort; onOpen: () => voi
         <span className="ep-pod">{short.pod_name}</span>
       </div>
     </button>
+  );
+}
+
+// "Hoy": what's scheduled/queued for today — only when the channels feature is
+// on. An empty day nudges toward making a short instead of showing nothing.
+const PLATFORM_TONE: Record<string, "ok" | "warn" | "err" | "accent"> = {
+  youtube: "err", tiktok: "accent", instagram: "warn",
+};
+
+function TodaySection() {
+  const cfg = useQuery<AppConfig>({ queryKey: ["app-config"], queryFn: getAppConfig });
+  const enabled = cfg.data?.channels_feature_enabled ?? false;
+  const uploads = useQuery<PublishJob[]>({
+    queryKey: ["channel-uploads"], queryFn: listUploads,
+    refetchInterval: 15_000, enabled,
+  });
+
+  if (!enabled) return null;
+
+  const now = new Date();
+  const isToday = (iso: string | null) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate();
+  };
+  const jobs = uploads.data ?? [];
+  const today = jobs.filter((j) => isToday(j.scheduled_at));
+  const active = jobs.filter((j) => j.status === "pending" || j.status === "uploading");
+
+  return (
+    <section className="card" style={{ marginBottom: 22 }}>
+      <div className="card-head between">
+        <h2><IcCalendar width={17} height={17} style={{ verticalAlign: "-3px", marginRight: 6 }} />Hoy</h2>
+        <Link to="/calendar" className="btn ghost sm">Ver calendario <IcArrowRight width={15} height={15} /></Link>
+      </div>
+      <div className="card-pad stack" style={{ gap: 10 }}>
+        {today.length === 0 && active.length === 0 && (
+          <div className="between" style={{ fontSize: 14, alignItems: "center" }}>
+            <span className="muted">Hoy no sale nada programado. ¿Un short rápido? 🎬</span>
+            <Link to="/recreations" className="btn primary sm"><IcSparkles width={15} height={15} /> Crear</Link>
+          </div>
+        )}
+        {today.map((j) => (
+          <div key={j.id} className="between" style={{ fontSize: 13 }}>
+            <span>
+              <strong>{new Date(j.scheduled_at!).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}</strong>
+              {" · "}{j.source === "short" ? "Short" : "Episodio"}
+            </span>
+            <Badge tone={PLATFORM_TONE[j.platform] ?? "default"}>{j.platform}</Badge>
+          </div>
+        ))}
+        {active.length > 0 && (
+          <div className="muted" style={{ fontSize: 12.5 }}>
+            {active.length} subida(s) en cola / subiendo ahora mismo.
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { api, type HealthResponse, type LlmConfig, type AppConfig } from "../api/client";
 import {
-  IcActivity, IcCloud, IcCpu, IcFilm, IcLaugh, IcLayout, IcMenu, IcMessageCircle,
+  IcActivity, IcCalendar, IcCloud, IcCpu, IcFilm, IcLaugh, IcLayout, IcMenu, IcMessageCircle,
   IcMoon, IcRadar, IcSliders, IcSparkles, IcSun, IcX,
 } from "../ui/icons";
 import { useTheme } from "../ui/useTheme";
@@ -38,7 +38,11 @@ export function AppShell() {
   });
 
   const items = appConfig.data?.channels_feature_enabled
-    ? [...NAV_ITEMS, { to: "/channels", label: "Canales", icon: <IcCloud width={16} height={16} /> }]
+    ? [
+        ...NAV_ITEMS,
+        { to: "/channels", label: "Canales", icon: <IcCloud width={16} height={16} /> },
+        { to: "/calendar", label: "Calendario", icon: <IcCalendar width={16} height={16} /> },
+      ]
     : NAV_ITEMS;
 
   return (
