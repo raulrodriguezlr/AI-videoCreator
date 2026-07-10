@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listChannels, connectChannel, disconnectChannel, verifyChannel, listUploads, getAppConfig,
+  accountLabel,
   type Channel, type ChannelPlatform, type PublishJob, type AppConfig,
 } from "../api/client";
 import {
@@ -109,9 +110,9 @@ export function ChannelsPage() {
               <div className="card-pad" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <IcCloud width={20} height={20} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600 }}>{acc.display_name}</div>
+                  <div style={{ fontWeight: 600 }}>{accountLabel(acc)}</div>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    {acc.platform}{acc.handle ? ` · ${acc.handle}` : ""}
+                    {acc.platform}{acc.handle ? ` · ${acc.handle}` : ` · #${acc.id.slice(-4)}`}
                   </div>
                 </div>
                 <Badge tone={statusTone(acc.status)}>{acc.status}</Badge>

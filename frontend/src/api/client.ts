@@ -714,6 +714,17 @@ export interface Channel {
   status: "connected" | "expired" | "error";
 }
 
+/** Human label for an account that stays distinguishable even when two
+ *  accounts share a generic display_name (e.g. two YouTube channels both
+ *  stored as "Youtube" before the channel-identity fetch existed): prefer the
+ *  @handle, else fall back to a short id suffix so they never look identical. */
+export function accountLabel(a: Channel): string {
+  if (a.handle) return `${a.display_name} · ${a.handle}`;
+  const generic = a.display_name.toLowerCase() === a.platform.toLowerCase();
+  if (generic) return `${a.display_name} · #${a.id.slice(-4)}`;
+  return a.display_name;
+}
+
 export interface PublishJob {
   id: string;
   account_id: string;

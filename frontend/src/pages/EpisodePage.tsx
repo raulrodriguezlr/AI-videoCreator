@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api, ApiError, generateSeo, getTemplate, recommendTitle, startRun,
-  getAppConfig, listChannels, enqueueUpload,
+  getAppConfig, listChannels, enqueueUpload, accountLabel,
   type EpisodeDetail, type MediaAsset, type ProviderCatalogEntry,
   type RecommendTitleResponse, type Script, type SeoMetadata,
   type AppConfig, type Channel,
@@ -27,6 +27,8 @@ export function EpisodePage() {
     queryKey: ["provider-catalog"], queryFn: () => api.get("/providers/catalog"),
   });
   const anyAvailable = (providers.data ?? []).some((p) => p.available);
+  const appConfig = useQuery<AppConfig>({ queryKey: ["app-config"], queryFn: getAppConfig });
+  const channelsOn = appConfig.data?.channels_feature_enabled ?? false;
 
   const toast = useToast();
 
@@ -108,10 +110,9 @@ export function EpisodePage() {
             />
           )}
           {(episode.state === "ready" || episode.state === "completed") && episode.final_video_key && (
-            <YouTubePublishPanel podId={podId} episodeId={episodeId} episode={episode} seo={seo} />
-          )}
-          {(episode.state === "ready" || episode.state === "completed") && episode.final_video_key && (
-            <ChannelsPublishPanel episodeId={episodeId} title={seo?.selected_title ?? episode.title} />
+            channelsOn
+              ? <ChannelsPublishPanel episodeId={episodeId} title={seo?.selected_title ?? episode.title} />
+              : <YouTubePublishPanel podId={podId} episodeId={episodeId} episode={episode} seo={seo} />
           )}
           <SeoPanel podId={podId} episodeId={episodeId} seo={seo} />
           {script && <ScriptPanel script={script} episodeId={episodeId} />}
@@ -407,7 +408,7 @@ function ChannelsPublishPanel({ episodeId, title }: { episodeId: string; title: 
                       onChange={(e) => setSelected((s) =>
                         e.target.checked ? [...s, a.id] : s.filter((x) => x !== a.id))}
                     />
-                    <span>{a.display_name} <span className="muted">· {a.platform}</span></span>
+                    <span>{accountLabel(a)} <span className="muted">· {a.platform}</span></span>
                   </label>
                 ))}
               </div>

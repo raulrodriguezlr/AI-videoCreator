@@ -363,7 +363,42 @@ def _default_youtube_flow(client_id: str, client_secret: str) -> TokenBundle:
             "OAuth completed but no refresh token issued — revoke at "
             "myaccount.google.com/permissions and retry"
         )
-    return {"refresh_token": refresh}
+    bundle: TokenBundle = {"refresh_token": refresh}
+    access = getattr(creds, "token", None)
+    if access:
+        bundle["access_token"] = access
+    # Fetch the real channel name/handle so multiple YouTube accounts are
+    # distinguishable in the UI (otherwise both fall back to "Youtube").
+    name, handle = _fetch_youtube_channel_identity(creds)
+    if name:
+        bundle["display_name"] = name
+    if handle:
+        bundle["handle"] = handle
+    return bundle
+
+
+def _fetch_youtube_channel_identity(creds: Any) -> tuple[str | None, str | None]:
+    """Return (channel title, @handle) for the just-authorized account.
+
+    Best-effort: any failure returns (None, None) so a transient API hiccup
+    never blocks a connection that already has a valid refresh token.
+    """
+    try:
+        from googleapiclient.discovery import build  # type: ignore[import-untyped]
+
+        yt = build("youtube", "v3", credentials=creds, cache_discovery=False)
+        resp = yt.channels().list(part="snippet", mine=True).execute()
+        items = resp.get("items") or []
+        if not items:
+            return None, None
+        snippet = items[0].get("snippet", {})
+        name = snippet.get("title")
+        custom = snippet.get("customUrl")  # e.g. "@piña_universo"
+        handle = custom if custom else None
+        return name, handle
+    except Exception as exc:  # noqa: BLE001 — identity is cosmetic, never fatal
+        log.warning("channel.youtube_identity_failed", error=str(exc))
+        return None, None
 
 
 def _default_auth_code_flow(
