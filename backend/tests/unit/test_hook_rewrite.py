@@ -14,7 +14,7 @@ from videocreator.application.use_cases.hook_rewrite import (
     recommend_hook,
 )
 from videocreator.domain.entities import Scene, Script
-from videocreator.shared.ids import new_scene_id, new_script_id, PodId, TopicId, ScriptId
+from videocreator.shared.ids import PodId, ScriptId, TopicId, new_scene_id, new_script_id
 
 
 # ---- fakes ----------------------------------------------------------------

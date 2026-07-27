@@ -13,9 +13,9 @@ import pytest
 from videocreator.domain.entities import PublishAccount
 from videocreator.domain.value_objects import AccountStatus, PublishPlatform
 from videocreator.infrastructure.publish.channel_accounts import (
-    OAuthAccountService,
     SECRET_ACCESS,
     SECRET_REFRESH,
+    OAuthAccountService,
     _key,
 )
 from videocreator.infrastructure.publish.channel_publishers import (
@@ -233,7 +233,6 @@ def test_channel_publisher_missing_file_raises(tmp_path: Path) -> None:
 # ============================================================================
 # PublishService: enqueue (batch) + process (status transitions)
 # ============================================================================
-from types import SimpleNamespace  # noqa: E402
 
 from videocreator.application.use_cases.publishing import PublishService  # noqa: E402
 from videocreator.domain.value_objects import PublishStatus  # noqa: E402

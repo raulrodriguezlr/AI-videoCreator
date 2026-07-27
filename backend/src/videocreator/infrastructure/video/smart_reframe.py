@@ -95,7 +95,7 @@ def analyze_segment(
         return []
 
     try:
-        import cv2  # noqa: PLC0415 — lazy: optional/heavy dep
+        import cv2
     except ImportError:
         log.info("smart_reframe.cv2_not_installed")
         return []
@@ -154,7 +154,7 @@ def _ensure_face_model() -> Path | None:
     """Return the local path to the BlazeFace `.tflite` model, downloading it
     on first use into ``var/models/``.  Returns ``None`` on any failure so the
     caller can degrade gracefully."""
-    from videocreator.shared.config import get_settings  # noqa: PLC0415
+    from videocreator.shared.config import get_settings
 
     models_dir = get_settings().var_dir / "models"
     model_path = models_dir / _FACE_MODEL_FILENAME
@@ -163,10 +163,10 @@ def _ensure_face_model() -> Path | None:
     try:
         models_dir.mkdir(parents=True, exist_ok=True)
         log.info("smart_reframe.downloading_face_model", url=_FACE_MODEL_URL)
-        urllib.request.urlretrieve(_FACE_MODEL_URL, model_path)  # noqa: S310
+        urllib.request.urlretrieve(_FACE_MODEL_URL, model_path)
         log.info("smart_reframe.face_model_ready", path=str(model_path))
         return model_path
-    except Exception:  # noqa: BLE001 — best-effort
+    except Exception:
         log.warning("smart_reframe.face_model_download_failed", exc_info=True)
         return None
 
@@ -178,11 +178,11 @@ def _build_face_detector() -> object | None:
     The result is cached at module level so the import + model download runs
     exactly once per process — prevents log-spam when ``analyze_timeline``
     iterates over many segments."""
-    global _cached_face_detector  # noqa: PLW0603
+    global _cached_face_detector
     if _cached_face_detector is not _FACE_DETECTOR_NOT_TRIED:
         return _cached_face_detector  # type: ignore[return-value]
     try:
-        import mediapipe as mp  # noqa: PLC0415 — lazy: optional/heavy dep
+        import mediapipe as mp
     except ImportError:
         log.info("smart_reframe.mediapipe_not_installed")
         _cached_face_detector = None
@@ -202,7 +202,7 @@ def _build_face_detector() -> object | None:
         _cached_face_detector = mp.tasks.vision.FaceDetector.create_from_options(options)
         log.info("smart_reframe.face_detector_ready",
                  version=getattr(mp, "__version__", "?"))
-    except Exception:  # noqa: BLE001 — best-effort
+    except Exception:
         log.warning("smart_reframe.face_detector_init_failed", exc_info=True)
         _cached_face_detector = None
     return _cached_face_detector  # type: ignore[return-value]
@@ -237,7 +237,7 @@ def _detect_center(
 
 
 def _face_center(frame: object, cv2: object, detector: object, width: int) -> float | None:
-    import mediapipe as mp  # noqa: PLC0415 — guaranteed importable here
+    import mediapipe as mp
 
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # type: ignore[attr-defined]
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)

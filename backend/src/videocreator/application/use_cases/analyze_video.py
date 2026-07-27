@@ -20,9 +20,12 @@ You are a viral video analyst. Analyze this video and extract its viral genome �
 the structural DNA that makes it work.
 
 Extract these fields:
-- format_id: a kebab-case identifier for the format pattern (e.g., "expectation-subversion-v1", "pov-reveal", "duet-reaction")
-- hook: the opening attention grab — type (visual_pattern_interrupt, text_hook, sound_hook, question, challenge), duration_s, text_overlay if any
-- structure: ordered beats (setup, build, punchline, payoff, callback, outro, etc.) with duration_s, audio/sound used, camera style, sfx, cut_style, visual_description
+- format_id: a kebab-case identifier for the format pattern (e.g., \
+"expectation-subversion-v1", "pov-reveal", "duet-reaction")
+- hook: the opening attention grab — type (visual_pattern_interrupt, text_hook, sound_hook, \
+question, challenge), duration_s, text_overlay if any
+- structure: ordered beats (setup, build, punchline, payoff, callback, outro, etc.) \
+with duration_s, audio/sound used, camera style, sfx, cut_style, visual_description
 - captions: style (word_by_word, sentence, none) and highlight style
 - sound: id if identifiable, whether trending, commercial safety
 - why_it_works: 1-2 sentences explaining the viral mechanic
@@ -73,7 +76,7 @@ def _parse_genome(raw: str) -> ViralGenome | None:
     raw = raw.strip()
     if raw.startswith("```"):
         lines = raw.split("\n")
-        lines = [l for l in lines if not l.startswith("```")]
+        lines = [line for line in lines if not line.startswith("```")]
         raw = "\n".join(lines)
     try:
         data = json.loads(raw)

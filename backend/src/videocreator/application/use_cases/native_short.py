@@ -30,7 +30,8 @@ RULES:
 - Story: hook(1.5s) + body segments + payoff(2s)
 - Each visual_prompt is a standalone scene description for AI video generation
 - audio_text: what the narrator says (short, speakable)
-- sfx_vibe: one of [impact, whoosh, rimshot, sad_trombone, bass_drop, transition, reveal, click, none]
+- sfx_vibe: one of [impact, whoosh, rimshot, sad_trombone, bass_drop, transition, reveal, \
+click, none]
 - caption_keywords: 1-3 words to highlight in captions (most important words)
 
 Respond ONLY with a JSON object matching this schema:
@@ -49,7 +50,7 @@ Respond ONLY with a JSON object matching this schema:
   "music_vibe": "<mood for background music>",
   "caption_keywords": ["word1", "word2"]
 }}
-"""
+"""  # noqa: RUF001 -- en dash is intentional prompt text sent verbatim to the LLM
 
 _CONTENT_TYPE_HINTS: dict[str, dict[str, Any]] = {
     "meme": {"duration": 10, "max_segments": 3},
@@ -105,7 +106,7 @@ def _parse_structure(raw: str) -> ShortStructure | None:
     raw = raw.strip()
     if raw.startswith("```"):
         lines = raw.split("\n")
-        lines = [l for l in lines if not l.startswith("```")]
+        lines = [line for line in lines if not line.startswith("```")]
         raw = "\n".join(lines)
     try:
         data = json.loads(raw)

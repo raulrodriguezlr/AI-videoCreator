@@ -9,9 +9,10 @@ then the flow is export + reminder.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from videocreator.shared.errors import ProviderError
 from videocreator.shared.logging import get_logger

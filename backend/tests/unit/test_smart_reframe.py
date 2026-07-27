@@ -13,6 +13,10 @@ from pathlib import Path
 import pytest
 
 from videocreator.domain.value_objects import EditingTimeline, TimelineSegment
+
+# Reset the module-level face-detector cache before every test so one test's
+# cached result (or failure) doesn't leak into the next.
+from videocreator.infrastructure.video import smart_reframe as _sr_module
 from videocreator.infrastructure.video.short_composer import FfmpegShortComposer
 from videocreator.infrastructure.video.smart_reframe import (
     CropWindow,
@@ -21,13 +25,9 @@ from videocreator.infrastructure.video.smart_reframe import (
     crop_x_expression,
 )
 
-# Reset the module-level face-detector cache before every test so one test's
-# cached result (or failure) doesn't leak into the next.
-from videocreator.infrastructure.video import smart_reframe as _sr_module
-
 
 @pytest.fixture(autouse=True)
-def _reset_face_detector_cache() -> None:  # noqa: PT004
+def _reset_face_detector_cache() -> None:
     _sr_module._cached_face_detector = _sr_module._FACE_DETECTOR_NOT_TRIED
     yield  # type: ignore[misc]
     _sr_module._cached_face_detector = _sr_module._FACE_DETECTOR_NOT_TRIED
@@ -35,7 +35,7 @@ def _reset_face_detector_cache() -> None:  # noqa: PT004
 
 # ---- CropWindow smoothing ---------------------------------------------------
 def test_smooth_applies_moving_average_window_3() -> None:
-    from videocreator.infrastructure.video.smart_reframe import _smooth  # noqa: PLC0415
+    from videocreator.infrastructure.video.smart_reframe import _smooth
 
     samples = [
         CropWindow(0.0, 0.0),
@@ -59,7 +59,7 @@ def test_smooth_applies_moving_average_window_3() -> None:
 
 
 def test_smooth_passthrough_for_fewer_than_two_samples() -> None:
-    from videocreator.infrastructure.video.smart_reframe import _smooth  # noqa: PLC0415
+    from videocreator.infrastructure.video.smart_reframe import _smooth
 
     assert _smooth([]) == []
     one = [CropWindow(0.0, 0.5)]

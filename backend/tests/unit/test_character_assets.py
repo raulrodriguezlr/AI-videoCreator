@@ -16,8 +16,8 @@ from videocreator.application.use_cases.characters import (
     RemoveCharacterReference,
     SyncCharacterAnchor,
 )
-from videocreator.infrastructure.providers.higgsfield_anchor import AnchorResult
 from videocreator.domain.entities import LOCAL_USER_ID, Character, Pod, PodConfig
+from videocreator.infrastructure.providers.higgsfield_anchor import AnchorResult
 from videocreator.shared.errors import ForbiddenError, ValidationError
 from videocreator.shared.ids import (
     CharacterId,

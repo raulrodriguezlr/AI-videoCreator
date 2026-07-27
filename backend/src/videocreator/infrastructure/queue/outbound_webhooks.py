@@ -10,7 +10,7 @@ import hashlib
 import hmac
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from videocreator.shared.logging import get_logger

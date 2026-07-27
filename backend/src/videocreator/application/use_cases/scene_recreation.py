@@ -179,7 +179,7 @@ class SceneTrendMatchUseCase:
 def _strip_fences(raw: str) -> str:
     raw = raw.strip()
     if raw.startswith("```"):
-        raw = "\n".join(l for l in raw.split("\n") if not l.startswith("```"))
+        raw = "\n".join(line for line in raw.split("\n") if not line.startswith("```"))
     return raw
 
 

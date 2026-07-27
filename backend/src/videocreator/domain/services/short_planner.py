@@ -96,7 +96,7 @@ class ShortPlanner:
         else:
             target = min(ShortPlanner.DEFAULT_TARGET_S, rule.max_duration_s)
         budget = min(target, rule.max_duration_s)
-        
+
         # Two ceilings: `budget` is the creator's *requested* length (what the
         # short should aim for) and `rule.max_duration_s` is the platform's hard
         # limit. The fit decision honors the requested budget so a 30s request
@@ -145,7 +145,7 @@ class ShortPlanner:
                 )
             )
             used += span
-            
+
             if used >= budget:
                 break
 

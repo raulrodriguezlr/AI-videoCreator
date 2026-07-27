@@ -13,8 +13,9 @@ The platform uploader callables are injectable so tests never hit the network.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from videocreator.domain.value_objects import PublishPlatform
 from videocreator.infrastructure.publish.channel_accounts import (
@@ -122,7 +123,9 @@ def _upload_youtube(path: Path, bundle: dict[str, Any], metadata: dict[str, Any]
     )
 
 
-def _default_tiktok_status_poll(access_token: str, publish_id: str) -> dict[str, Any]:  # pragma: no cover - network
+def _default_tiktok_status_poll(  # pragma: no cover - network
+    access_token: str, publish_id: str
+) -> dict[str, Any]:
     """POST the publish_id to TikTok's status-fetch endpoint; returns raw JSON."""
     import httpx  # lazy
 

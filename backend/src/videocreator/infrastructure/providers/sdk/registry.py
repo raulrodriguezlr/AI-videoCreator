@@ -134,9 +134,8 @@ class ProviderRegistry:
                 if key == "max_cost_usd":
                     if lp.adapter.estimate_cost(constraints.get("duration_s", 5)) > val:
                         match = False
-                elif key == "tag":
-                    if val not in lp.manifest.tags:
-                        match = False
+                elif key == "tag" and val not in lp.manifest.tags:
+                    match = False
             if match:
                 results.append(lp)
         return results

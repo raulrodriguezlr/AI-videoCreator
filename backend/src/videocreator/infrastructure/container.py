@@ -14,10 +14,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import lru_cache
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from videocreator.application.use_cases.analyze_video import AnalyzeVideoUseCase
 from videocreator.application.use_cases.auth import (
     CurrentUser,
     LoginUser,
@@ -34,6 +35,8 @@ from videocreator.application.use_cases.characters import (
     SyncCharacterAnchor,
     UpdateCharacter,
 )
+from videocreator.application.use_cases.concept_visualizer import ConceptVisualizerUseCase
+from videocreator.application.use_cases.director_chat import DirectorChatUseCase
 from videocreator.application.use_cases.episodes import (
     CreateEpisodeFromScript,
     DeleteEpisode,
@@ -44,8 +47,11 @@ from videocreator.application.use_cases.episodes import (
     ListEpisodes,
     UpdateEpisode,
 )
+from videocreator.application.use_cases.hook_rewrite import HookRewriteUseCase
 from videocreator.application.use_cases.import_pods import ImportPods
 from videocreator.application.use_cases.jobs import DeleteJob, GetJob, ListRecentJobs
+from videocreator.application.use_cases.multiply import GenerateCarouselSlidesUseCase
+from videocreator.application.use_cases.native_short import GenerateNativeShortUseCase
 from videocreator.application.use_cases.pods import (
     CreatePod,
     DeletePod,
@@ -53,12 +59,6 @@ from videocreator.application.use_cases.pods import (
     ListPods,
     UpdatePodConfig,
 )
-from videocreator.application.use_cases.analyze_video import AnalyzeVideoUseCase
-from videocreator.application.use_cases.concept_visualizer import ConceptVisualizerUseCase
-from videocreator.application.use_cases.director_chat import DirectorChatUseCase
-from videocreator.application.use_cases.hook_rewrite import HookRewriteUseCase
-from videocreator.application.use_cases.multiply import GenerateCarouselSlidesUseCase
-from videocreator.application.use_cases.native_short import GenerateNativeShortUseCase
 from videocreator.application.use_cases.scene_recreation import (
     PlanSceneRecreationUseCase,
     SceneTrendMatchUseCase,
@@ -114,6 +114,9 @@ from videocreator.domain.ports import (
     LLMPort,
     MediaLibraryPort,
     PodRepository,
+    PublishAccountRepository,
+    PublishJobRepository,
+    RecreationRepository,
     ScriptRepository,
     SecretVaultPort,
     SeoRepository,
@@ -125,9 +128,6 @@ from videocreator.domain.ports import (
     UserRepository,
     VideoAssemblerPort,
     VideoProviderPort,
-    RecreationRepository,
-    PublishAccountRepository,
-    PublishJobRepository,
 )
 from videocreator.domain.services.linucb import LinUcbBandit
 from videocreator.domain.services.provider_router import ProviderRouter
@@ -161,14 +161,14 @@ from videocreator.infrastructure.repositories.sql_repos import (
     SqlEpisodeRepository,
     SqlJobRepository,
     SqlPodRepository,
+    SqlPublishAccountRepository,
+    SqlPublishJobRepository,
+    SqlRecreationRepository,
     SqlScriptRepository,
     SqlSeoRepository,
     SqlShortRepository,
     SqlTopicRepository,
     SqlUserRepository,
-    SqlRecreationRepository,
-    SqlPublishAccountRepository,
-    SqlPublishJobRepository,
 )
 from videocreator.infrastructure.security.cipher import SecretCipher
 from videocreator.infrastructure.security.passwords import Argon2PasswordHasher
@@ -180,14 +180,27 @@ from videocreator.infrastructure.security.secret_vault import (
 from videocreator.infrastructure.security.tokens import JwtTokenService
 from videocreator.infrastructure.storage.file_storage import LocalFileStorage
 from videocreator.infrastructure.system.ollama_admin import OllamaAdmin
-from videocreator.infrastructure.templates.template_gallery import TemplateGallery
 from videocreator.infrastructure.system.runtime_config import JsonRuntimeConfig
+from videocreator.infrastructure.templates.template_gallery import TemplateGallery
 from videocreator.infrastructure.trends.google_trends import GoogleTrendsRss
 from videocreator.infrastructure.video.ffmpeg_assembler import FfmpegVideoAssembler
 from videocreator.infrastructure.video.short_composer import FfmpegShortComposer
 from videocreator.infrastructure.video.shorts_rules import default_shorts_rules
 from videocreator.shared.config import Settings, get_settings
 from videocreator.shared.logging import get_logger
+
+if TYPE_CHECKING:
+    # Imported for annotations only. At runtime these are imported lazily inside
+    # the factory methods below, so an optional/heavy dependency never loads
+    # just because the container was constructed.
+    from videocreator.application.use_cases.alternate_ending import AlternateEndingService
+    from videocreator.application.use_cases.publishing import PublishService
+    from videocreator.infrastructure.providers.higgsfield_anchor import HiggsfieldAnchorClient
+    from videocreator.infrastructure.providers.sdk.registry import ProviderRegistry
+    from videocreator.infrastructure.publish.channel_accounts import OAuthAccountService
+    from videocreator.infrastructure.publish.channel_publishers import ChannelPublisher
+    from videocreator.infrastructure.publish.youtube_oauth import YouTubeOAuthService
+    from videocreator.infrastructure.queue.capability_executor import CapabilityExecutor
 
 log = get_logger(__name__)
 
@@ -251,7 +264,10 @@ class Container:
         return self._get("recreation_repo", lambda: SqlRecreationRepository(self._sessionmaker()))
 
     def publish_account_repo(self) -> PublishAccountRepository:
-        return self._get("publish_account_repo", lambda: SqlPublishAccountRepository(self._sessionmaker()))
+        return self._get(
+            "publish_account_repo",
+            lambda: SqlPublishAccountRepository(self._sessionmaker()),
+        )
 
     def publish_job_repo(self) -> PublishJobRepository:
         return self._get("publish_job_repo", lambda: SqlPublishJobRepository(self._sessionmaker()))
@@ -499,7 +515,7 @@ class Container:
 
     #: engine -> (SDK provider_id, default text_to_image model). Gemini is the
     #: built-in default; Higgsfield exposes its unlimited/cheap image models.
-    _IMAGE_ENGINES: dict[str, tuple[str, str]] = {
+    _IMAGE_ENGINES: ClassVar[dict[str, tuple[str, str]]] = {
         "higgsfield": ("higgsfield", "soul"),
     }
 
@@ -523,8 +539,8 @@ class Container:
         provider_id, default_model = mapping
         return SdkImageProvider(self.provider_registry(), provider_id, model or default_model)
 
-    def higgsfield_anchor(self) -> "HiggsfieldAnchorClient":
-        def _build() -> "HiggsfieldAnchorClient":
+    def higgsfield_anchor(self) -> HiggsfieldAnchorClient:
+        def _build() -> HiggsfieldAnchorClient:
             from videocreator.infrastructure.providers.higgsfield_anchor import (
                 HiggsfieldAnchorClient,
             )
@@ -550,25 +566,25 @@ class Container:
         return self._get("bandit", LinUcbBandit)
 
     # ---- publishing (§16.14) -----------------------------------------------
-    def youtube_oauth(self) -> "YouTubeOAuthService":
+    def youtube_oauth(self) -> YouTubeOAuthService:
         return self._get("youtube_oauth", self._build_youtube_oauth)
 
-    def _build_youtube_oauth(self) -> "YouTubeOAuthService":
+    def _build_youtube_oauth(self) -> YouTubeOAuthService:
         from videocreator.infrastructure.publish.youtube_oauth import (
             YouTubeOAuthService,
         )
         return YouTubeOAuthService(self.secret_vault())
 
-    def oauth_account_service(self) -> "OAuthAccountService":
+    def oauth_account_service(self) -> OAuthAccountService:
         return self._get("oauth_account_service", self._build_oauth_account_service)
 
-    def _build_oauth_account_service(self) -> "OAuthAccountService":
+    def _build_oauth_account_service(self) -> OAuthAccountService:
         from videocreator.infrastructure.publish.channel_accounts import (
             OAuthAccountService,
         )
         return OAuthAccountService(self.secret_vault(), self.publish_account_repo())
 
-    def channel_publisher(self) -> "ChannelPublisher":
+    def channel_publisher(self) -> ChannelPublisher:
         from videocreator.infrastructure.publish.channel_publishers import (
             ChannelPublisher,
         )
@@ -576,21 +592,23 @@ class Container:
 
     def alternate_ending_service(
         self, *, provider: str | None = None, model: str | None = None,
-    ) -> "AlternateEndingService":
+    ) -> AlternateEndingService:
         """`provider`/`model` pin the video model for BOTH modes: `mode="i2v"`
         (image_to_video) and `mode="edit"` (video_to_video, e.g. Gemini Omni
         Flash) — `ProviderI2VContinuation` resolves the right capability per
         call (`seed_frame=` vs `video=`), so one instance covers both."""
         from videocreator.application.use_cases.alternate_ending import AlternateEndingService
         from videocreator.infrastructure.publish.i2v_continuation import ProviderI2VContinuation
-        continuation = ProviderI2VContinuation(self.provider_registry(), model=model, provider=provider)
+        continuation = ProviderI2VContinuation(
+            self.provider_registry(), model=model, provider=provider,
+        )
         work = self.settings.var_dir / "runs" / "alt_ending"
         return AlternateEndingService(continuation, work_dir=work, v2v=continuation)
 
-    def publish_service(self) -> "PublishService":
+    def publish_service(self) -> PublishService:
         return self._get("publish_service", self._build_publish_service)
 
-    def _build_publish_service(self) -> "PublishService":
+    def _build_publish_service(self) -> PublishService:
         from videocreator.application.use_cases.publishing import PublishService
         return PublishService(
             episode_repo=self.episode_repo(),
@@ -613,10 +631,10 @@ class Container:
         return override or self.settings.public_media_base_url
 
     # ---- provider SDK (§9.1) -----------------------------------------------
-    def provider_registry(self) -> "ProviderRegistry":
+    def provider_registry(self) -> ProviderRegistry:
         return self._get("provider_registry", self._build_provider_registry)
 
-    def _build_provider_registry(self) -> "ProviderRegistry":
+    def _build_provider_registry(self) -> ProviderRegistry:
         from pathlib import Path
 
         from videocreator.infrastructure.providers.sdk.registry import (
@@ -634,10 +652,10 @@ class Container:
     def run_registry(self) -> RunRegistry:
         return self._get("run_registry", RunRegistry)
 
-    def capability_executor(self) -> "CapabilityExecutor":
+    def capability_executor(self) -> CapabilityExecutor:
         return self._get("capability_executor", self._build_capability_executor)
 
-    def _build_capability_executor(self) -> "CapabilityExecutor":
+    def _build_capability_executor(self) -> CapabilityExecutor:
         from videocreator.infrastructure.queue.capability_executor import (
             CapabilityExecutor,
         )
@@ -649,7 +667,7 @@ class Container:
         self._register_capability_handlers(executor)
         return executor
 
-    def _register_capability_handlers(self, executor: "CapabilityExecutor") -> None:
+    def _register_capability_handlers(self, executor: CapabilityExecutor) -> None:
         """Wire app-level capabilities the SDK registry doesn't cover."""
         from videocreator.application.use_cases.multiply import (
             GenerateCarouselSlidesUseCase,
@@ -712,10 +730,11 @@ class Container:
                         break
             if not text:
                 raise RuntimeError("tts: no text in params or upstream")
+            import uuid
+
             from videocreator.infrastructure.engine.providers.elevenlabs_provider import (
                 ElevenLabsProvider,
             )
-            import uuid
             out_dir = self.settings.var_dir / "runs" / "audio"
             out_dir.mkdir(parents=True, exist_ok=True)
             out_path = out_dir / f"tts_{uuid.uuid4().hex}.mp3"

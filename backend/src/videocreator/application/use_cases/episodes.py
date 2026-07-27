@@ -6,6 +6,7 @@ the dependencies (script → providers → storage) from the DI container.
 """
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -224,10 +225,8 @@ class DeleteEpisode:
         await self.episode_repo.delete(episode_id)
         # Purge the episode's media from storage too (clips/finals/audio/frames
         # under episodes/<id>/…) — a DB-only delete left them orphaned on disk.
-        try:
+        with contextlib.suppress(Exception):
             await self.storage.delete_prefix("episodes", str(episode_id))
-        except Exception:  # noqa: BLE001 — best-effort; DB row is already gone
-            pass
 
 
 @dataclass(frozen=True, slots=True)

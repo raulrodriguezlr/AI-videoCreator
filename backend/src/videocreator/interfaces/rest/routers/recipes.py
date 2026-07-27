@@ -28,6 +28,11 @@ from videocreator.shared.logging import get_logger
 log = get_logger(__name__)
 router = APIRouter(tags=["recipes"])
 
+#: Fire-and-forget DAG runs. asyncio only holds a weak reference to a running
+#: task, so without a strong one here a run can be garbage-collected mid-flight.
+#: Tasks remove themselves when they finish.
+_background_tasks: set[asyncio.Task[None]] = set()
+
 
 def _to_spec_schema(spec: DagSpec) -> DagSpecSchema:
     return DagSpecSchema.model_validate(spec.model_dump())
@@ -119,7 +124,9 @@ async def start_run(
         except Exception as e:  # defensive: a crashed run must stay inspectable
             log.error("run.crashed", run_id=run.run_id, error=str(e))
 
-    asyncio.create_task(_execute())
+    task = asyncio.create_task(_execute())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     snapshot = registry.snapshot(run.run_id)
     assert snapshot is not None
     return RunSnapshotResponse.model_validate(snapshot)

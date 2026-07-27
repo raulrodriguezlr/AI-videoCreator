@@ -11,8 +11,9 @@ and posts them.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from videocreator.domain.entities import PublishAccount, PublishJob
 from videocreator.domain.value_objects import AccountStatus, PublishPlatform, PublishStatus
@@ -171,7 +172,7 @@ class PublishService:
             result = await asyncio.to_thread(
                 self._publisher.upload, job.platform, video_path, bundle, metadata,
             )
-        except Exception as e:  # noqa: BLE001 - surface any upload failure on the job
+        except Exception as e:
             log.error("publish.failed", job_id=str(job.id), error=str(e))
             if _is_auth_error(e):
                 await self._expire_account(account)

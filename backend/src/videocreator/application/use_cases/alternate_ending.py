@@ -159,7 +159,7 @@ class AlternateEndingService:
 
 
 def _run(args: list[str]) -> None:
-    r = subprocess.run(args, capture_output=True, text=True)
+    r = subprocess.run(args, capture_output=True, text=True, check=False)
     if r.returncode != 0:
         raise RuntimeError(f"ffmpeg failed: {r.stderr[-800:]}")
 

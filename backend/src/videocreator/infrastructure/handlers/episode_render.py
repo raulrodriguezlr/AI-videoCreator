@@ -14,6 +14,7 @@ event loop stays responsive.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import functools
 import io
 import json
@@ -128,13 +129,13 @@ def _engine_script_dict(episode: Episode, script: Script, settings: Settings) ->
                         scene_data["audio_text"] = db_s.audio_text or ""
                         scene_data["duration_seconds"] = db_s.duration_s
                         scene_data["transition_to_next"] = db_s.transition
-                        
+
                         if "camera" not in scene_data:
                             scene_data["camera"] = {}
                         scene_data["camera"]["shot_type"] = db_s.camera_shot
                         scene_data["camera"]["movement"] = db_s.camera_movement
                         scene_data["camera"]["angle"] = db_s.camera_angle
-                
+
                 data["title"] = script.title
                 data["summary"] = script.summary or ""
                 return data
@@ -347,14 +348,12 @@ def _redub_sync(
         clip_path = os.path.join(clips_dir, f"clip_{i + 1:02d}.mp4")
         if not os.path.exists(clip_path):
             continue
-            
+
         old_dubbed = os.path.join(clips_dir, f"clip_{i + 1:02d}_dubbed.mp4")
         if os.path.exists(old_dubbed):
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(old_dubbed)
-            except OSError:
-                pass
-                
+
         clip = VideoClip(file_path=clip_path,
                          duration=float(scenes[i].get("duration_seconds", 5)))
         provider._apply_dubbing(clip, scenes[i], clips_dir, f"{i + 1:02d}")
@@ -394,10 +393,8 @@ def _regen_scene_sync(
     old_base = os.path.join(clips_dir, f"clip_{scene_index + 1:02d}")
     for ext in [".mp4", "_dubbed.mp4"]:
         if os.path.exists(old_base + ext):
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(old_base + ext)
-            except OSError:
-                pass
 
     # Replay prior scenes so the regenerated prompt keeps visual continuity.
     context_mgr = SceneContextManager(str(episode_dir), pod_config=getattr(provider, "config", {}))
@@ -542,7 +539,7 @@ async def _sync_intermediate_clips(
 ) -> None:
     """Periodically sync generated clips to storage during render."""
     from videocreator.infrastructure.filesystem.pod_importer import _MEDIA_INGEST_EXTS
-    
+
     try:
         while True:
             await asyncio.sleep(5)
@@ -557,10 +554,8 @@ async def _sync_intermediate_clips(
                     continue
                 key = f"{episode_id}/{rel.as_posix()}"
                 if key not in existing:
-                    try:
+                    with contextlib.suppress(Exception):
                         await storage.put(STORAGE_BUCKET, key, path.read_bytes())
-                    except Exception:
-                        pass
     except asyncio.CancelledError:
         pass
 
@@ -714,13 +709,15 @@ class EpisodeRenderHandler:
         # so the deliverable on disk is human-readable too — storage already
         # re-keys by title, this keeps the engine's own output consistent.
         output_path = episode_dir / f"{episode_filename(episode.title)}.mp4"
-        
+
         loop = asyncio.get_running_loop()
         def _on_progress(pct: float, msg: str):
             # Scale the 0.0-1.0 engine progress into the 0.15-0.90 window
             asyncio.run_coroutine_threadsafe(ctx.progress(0.15 + (pct * 0.75), msg), loop)
 
-        sync_task = asyncio.create_task(_sync_intermediate_clips(episode.id, episode_dir, self._storage))
+        sync_task = asyncio.create_task(
+            _sync_intermediate_clips(episode.id, episode_dir, self._storage)
+        )
         try:
             mp4_path = await asyncio.to_thread(
                 _run_engine_sync,
@@ -739,10 +736,8 @@ class EpisodeRenderHandler:
             ) from exc
         finally:
             sync_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await sync_task
-            except asyncio.CancelledError:
-                pass
 
         await ctx.progress(0.90, "ingesting render output into storage")
         final_key, dub_key = await _store_render_output(
@@ -753,7 +748,7 @@ class EpisodeRenderHandler:
             await asyncio.to_thread(shutil.rmtree, episode_dir, ignore_errors=True)
         except Exception as e:
             log.warning("episode_render.cleanup_failed", episode_id=episode.id, error=str(e))
-        
+
         if dub_key:
             episode.dubbed_video_key = dub_key
         return final_key
@@ -827,10 +822,8 @@ class EpisodeRenderHandler:
             n = f"{refresh_clip_index + 1:02d}"
             for k in (f"{episode.id}/clips/clip_{n}.mp4",
                       f"{episode.id}/clips/clip_{n}_dubbed.mp4"):
-                try:
+                with contextlib.suppress(Exception):
                     await self._storage.delete(STORAGE_BUCKET, k)
-                except Exception:  # noqa: BLE001 — best-effort; missing key is fine
-                    pass
         final_key, dub_key = await _store_render_output(
             episode, episode_dir, mp4_path, self._storage
         )

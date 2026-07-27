@@ -157,8 +157,11 @@ class PublishJobRow(Base):
     source: Mapped[str] = mapped_column(String(16))  # episode|short
     source_id: Mapped[str] = mapped_column(String(64), index=True)
     metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
-    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending|uploading|published|error
+    scheduled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    # status: pending|uploading|published|error
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
     result_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

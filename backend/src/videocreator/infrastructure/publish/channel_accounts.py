@@ -23,8 +23,9 @@ upload failing opaquely with whatever the platform API happened to return.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from videocreator.domain.entities import PublishAccount
 from videocreator.domain.ports import PublishAccountRepository, SecretVaultPort
@@ -153,14 +154,20 @@ class OAuthAccountService:
 
         aid = str(account.id)
         if bundle.get("refresh_token"):
-            await self._vault.set_secret(user_id, _key(platform, aid, SECRET_REFRESH), bundle["refresh_token"])
+            await self._vault.set_secret(
+                user_id, _key(platform, aid, SECRET_REFRESH), bundle["refresh_token"]
+            )
         if bundle.get("access_token"):
-            await self._vault.set_secret(user_id, _key(platform, aid, SECRET_ACCESS), bundle["access_token"])
+            await self._vault.set_secret(
+                user_id, _key(platform, aid, SECRET_ACCESS), bundle["access_token"]
+            )
         if bundle.get(SECRET_IG_USER_ID):
             ig_key = _key(platform, aid, SECRET_IG_USER_ID)
             await self._vault.set_secret(user_id, ig_key, bundle[SECRET_IG_USER_ID])
         await self._vault.set_secret(user_id, _key(platform, aid, SECRET_CLIENT_ID), client_id)
-        await self._vault.set_secret(user_id, _key(platform, aid, SECRET_CLIENT_SECRET), client_secret)
+        await self._vault.set_secret(
+            user_id, _key(platform, aid, SECRET_CLIENT_SECRET), client_secret
+        )
         log.info("channel.connected", platform=platform.value, account_id=aid)
         return account
 
@@ -184,7 +191,8 @@ class OAuthAccountService:
         aid = str(account.id)
         bundle: TokenBundle = {}
         for secret in (
-            SECRET_REFRESH, SECRET_ACCESS, SECRET_CLIENT_ID, SECRET_CLIENT_SECRET, SECRET_IG_USER_ID,
+            SECRET_REFRESH, SECRET_ACCESS, SECRET_CLIENT_ID,
+            SECRET_CLIENT_SECRET, SECRET_IG_USER_ID,
         ):
             val = await self._vault.get_secret(account.user_id, _key(account.platform, aid, secret))
             if val is not None:
@@ -396,7 +404,7 @@ def _fetch_youtube_channel_identity(creds: Any) -> tuple[str | None, str | None]
         custom = snippet.get("customUrl")  # e.g. "@piña_universo"
         handle = custom if custom else None
         return name, handle
-    except Exception as exc:  # noqa: BLE001 — identity is cosmetic, never fatal
+    except Exception as exc:
         log.warning("channel.youtube_identity_failed", error=str(exc))
         return None, None
 
@@ -429,7 +437,7 @@ def _default_auth_code_flow(
     captured: dict[str, str] = {}
 
     class _Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             q = urllib.parse.urlparse(self.path).query
             params = dict(urllib.parse.parse_qsl(q))
             captured.update(params)
@@ -520,8 +528,8 @@ def _default_verify_probe(  # pragma: no cover - network, exercised via injected
 
     if platform is PublishPlatform.YOUTUBE:
         try:
-            from googleapiclient.discovery import build  # type: ignore[import-untyped]
             from google.oauth2.credentials import Credentials  # type: ignore[import-untyped]
+            from googleapiclient.discovery import build  # type: ignore[import-untyped]
         except ImportError as e:
             raise ProviderError("google-api-python-client not installed") from e
         creds = Credentials(token=access)
@@ -556,8 +564,6 @@ def _default_verify_probe(  # pragma: no cover - network, exercised via injected
 
 
 __all__ = [
-    "OAuthAccountService",
-    "PlatformOAuth",
     "PLATFORM_OAUTH",
     "SECRET_ACCESS",
     "SECRET_CLIENT_ID",
@@ -565,5 +571,7 @@ __all__ = [
     "SECRET_IG_USER_ID",
     "SECRET_REFRESH",
     "TIKTOK_TOKEN_URL",
+    "OAuthAccountService",
+    "PlatformOAuth",
     "VerifyProbe",
 ]

@@ -124,8 +124,8 @@ async def account_balance(settings: Settings, *, runner: Any = None) -> dict[str
     except json.JSONDecodeError:
         # Fall back to the last JSON-parseable line (progress lines may precede it).
         data = None
-        for line in reversed(stdout.strip().splitlines()):
-            line = line.strip()
+        for raw_line in reversed(stdout.strip().splitlines()):
+            line = raw_line.strip()
             if line.startswith("{") or line.startswith("["):
                 try:
                     data = json.loads(line)
@@ -182,8 +182,10 @@ async def auth_login_stream(settings: Settings):
         yield f"data: {payload}\n\n"
 
     await proc.wait()
-    done_payload = json.dumps({"done": True, "success": proc.returncode == 0, "code": proc.returncode})
+    done_payload = json.dumps(
+        {"done": True, "success": proc.returncode == 0, "code": proc.returncode}
+    )
     yield f"data: {done_payload}\n\n"
 
 
-__all__ = ["account_balance", "auth_status", "auth_login_stream"]
+__all__ = ["account_balance", "auth_login_stream", "auth_status"]

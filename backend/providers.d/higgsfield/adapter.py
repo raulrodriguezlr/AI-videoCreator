@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 from typing import Any
 
 from videocreator.infrastructure.providers.sdk.adapter_base import (
@@ -86,7 +85,8 @@ def _first_url(data: Any) -> str | None:
 def _scan_url(obj: Any) -> str | None:
     if isinstance(obj, str):
         return obj if obj.startswith("http") and any(
-            obj.lower().endswith(e) for e in (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".webm")
+            obj.lower().endswith(e)
+            for e in (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".webm")
         ) else None
     if isinstance(obj, dict):
         for v in obj.values():
@@ -111,8 +111,8 @@ def _parse_json(stdout: str) -> Any:
     except json.JSONDecodeError:
         pass
     # Fall back to the last JSON-parseable line (progress may precede the result).
-    for line in reversed(s.splitlines()):
-        line = line.strip()
+    for raw_line in reversed(s.splitlines()):
+        line = raw_line.strip()
         if line.startswith("{") or line.startswith("["):
             try:
                 return json.loads(line)
@@ -145,7 +145,7 @@ def _snap_duration(seconds: float, model: Any) -> int:
     if valid:
         allowed = [v for v in valid if not max_s or v <= max_s] or list(valid)
         return min(allowed, key=lambda v: (abs(v - s), -v))
-    snapped = int(round(s)) or 1
+    snapped = round(s) or 1
     return min(snapped, max_s) if max_s else snapped
 
 
@@ -178,7 +178,10 @@ class Adapter(AdapterBase):
             if ar != "1:1":
                 args += ["--aspect_ratio", ar]
         else:
-            args += ["--aspect_ratio", ar, "--duration", str(_snap_duration(request.duration_s, model))]
+            args += [
+                "--aspect_ratio", ar,
+                "--duration", str(_snap_duration(request.duration_s, model)),
+            ]
             video = request.extra.get("input_video")
             start = request.extra.get("input_image") or request.extra.get("image_url")
             # A model that declares video_to_video prefers the real clip over a
@@ -208,13 +211,13 @@ class Adapter(AdapterBase):
         stdout, stderr, code = await self._run(args)
         if code != 0:
             err_text = (stderr or stdout)[:600].lower()
-            _AUTH_HINTS = (
+            auth_hints = (
                 "not authenticated", "unauthenticated", "please log in",
                 "login required", "hf auth login", "auth login",
                 "unauthorized", "session expired", "need to authenticate",
                 "please authenticate", "you are not logged",
             )
-            if any(h in err_text for h in _AUTH_HINTS):
+            if any(h in err_text for h in auth_hints):
                 raise HiggsfieldNeedsAuthError(
                     "higgsfield CLI requires auth — run `hf auth login` to authenticate "
                     "with your Plus subscription"
@@ -266,7 +269,7 @@ class Adapter(AdapterBase):
 
     async def _download(self, url: str) -> bytes:
         try:
-            import httpx  # noqa: PLC0415
+            import httpx
         except ImportError as e:  # pragma: no cover
             raise ProviderError("httpx not installed") from e
         async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:

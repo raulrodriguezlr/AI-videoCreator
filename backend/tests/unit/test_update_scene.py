@@ -7,7 +7,11 @@ from videocreator.application.use_cases.scripts import UpdateScriptScene
 from videocreator.domain.entities import LOCAL_USER_ID, Pod, PodConfig, Scene, Script
 from videocreator.shared.errors import ForbiddenError, ValidationError
 from videocreator.shared.ids import (
-    UserId, new_pod_id, new_scene_id, new_script_id, new_topic_id,
+    UserId,
+    new_pod_id,
+    new_scene_id,
+    new_script_id,
+    new_topic_id,
 )
 
 

@@ -5,6 +5,8 @@ from unittest.mock import patch
 from videocreator.infrastructure.video.ass_captions import (
     AsrWord,
     WordTiming,
+    _format_ass_time,
+    _merge_short_words,
     build_ass,
     build_captions_from_asr,
     correct_words_against_script,
@@ -12,8 +14,6 @@ from videocreator.infrastructure.video.ass_captions import (
     group_into_phrases,
     transcribe_audio_words,
     words_from_elevenlabs_alignment,
-    _merge_short_words,
-    _format_ass_time,
 )
 
 

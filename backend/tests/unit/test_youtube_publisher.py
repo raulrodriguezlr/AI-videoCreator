@@ -141,7 +141,7 @@ class TestBuildCredentials:
         from google.oauth2.credentials import Credentials
 
         def fake_refresh(self: Credentials, request: Any) -> None:
-            self.token = "fresh-access-token"  # noqa: S105 - test fixture value
+            self.token = "fresh-access-token"
 
         monkeypatch.setattr(Credentials, "refresh", fake_refresh)
 

@@ -20,8 +20,8 @@ from videocreator.domain.ports import (
     PodRepository,
     StoragePort,
 )
-from videocreator.infrastructure.filesystem.file_store import PodFileStore
 from videocreator.domain.value_objects import VoiceSettings
+from videocreator.infrastructure.filesystem.file_store import PodFileStore
 from videocreator.shared.errors import (
     CharacterNotFound,
     ForbiddenError,
@@ -80,13 +80,13 @@ class CreateCharacter:
             voice=voice,
         )
         saved = await self.char_repo.save(character)
-        
+
         try:
             config_json = self.file_store.read_pod_file(pod.name, "config.json")
             data = json.loads(config_json)
             if "characters" not in data:
                 data["characters"] = []
-            
+
             new_char = {
                 "name": name,
                 "role": role,
@@ -103,7 +103,7 @@ class CreateCharacter:
             self.file_store.write_pod_file(pod.name, "config.json", json.dumps(data, indent=2))
         except Exception:
             pass
-            
+
         return saved
 
 
@@ -151,7 +151,7 @@ class UpdateCharacter:
             }.items() if v is not None
         })
         saved = await self.char_repo.save(updated)
-        
+
         pod = await self.pod_repo.get(character.pod_id)
         if pod:
             # 1. Update universe_memory if name changed
@@ -162,7 +162,7 @@ class UpdateCharacter:
                     updated_config = pod.config.model_copy(update={"universe_memory": new_mem})
                     pod = pod.model_copy(update={"config": updated_config})
                     await self.pod_repo.save(pod)
-            
+
             # 2. Update config.json (legacy engine reads it; skip without store)
             if self.file_store is None:
                 return saved
@@ -170,7 +170,7 @@ class UpdateCharacter:
                 config_json = self.file_store.read_pod_file(pod.name, "config.json")
                 data = json.loads(config_json)
                 chars = data.get("characters", [])
-                
+
                 for char_cfg in chars:
                     if isinstance(char_cfg, dict) and char_cfg.get("name") == original_name:
                         if name is not None:
@@ -187,11 +187,11 @@ class UpdateCharacter:
                                 k: getattr(voice, k) for k in voice.model_fields if k != "voice_id"
                             }
                         break
-                
+
                 self.file_store.write_pod_file(pod.name, "config.json", json.dumps(data, indent=2))
             except Exception:
                 pass
-                
+
         return saved
 
 
@@ -209,14 +209,17 @@ class DeleteCharacter:
         if pod is None or not pod.is_owned_by(requester_id):
             raise ForbiddenError("character belongs to a pod owned by a different user")
         await self.char_repo.delete(character_id)
-        
+
         try:
             config_json = self.file_store.read_pod_file(pod.name, "config.json")
             data = json.loads(config_json)
             chars = data.get("characters", [])
             original_name = character.name
-            
-            new_chars = [c for c in chars if not (isinstance(c, dict) and c.get("name") == original_name)]
+
+            new_chars = [
+                c for c in chars
+                if not (isinstance(c, dict) and c.get("name") == original_name)
+            ]
             if len(new_chars) != len(chars):
                 data["characters"] = new_chars
                 self.file_store.write_pod_file(pod.name, "config.json", json.dumps(data, indent=2))
@@ -321,11 +324,11 @@ class SyncCharacterAnchor:
     pod_repo: PodRepository
     char_repo: CharacterRepository
     storage: StoragePort
-    anchor: "HiggsfieldAnchorClient"
+    anchor: HiggsfieldAnchorClient
 
     async def execute(
         self, *, character_id: CharacterId, requester_id: UserId,
-    ) -> tuple[Character, "AnchorResult"]:
+    ) -> tuple[Character, AnchorResult]:
         character = await _owned_character(
             self.char_repo, self.pod_repo, character_id, requester_id,
         )

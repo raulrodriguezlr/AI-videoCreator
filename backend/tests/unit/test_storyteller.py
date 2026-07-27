@@ -10,15 +10,15 @@ import json
 from typing import Any
 
 from videocreator.application.use_cases.scripts import (
+    _DIALOGUE_QUALITY,
     GenerateScript,
     WriteStory,
-    _DIALOGUE_QUALITY,
     _format_characters,
     _role_group,
     _style_label,
 )
-from videocreator.domain.value_objects import StyleProfile
 from videocreator.domain.entities import LOCAL_USER_ID, Character, Pod, PodConfig, Topic
+from videocreator.domain.value_objects import StyleProfile
 from videocreator.shared.ids import new_character_id, new_pod_id, new_topic_id
 
 

@@ -7,6 +7,8 @@ existing owner-scoped list use cases rather than adding new repository queries
 """
 from __future__ import annotations
 
+from fastapi import APIRouter
+
 from videocreator.interfaces.rest.deps import ContainerDep, UseCasesDep, UserIdDep
 from videocreator.interfaces.rest.schemas import (
     DashboardCounts,
@@ -14,8 +16,6 @@ from videocreator.interfaces.rest.schemas import (
     DashboardResponse,
     DashboardShort,
 )
-
-from fastapi import APIRouter
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -61,7 +61,7 @@ async def get_dashboard(
             assets = await media_lib.list_for_episode(ep)
             image = next((a for a in assets if a.kind == "image"), None)
             thumb_url = image.url if image else None
-        except Exception:  # noqa: BLE001 — thumbnail is best-effort
+        except Exception:
             thumb_url = None
         video_url = (
             f"/api/v1/storage/episodes/{ep.final_video_key}"

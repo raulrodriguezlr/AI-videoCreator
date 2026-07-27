@@ -14,6 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from videocreator.application.use_cases.shorts_planning import (
+    SelectShortHighlights,
+    SelectTeaserStructure,
+)
 from videocreator.domain.entities import Episode, Job, Short
 from videocreator.domain.ports import (
     EpisodeRepository,
@@ -24,12 +28,8 @@ from videocreator.domain.ports import (
     StoragePort,
     VideoAssemblerPort,
 )
-from videocreator.application.use_cases.shorts_planning import (
-    SelectShortHighlights,
-    SelectTeaserStructure,
-)
 from videocreator.domain.services.short_planner import ShortPlanner
-from videocreator.domain.value_objects import EditingTimeline, ShortsRules, TeaserStructure
+from videocreator.domain.value_objects import EditingTimeline, ShortsRules
 from videocreator.infrastructure.queue.inprocess import JobContext
 from videocreator.shared.config import Settings
 from videocreator.shared.errors import (
@@ -77,7 +77,7 @@ class _PolishOptions:
         pipeline = raw_pipeline if raw_pipeline in _PIPELINES else "teaser"
         is_teaser = pipeline == "teaser"
 
-        raw_transition = payload.get("transition", None)
+        raw_transition = payload.get("transition")
         transition = str(raw_transition) if raw_transition else None
         # Reframe strategy: "fill" (crop to 9:16), "fit_blur" (whole frame +
         # blurred margins) or "split" (main video over b-roll). The legacy
@@ -221,14 +221,14 @@ class ShortRenderHandler:
             style, script, warnings,
         )
 
-        import shutil
         import asyncio
+        import shutil
         workdir = self._workdir(short)
         try:
             await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
         except Exception as e:
             log.warning("short_render.cleanup_failed", short_id=short.id, error=str(e))
-            
+
         short.rendered_video_key = key
         short.duration_s = timeline.total_duration_s
         await self._shorts.save(short)
@@ -310,15 +310,14 @@ class ShortRenderHandler:
                 timeline = await self._plan_teaser_timeline(short, script, rule, style, warnings)
                 if timeline is not None:
                     return timeline
+        elif self._selector is None:
+            warnings.append("highlight brain not configured — using heuristic single cut")
+        elif not has_script:
+            warnings.append("source has no script — using heuristic single cut")
         else:
-            if self._selector is None:
-                warnings.append("highlight brain not configured — using heuristic single cut")
-            elif not has_script:
-                warnings.append("source has no script — using heuristic single cut")
-            else:
-                timeline = await self._plan_montage_timeline(short, script, rule, style)
-                if timeline is not None:
-                    return timeline
+            timeline = await self._plan_montage_timeline(short, script, rule, style)
+            if timeline is not None:
+                return timeline
 
         return self._planner.plan(
             source_duration_s=self._duration_from_script(script),
@@ -341,7 +340,7 @@ class ShortRenderHandler:
                 target_duration_s=short.duration_s,
                 platform=short.target_platform,
             )
-        except Exception as exc:  # noqa: BLE001 — never fail render on brain
+        except Exception as exc:
             log.warning("short.teaser_brain_error", short_id=short.id, error=str(exc))
             warnings.append("teaser brain failed — using heuristic single cut")
             return None
@@ -362,7 +361,9 @@ class ShortRenderHandler:
             layout=style.layout,
         )
         if timeline.is_empty:
-            warnings.append("teaser structure mapped to no valid segments — using heuristic single cut")
+            warnings.append(
+                "teaser structure mapped to no valid segments — using heuristic single cut"
+            )
             return None
 
         if structure.hook_text and not short.hook_text:
@@ -390,7 +391,7 @@ class ShortRenderHandler:
                 target_duration_s=short.duration_s,
                 platform=short.target_platform,
             )
-        except Exception as exc:  # noqa: BLE001 — never fail render on brain
+        except Exception as exc:
             log.warning("short.brain_error", short_id=short.id, error=str(exc))
             return None
         if selection.is_empty:
@@ -451,7 +452,12 @@ class ShortRenderHandler:
         # (see `ass_captions.build_captions_from_asr`) instead of the estimated
         # per-segment timing. Best-effort — the composer itself degrades to
         # estimated timing (with a warning) if ASR isn't available.
-        if style is not None and style.pipeline == "teaser" and style.captions and script is not None:
+        if (
+            style is not None
+            and style.pipeline == "teaser"
+            and style.captions
+            and script is not None
+        ):
             extra["asr_audio_path"] = source_local
             extra["script_lines"] = [
                 (s.audio_text or "") for s in script.scenes if s.audio_text
@@ -481,7 +487,7 @@ class ShortRenderHandler:
             asset = await self._broll.fetch(
                 style.broll_query, max_duration_s=timeline.total_duration_s
             )
-        except Exception as exc:  # noqa: BLE001 — never fail render on b-roll
+        except Exception as exc:
             log.warning("short.broll_error", short_id=getattr(timeline, "id", "?"),
                         error=str(exc))
             return None
@@ -497,7 +503,7 @@ class ShortRenderHandler:
             return None
         try:
             asset = self._music.resolve(style.music_vibe)
-        except Exception as exc:  # noqa: BLE001 — never fail render on music
+        except Exception as exc:
             log.warning("short.music_error", error=str(exc))
             return None
         return asset
@@ -521,12 +527,12 @@ class ShortRenderHandler:
         if getattr(timeline, "layout", "fill") != "fill":
             return None
         try:
-            from videocreator.infrastructure.video.smart_reframe import (  # noqa: PLC0415
+            from videocreator.infrastructure.video.smart_reframe import (
                 analyze_timeline,
             )
 
             return analyze_timeline(source_local, timeline)
-        except Exception as exc:  # noqa: BLE001 — never fail render on reframe
+        except Exception as exc:
             log.warning("short.smart_reframe_error", short_id=short.id, error=str(exc))
             if warnings is not None:
                 warnings.append(f"smart-reframe unavailable ({exc}) — using centered crop")

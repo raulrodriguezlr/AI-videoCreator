@@ -134,7 +134,7 @@ class GoogleTrendsRss:
         except httpx.HTTPError as exc:
             log.info("trends.unavailable", geo=geo, error=str(exc))
             return []
-        except Exception:  # noqa: BLE001 - best-effort source, never breaks callers
+        except Exception:
             log.warning("trends.parse_failed", geo=geo, exc_info=True)
             return []
         return terms

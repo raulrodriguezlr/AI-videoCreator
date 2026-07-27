@@ -182,7 +182,7 @@ def test_split_without_broll_warns_with_gameplay_folder_hint() -> None:
         width=1080, height=1920, layout="split",
     )
 
-    async def _fake_run(self, args, output_path):  # noqa: ANN001 — test stub
+    async def _fake_run(self, args, output_path):
         output_path.write_bytes(b"fake")
 
     with patch.object(FfmpegShortComposer, "_run", _fake_run), \

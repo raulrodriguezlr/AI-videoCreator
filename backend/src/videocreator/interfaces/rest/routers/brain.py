@@ -1,12 +1,18 @@
 """Brain endpoints — video analysis, trend radar, scene recreation."""
 from __future__ import annotations
 
-from typing import Literal
+import asyncio
+import uuid
+from collections.abc import Coroutine
+from typing import Any, Literal
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from videocreator.domain.services.provider_hints import hint_for
+from videocreator.domain.entities import Recreation
+from videocreator.domain.services.provider_hints import filter_available, hint_for
+from videocreator.domain.value_objects import RecreationState
+from videocreator.infrastructure.trends.google_trends import GoogleTrendsRss
 from videocreator.interfaces.rest.deps import ContainerDep, UseCasesDep, UserIdDep
 from videocreator.interfaces.rest.schemas import (
     AnalyzeVideoRequest,
@@ -15,31 +21,39 @@ from videocreator.interfaces.rest.schemas import (
     GenomeHookResponse,
     PlanRecreationRequest,
     RecreationBeatResponse,
+    RecreationListResponse,
     RecreationPlanResponse,
     RecreationResponse,
-    RecreationListResponse,
-    UpdateRecreationRequest,
     SceneCandidateResponse,
     SceneTrendMatchRequest,
     SceneTrendMatchResponse,
+    UpdateRecreationRequest,
     ViralGenomeResponse,
 )
-from videocreator.infrastructure.trends.google_trends import GoogleTrendsRss
-from videocreator.domain.entities import Recreation
-from videocreator.domain.value_objects import RecreationState
-from videocreator.domain.services.provider_hints import filter_available
-from videocreator.shared.ids import new_recreation_id, RecreationId
-from fastapi import HTTPException
-import asyncio
-import uuid
+from videocreator.shared.ids import RecreationId, new_recreation_id
 
 router = APIRouter(prefix="/brain", tags=["brain"])
+
+#: Fire-and-forget run tasks. asyncio only holds a weak reference to a running
+#: task, so without a strong one here a recreation run can be garbage-collected
+#: mid-flight. Tasks remove themselves when they finish.
+_background_tasks: set[asyncio.Task[None]] = set()
+
+
+def _spawn(coro: Coroutine[Any, Any, None]) -> None:
+    """Schedule a background coroutine, keeping it alive until it completes."""
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 @router.post(
     "/analyze",
     response_model=ViralGenomeResponse,
-    summary="Analyze a video's context/URL as text and extract its viral genome (no video ingestion)",
+    summary=(
+        "Analyze a video's context/URL as text and extract its viral genome "
+        "(no video ingestion)"
+    ),
 )
 async def analyze_video(
     body: AnalyzeVideoRequest,
@@ -84,7 +98,7 @@ async def plan_recreation(
     plan = await uc.brain.plan_recreation.execute(
         original=body.original, niche=body.niche, twist=body.twist,
     )
-    
+
     hint = hint_for("scene_recreation")
     available_providers = set(await container.secret_vault().list_providers(user_id))
     available_providers |= container.available_provider_names()
@@ -101,7 +115,10 @@ async def plan_recreation(
         niche=body.niche,
         twist=body.twist,
         v2v_prompt=plan.v2v_prompt,
-        beats=[{"beat": b.beat, "duration_s": b.duration_s, "description": b.description} for b in plan.beats],
+        beats=[
+            {"beat": b.beat, "duration_s": b.duration_s, "description": b.description}
+            for b in plan.beats
+        ],
         audio_note=plan.audio_note,
         reference_description=plan.reference_description,
         fair_use={
@@ -172,7 +189,7 @@ async def update_recreation(
     rec = await repo.get(RecreationId(recreation_id))
     if rec is None or rec.owner_id != user_id:
         raise HTTPException(status_code=404, detail="Recreation not found")
-    
+
     if body.title is not None:
         rec.title = body.title
     if body.v2v_prompt is not None:
@@ -180,7 +197,10 @@ async def update_recreation(
     if body.reference_description is not None:
         rec.reference_description = body.reference_description
     if body.beats is not None:
-        rec.beats = [{"beat": b.beat, "duration_s": b.duration_s, "description": b.description} for b in body.beats]
+        rec.beats = [
+            {"beat": b.beat, "duration_s": b.duration_s, "description": b.description}
+            for b in body.beats
+        ]
     if body.audio_note is not None:
         rec.audio_note = body.audio_note
     if body.provider is not None:
@@ -271,8 +291,8 @@ async def run_recreation(
     if rec is None or rec.owner_id != user_id:
         raise HTTPException(status_code=404, detail="Recreation not found")
 
-    from videocreator.domain.value_objects import DagSpec, DagNode
-    from videocreator.infrastructure.queue.dag_executor import DagRun, DagExecutor
+    from videocreator.domain.value_objects import DagNode, DagSpec
+    from videocreator.infrastructure.queue.dag_executor import DagExecutor, DagRun
 
     # A recreation with a real clip attached (ingested via the Alternate-Ending
     # upload/YouTube endpoints, PATCHed onto the draft as `source_id`) EDITS
@@ -318,7 +338,7 @@ async def run_recreation(
     spec = DagSpec(nodes=tuple(nodes))
     run_id = f"run_{uuid.uuid4().hex[:12]}"
     run = DagRun(run_id=run_id, spec=spec)
-    
+
     registry = container.run_registry()
     registry.register(run)
     bus = container.event_bus()
@@ -335,23 +355,23 @@ async def run_recreation(
         try:
             completed_run = await executor.run(run)
             rec.state = RecreationState.DONE
-            
+
             # Persist result from render node
             result_node = completed_run.node_states.get("render_0")
             if result_node and result_node.result:
                 rec.result = result_node.result
-                
+
         except Exception:
             rec.state = RecreationState.FAILED
         finally:
             await repo.save(rec)
 
-    asyncio.create_task(_execute())
-    
+    _spawn(_execute())
+
     rec.run_id = run_id
     rec.state = RecreationState.RUNNING
     await repo.save(rec)
-    
+
     return {"run_id": run_id}
 
 
@@ -385,7 +405,6 @@ class AlternateEndingResponse(BaseModel):
 
 
 def _alt_source_dir(container: ContainerDep, source_id: str):
-    from videocreator.shared.ids import generate_id
     base = container.settings.var_dir / "runs" / "alt_ending"
     # source_id is an opaque slug we mint; reject anything with path separators.
     if not source_id or "/" in source_id or "\\" in source_id or ".." in source_id:
@@ -398,8 +417,8 @@ def _alt_source_dir(container: ContainerDep, source_id: str):
 async def ingest_upload(
     container: ContainerDep, user_id: UserIdDep, file: UploadFile = File(...),
 ) -> IngestResponse:
-    from videocreator.infrastructure.publish.media_ingest import save_upload
     from videocreator.application.use_cases.alternate_ending import probe_duration
+    from videocreator.infrastructure.publish.media_ingest import save_upload
     from videocreator.shared.ids import generate_id
 
     source_id = generate_id("src")
@@ -408,7 +427,7 @@ async def ingest_upload(
     try:
         path = save_upload(data, dest, filename=file.filename or "source.mp4")
     except Exception as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
     return IngestResponse(source_id=source_id, duration_s=probe_duration(path))
 
 
@@ -417,10 +436,10 @@ async def ingest_upload(
 async def ingest_youtube_ep(
     body: IngestYouTubeRequest, container: ContainerDep, user_id: UserIdDep,
 ) -> IngestResponse:
-    from videocreator.infrastructure.publish.media_ingest import ingest_youtube
     from videocreator.application.use_cases.alternate_ending import probe_duration
+    from videocreator.infrastructure.publish.media_ingest import ingest_youtube
+    from videocreator.shared.errors import ProviderError, ValidationError
     from videocreator.shared.ids import generate_id
-    from videocreator.shared.errors import ValidationError, ProviderError
 
     source_id = generate_id("src")
     dest = _alt_source_dir(container, source_id)
@@ -429,9 +448,9 @@ async def ingest_youtube_ep(
             ingest_youtube, body.url, dest, rights_ack=body.rights_ack,
         )
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except ProviderError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
     return IngestResponse(source_id=source_id, duration_s=probe_duration(path))
 
 
@@ -454,7 +473,7 @@ async def alternate_ending(
             tail_duration_s=body.tail_duration_s, mode=body.mode,
         )
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
     # Publish to the media bucket so the UI can stream it.
     storage = container.storage()
     key = f"alt_ending/{body.source_id}.mp4"
@@ -490,7 +509,9 @@ def _to_recreation_response(rec: Recreation) -> RecreationResponse:
         twist=rec.twist,
         v2v_prompt=rec.v2v_prompt,
         beats=[RecreationBeatResponse(
-            beat=b.get("beat", ""), duration_s=b.get("duration_s", 0.0), description=b.get("description", ""),
+            beat=b.get("beat", ""),
+            duration_s=b.get("duration_s", 0.0),
+            description=b.get("description", ""),
         ) for b in rec.beats],
         audio_note=rec.audio_note,
         reference_description=rec.reference_description,

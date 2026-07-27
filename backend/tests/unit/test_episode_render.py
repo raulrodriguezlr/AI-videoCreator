@@ -362,9 +362,8 @@ async def test_handler_marks_failed_when_provider_fails(tmp_path: Path) -> None:
         handler, "_render_with_engine",
         new_callable=AsyncMock,
         side_effect=ProviderError("boom"),
-    ):
-        with pytest.raises(ProviderError):
-            await handler(_job(), _FakeCtx())  # type: ignore[arg-type]
+    ), pytest.raises(ProviderError):
+        await handler(_job(), _FakeCtx())  # type: ignore[arg-type]
 
     assert saved["last"].state == EpisodeState.FAILED
 

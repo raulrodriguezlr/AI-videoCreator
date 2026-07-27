@@ -39,7 +39,7 @@ class CopyrightGuard:
             try:
                 data = json.loads(cache_file.read_text(encoding="utf-8"))
                 return CopyrightScreen.from_dict(data), True
-            except Exception:  # noqa: BLE001 — corrupt cache: just re-run
+            except Exception:
                 log.warning("copyright_guard.cache_read_failed", key=key)
 
         raw = await self._llm.complete(

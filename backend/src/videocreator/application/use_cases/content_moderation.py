@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
 
 from videocreator.domain.ports import LLMPort
 from videocreator.shared.logging import get_logger
@@ -90,7 +89,7 @@ class ModerateContentUseCase:
 def _parse_flags(raw: str) -> list[ModerationFlag] | None:
     raw = raw.strip()
     if raw.startswith("```"):
-        raw = "\n".join(l for l in raw.split("\n") if not l.startswith("```"))
+        raw = "\n".join(line for line in raw.split("\n") if not line.startswith("```"))
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:

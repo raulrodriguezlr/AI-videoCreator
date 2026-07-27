@@ -7,7 +7,6 @@ import pytest
 
 from videocreator.domain.value_objects import DagNode, DagSpec
 from videocreator.infrastructure.queue.dag_executor import (
-    DagDeadlockError,
     DagExecutor,
     DagRun,
     NodeState,

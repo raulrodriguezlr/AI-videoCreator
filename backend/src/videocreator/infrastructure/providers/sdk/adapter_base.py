@@ -72,7 +72,7 @@ class AdapterBase(abc.ABC):
         c = self.manifest.cost
         return c.per_request_usd + c.per_second_usd * duration_s
 
-    async def aclose(self) -> None:
+    async def aclose(self) -> None:  # noqa: B027 -- intentionally optional hook, not all adapters hold resources to close
         """Cleanup resources. Override if adapter holds connections."""
 
 

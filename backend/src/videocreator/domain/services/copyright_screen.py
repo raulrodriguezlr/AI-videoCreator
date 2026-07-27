@@ -98,7 +98,7 @@ def parse_result(raw: str) -> CopyrightScreen:
         return CopyrightScreen(notes="screen parse failed — treated as safe")
     try:
         return CopyrightScreen.from_dict(payload)
-    except Exception:  # noqa: BLE001 — never let a bad shape break the pipeline
+    except Exception:
         log.warning("copyright_screen.shape_failed", sample=str(payload)[:160])
         return CopyrightScreen(notes="screen shape invalid — treated as safe")
 

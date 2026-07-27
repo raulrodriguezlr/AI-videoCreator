@@ -48,7 +48,7 @@ def analyze_beats(audio_path: str | Path) -> BeatGrid:
     If the source is a container format librosa can't decode (some AAC),
     the caller should extract to WAV first via ffmpeg.
     """
-    import librosa  # noqa: PLC0415
+    import librosa
 
     y, sr = librosa.load(str(audio_path), sr=22050, mono=True)
     tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)

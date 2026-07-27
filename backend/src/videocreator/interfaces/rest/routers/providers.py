@@ -15,6 +15,7 @@ from videocreator.infrastructure.providers.artlist_provider import (
     _STATIC_CATALOG,
     ArtlistProvider,
 )
+from videocreator.infrastructure.providers.higgsfield_cli import auth_login_stream, auth_status
 from videocreator.infrastructure.providers.ltx_desktop import LtxDesktopClient
 from videocreator.interfaces.rest.deps import ContainerDep
 from videocreator.interfaces.rest.schemas import (
@@ -23,7 +24,6 @@ from videocreator.interfaces.rest.schemas import (
     ProviderHealthResponse,
     ProviderSelectionResponse,
 )
-from videocreator.infrastructure.providers.higgsfield_cli import auth_login_stream, auth_status
 from videocreator.shared.errors import ProviderError
 from videocreator.shared.logging import get_logger
 
@@ -194,20 +194,20 @@ async def _engine_entries(container: ContainerDep) -> list[ProviderCatalogEntry]
         message=None if settings.google_api_key else "Falta GOOGLE_API_KEY",
         models=["veo-3.1-generate-preview", "veo-3.0-generate-001", "veo-2.0-generate-001"],
     )
-    
+
     # Check if the vertex JSON exists
     import os
     vertex_json_path = settings.vertex_key_path if settings.vertex_key_path else "vertex-key.json"
     full_vertex_path = os.path.join(str(settings.project_root), vertex_json_path)
     vertex_available = os.path.exists(full_vertex_path)
-    
+
     veo_vertex = ProviderCatalogEntry(
         name="veo_vertex", label=_PROVIDER_LABELS["veo_vertex"],
         available=vertex_available,
         message=None if vertex_available else f"Falta el archivo {vertex_json_path}",
         models=["veo-3.1-generate-001", "veo-3.0-generate-001", "veo-2.0-generate-001", "veo-3.1-fast-generate-001"],
     )
-    
+
     return [veo, veo_vertex, await _ltx_desktop_entry(container), await _ltx_comfyui_entry()]
 
 

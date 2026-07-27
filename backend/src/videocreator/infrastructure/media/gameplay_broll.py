@@ -62,7 +62,7 @@ def probe_duration_s(path: Path) -> float:
             stderr=subprocess.DEVNULL,
         )
         return float(out.strip() or 0.0)
-    except Exception as exc:  # noqa: BLE001 — best-effort probing
+    except Exception as exc:
         log.warning("gameplay_broll.probe_failed", path=str(path), error=str(exc))
         return 0.0
 
@@ -87,7 +87,7 @@ class GameplayBrollLibrary:
             return {}
         try:
             return json.loads(p.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
+        except Exception:
             return {}
 
     def _save_duration_cache(self, cache: dict[str, Any]) -> None:
@@ -95,7 +95,7 @@ class GameplayBrollLibrary:
             self._duration_cache_path().write_text(
                 json.dumps(cache, indent=2), encoding="utf-8"
             )
-        except Exception as exc:  # noqa: BLE001 — cache is best-effort
+        except Exception as exc:
             log.warning("gameplay_broll.cache_write_failed", error=str(exc))
 
     def _attribution_for(self, clip_path: Path) -> dict[str, str] | None:
@@ -104,7 +104,7 @@ class GameplayBrollLibrary:
             return None
         try:
             return json.loads(side.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
     def list_clips(self) -> list[GameplayClip]:
@@ -152,7 +152,7 @@ class GameplayBrollLibrary:
             return -1
         try:
             return int(json.loads(p.read_text(encoding="utf-8")).get("last_index", -1))
-        except Exception:  # noqa: BLE001
+        except Exception:
             return -1
 
     def _save_last_index(self, index: int) -> None:
@@ -160,7 +160,7 @@ class GameplayBrollLibrary:
             self._state_path().write_text(
                 json.dumps({"last_index": index}), encoding="utf-8"
             )
-        except Exception as exc:  # noqa: BLE001 — rotation state is best-effort
+        except Exception as exc:
             log.warning("gameplay_broll.state_write_failed", error=str(exc))
 
     def next_clip(self) -> GameplayClip | None:
@@ -260,7 +260,7 @@ async def populate_from_pexels(
     if not api_key:
         raise ValueError("PEXELS_API_KEY is required to populate b-roll")
 
-    import httpx  # noqa: PLC0415 — optional/heavy
+    import httpx
 
     folder.mkdir(parents=True, exist_ok=True)
     owns_client = http_client is None
@@ -279,7 +279,7 @@ async def populate_from_pexels(
                 )
                 r.raise_for_status()
                 data = r.json()
-            except Exception as exc:  # noqa: BLE001 — best-effort, skip this query
+            except Exception as exc:
                 log.warning("gameplay_broll.populate_search_failed", query=query, error=str(exc))
                 continue
 
@@ -308,7 +308,7 @@ async def populate_from_pexels(
                 dr = await client.get(file_url)
                 dr.raise_for_status()
                 dest.write_bytes(dr.content)
-            except Exception as exc:  # noqa: BLE001 — best-effort, skip this clip
+            except Exception as exc:
                 log.warning("gameplay_broll.populate_download_failed", query=query, error=str(exc))
                 continue
 
@@ -334,9 +334,9 @@ async def populate_from_pexels(
 
 
 __all__ = [
+    "CompositeBrollLibrary",
     "GameplayBrollLibrary",
     "GameplayClip",
-    "CompositeBrollLibrary",
     "PopulatedClip",
     "populate_from_pexels",
     "probe_duration_s",

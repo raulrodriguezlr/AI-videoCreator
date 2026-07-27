@@ -22,7 +22,7 @@ from videocreator.interfaces.rest.schemas import (
     YouTubeUploadRequest,
     YouTubeUploadResponse,
 )
-from videocreator.shared.errors import NotFoundError, ProviderError, ValidationError
+from videocreator.shared.errors import NotFoundError, ValidationError
 from videocreator.shared.ids import EpisodeId
 
 router = APIRouter(prefix="/publish", tags=["publish"])

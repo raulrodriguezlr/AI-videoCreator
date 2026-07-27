@@ -1,6 +1,6 @@
 """Carousel slide rendering — pure-Pillow alternative per §16.14.
 
-Renders 1080×1350 (4:5) slide images from CarouselSlide copy. Playwright
+Renders 1080x1350 (4:5) slide images from CarouselSlide copy. Playwright
 HTML-template rendering can replace this later behind the same signature;
 Pillow keeps the local-first path browser-free.
 """

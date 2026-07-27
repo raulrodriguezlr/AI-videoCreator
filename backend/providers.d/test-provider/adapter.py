@@ -1,6 +1,8 @@
 """Dummy adapter for integration tests."""
 from __future__ import annotations
 
+import pathlib
+
 from videocreator.infrastructure.providers.sdk.adapter_base import (
     AdapterBase,
     GenRequest,
@@ -8,18 +10,13 @@ from videocreator.infrastructure.providers.sdk.adapter_base import (
 )
 
 
-import pathlib
-
 class Adapter(AdapterBase):
     """Returns a dummy video for testing."""
 
     async def generate(self, request: GenRequest) -> GenResult:
         dummy_path = pathlib.Path(__file__).parent / "dummy.mp4"
-        if dummy_path.exists():
-            video_bytes = dummy_path.read_bytes()
-        else:
-            video_bytes = b"\x00"
-            
+        video_bytes = dummy_path.read_bytes() if dummy_path.exists() else b"\x00"
+
         return GenResult(
             video_bytes=video_bytes,
             duration_s=request.duration_s,

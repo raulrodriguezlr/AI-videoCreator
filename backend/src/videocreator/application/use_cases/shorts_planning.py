@@ -149,7 +149,7 @@ class SelectShortHighlights:
                 prompt, response_schema=_HIGHLIGHT_SCHEMA, temperature=0.7
             )
             data = json.loads(raw)
-        except Exception as exc:  # noqa: BLE001 — degrade gracefully, never fail render
+        except Exception as exc:
             log.warning("shorts.highlight_select_failed", error=str(exc))
             return HighlightSelection()
 
@@ -227,7 +227,7 @@ class SelectTeaserStructure:
                 prompt, response_schema=_TEASER_SCHEMA, temperature=0.7
             )
             data = json.loads(raw)
-        except Exception as exc:  # noqa: BLE001 — degrade gracefully, never fail render
+        except Exception as exc:
             log.warning("shorts.teaser_select_failed", error=str(exc))
             return TeaserStructure()
 

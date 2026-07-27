@@ -274,7 +274,7 @@ def transcribe_audio_words(
     Runs on CPU by default — Whisper `base` is fast enough for a ~30-60s short.
     """
     try:
-        from faster_whisper import WhisperModel  # noqa: PLC0415
+        from faster_whisper import WhisperModel
     except ImportError:
         log.warning("ass_captions.faster_whisper_missing")
         return None
@@ -292,7 +292,7 @@ def transcribe_audio_words(
                     continue
                 words.append(AsrWord(text=text, start_s=float(w.start), end_s=float(w.end)))
         return words
-    except Exception as exc:  # noqa: BLE001 — ASR is best-effort, never fatal
+    except Exception as exc:
         log.warning("ass_captions.asr_failed", error=str(exc))
         return None
 
@@ -467,17 +467,17 @@ def extract_keywords_from_script(text: str) -> set[str]:
 
 
 __all__ = [
-    "WordTiming",
-    "CaptionStyle",
-    "TEMPLATES",
     "DEFAULT_TEMPLATE",
-    "style_for",
-    "build_ass",
-    "words_from_elevenlabs_alignment",
-    "extract_keywords_from_script",
+    "TEMPLATES",
     "AsrWord",
-    "transcribe_audio_words",
-    "correct_words_against_script",
-    "group_into_phrases",
+    "CaptionStyle",
+    "WordTiming",
+    "build_ass",
     "build_captions_from_asr",
+    "correct_words_against_script",
+    "extract_keywords_from_script",
+    "group_into_phrases",
+    "style_for",
+    "transcribe_audio_words",
+    "words_from_elevenlabs_alignment",
 ]

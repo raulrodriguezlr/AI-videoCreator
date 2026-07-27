@@ -7,8 +7,7 @@ generated here via LLM; rendering lives in infrastructure (Pillow/Playwright).
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 from videocreator.domain.ports import LLMPort
 from videocreator.domain.value_objects import DagNode, DagSpec
@@ -151,7 +150,10 @@ def build_multiply_dag(plan: MultiplyPlan) -> DagSpec:
         build_carousel_dag(plan.episode_id) if plan.carousel else None,
         build_thumbnails_dag(plan.episode_id, n=plan.n_thumbnails) if plan.n_thumbnails else None,
         build_thread_dag(plan.episode_id, newsletter=plan.newsletter) if plan.thread else None,
-        build_dubbing_dag(plan.episode_id, plan.dubbing_languages) if plan.dubbing_languages else None,
+        (
+            build_dubbing_dag(plan.episode_id, plan.dubbing_languages)
+            if plan.dubbing_languages else None
+        ),
     ):
         if spec is None:
             continue
@@ -188,7 +190,7 @@ class GenerateCarouselSlidesUseCase:
 def _parse_slides(raw: str) -> list[CarouselSlide] | None:
     raw = raw.strip()
     if raw.startswith("```"):
-        raw = "\n".join(l for l in raw.split("\n") if not l.startswith("```"))
+        raw = "\n".join(line for line in raw.split("\n") if not line.startswith("```"))
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:

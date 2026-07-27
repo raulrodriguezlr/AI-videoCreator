@@ -553,8 +553,9 @@ class NarrationStyle(str, Enum):
 class SettingMode(str, Enum):
     """WHERE the narration happens relative to the action's real setting."""
 
-    IN_SCENE = "in_scene"            # narrate FROM the action's place (e.g. in space, among planets)
-    FRAMING_DEVICE = "framing_device"  # a host frame (studio/classroom/blackboard) cut against the topic
+    IN_SCENE = "in_scene"  # narrate FROM the action's place (e.g. in space, among planets)
+    FRAMING_DEVICE = "framing_device"
+    # ^ a host frame (studio/classroom/blackboard) cut against the topic
 
 
 class ContentProfile(BaseModel):
@@ -764,7 +765,7 @@ class DagSpec(BaseModel):
     nodes: tuple[DagNode, ...]
 
     @model_validator(mode="after")
-    def _validate_dag(self) -> "DagSpec":
+    def _validate_dag(self) -> DagSpec:
         ids = {n.id for n in self.nodes}
         if len(ids) != len(self.nodes):
             raise ValueError("Duplicate node IDs in DagSpec")
@@ -852,21 +853,21 @@ class ViralGenome(BaseModel):
 
 def _has_cycle(nodes: tuple[DagNode, ...]) -> bool:
     """Detect cycle via DFS."""
-    WHITE, GRAY, BLACK = 0, 1, 2
-    color = {n.id: WHITE for n in nodes}
+    white, gray, black = 0, 1, 2
+    color = {n.id: white for n in nodes}
     adj: dict[str, list[str]] = {n.id: [] for n in nodes}
     for n in nodes:
         for dep in n.depends_on:
             adj[dep].append(n.id)
 
     def dfs(nid: str) -> bool:
-        color[nid] = GRAY
+        color[nid] = gray
         for child in adj[nid]:
-            if color[child] == GRAY:
+            if color[child] == gray:
                 return True
-            if color[child] == WHITE and dfs(child):
+            if color[child] == white and dfs(child):
                 return True
-        color[nid] = BLACK
+        color[nid] = black
         return False
 
-    return any(color[n.id] == WHITE and dfs(n.id) for n in nodes)
+    return any(color[n.id] == white and dfs(n.id) for n in nodes)

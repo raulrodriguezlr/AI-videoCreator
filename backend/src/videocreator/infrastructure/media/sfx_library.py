@@ -80,4 +80,4 @@ class SfxLibrary:
         return not self._catalog
 
 
-__all__ = ["SfxLibrary", "SfxVibe", "ALL_VIBES"]
+__all__ = ["ALL_VIBES", "SfxLibrary", "SfxVibe"]

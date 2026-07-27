@@ -69,7 +69,7 @@ class ConceptVisualizerUseCase:
 def _parse_metaphor(raw: str) -> VisualMetaphor | None:
     raw = raw.strip()
     if raw.startswith("```"):
-        raw = "\n".join(l for l in raw.split("\n") if not l.startswith("```"))
+        raw = "\n".join(line for line in raw.split("\n") if not line.startswith("```"))
     try:
         data: dict[str, Any] = json.loads(raw)
     except json.JSONDecodeError:

@@ -7,8 +7,9 @@ lazy import; the flow factory is injectable so tests never touch Google.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from videocreator.domain.ports import SecretVaultPort
 from videocreator.shared.errors import ProviderError

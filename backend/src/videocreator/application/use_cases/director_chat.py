@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import copy
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import ValidationError
@@ -176,7 +176,7 @@ class DirectorChatUseCase:
 def _parse_decision(raw: str) -> dict[str, Any] | None:
     raw = raw.strip()
     if raw.startswith("```"):
-        raw = "\n".join(l for l in raw.split("\n") if not l.startswith("```"))
+        raw = "\n".join(line for line in raw.split("\n") if not line.startswith("```"))
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:

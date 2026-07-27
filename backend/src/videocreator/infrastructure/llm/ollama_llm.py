@@ -81,7 +81,11 @@ class OllamaLLM:
             body["format"] = response_schema
         log.info("ollama.request", model=body["model"], prompt_length=len(body["prompt"]))
         response_text = self._parse(await self._post(body, allow_autostart=True))
-        log.info("ollama.response", response_length=len(response_text), preview=response_text[:200].replace("\n", " "))
+        log.info(
+            "ollama.response",
+            response_length=len(response_text),
+            preview=response_text[:200].replace("\n", " "),
+        )
         return response_text
 
     async def _post(self, body: dict[str, Any], *, allow_autostart: bool) -> httpx.Response:

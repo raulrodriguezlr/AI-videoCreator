@@ -140,6 +140,16 @@ ignore = [
     "B008",     # Typer/FastAPI deliberately call Option()/Depends() in arg defaults
     "PLW0603",  # lazy module-singleton caches (DB engine, settings) legitimately use `global`
     "PLC0415",  # lazy imports of optional/heavy SDKs (e.g. google-genai) are intentional
+    # --- shape-of-the-code opinions, not defects -------------------------------
+    # These flag working, tested code (ffmpeg filtergraph builders, provider
+    # adapters, planners) and can only be "fixed" by splitting functions that
+    # read fine as one unit. Revisit deliberately during a refactor, not as a
+    # merge gate.
+    "PLR2004",  # magic-value-comparison — HTTP codes, ffmpeg thresholds, ratios
+    "C901",     # complex-structure
+    "PLR0915",  # too-many-statements
+    "PLR0912",  # too-many-branches
+    "PLR0911",  # too-many-return-statements
 ]
 
 [tool.ruff.lint.mccabe]

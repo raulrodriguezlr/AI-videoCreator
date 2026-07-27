@@ -11,7 +11,6 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from videocreator.domain.entities import Script
 from videocreator.domain.ports import LLMPort, ScriptRepository
 from videocreator.domain.services.linucb import LinUcbBandit
 from videocreator.domain.value_objects import BanditDecision, BanditPolicy
@@ -182,7 +181,7 @@ def _parse_hook_response(raw: str) -> dict[str, Any] | None:
     raw = raw.strip()
     if raw.startswith("```"):
         lines = raw.split("\n")
-        lines = [l for l in lines if not l.startswith("```")]
+        lines = [line for line in lines if not line.startswith("```")]
         raw = "\n".join(lines)
     try:
         return json.loads(raw)
@@ -192,9 +191,9 @@ def _parse_hook_response(raw: str) -> dict[str, Any] | None:
 
 
 __all__ = [
+    "ANGLES",
     "HookRewriteUseCase",
     "HookVariant",
-    "recommend_hook",
     "cold_start_hook_policy",
-    "ANGLES",
+    "recommend_hook",
 ]

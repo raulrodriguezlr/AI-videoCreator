@@ -111,7 +111,7 @@ async def judge_frames(
     )
     raw = raw.strip()
     if raw.startswith("```"):
-        raw = "\n".join(l for l in raw.split("\n") if not l.startswith("```"))
+        raw = "\n".join(line for line in raw.split("\n") if not line.startswith("```"))
     try:
         data = json.loads(raw)
         vals = [float(data[k]) for k in ("adherence", "artifacts", "coherence")]

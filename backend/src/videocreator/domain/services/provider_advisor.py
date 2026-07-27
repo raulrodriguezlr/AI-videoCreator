@@ -169,10 +169,7 @@ def _reason_es(
         cost = f"~{opt.credits:g} créditos (~{usd:.2f} $)"
     else:
         cost = f"~{usd:.2f} $"
-    if fits:
-        head = f"Ideal para {label}"
-    else:
-        head = f"Sirve, pero no está optimizado para {label}"
+    head = f"Ideal para {label}" if fits else f"Sirve, pero no está optimizado para {label}"
     tail = "" if within else f" · máx {opt.max_duration_s}s (se recortará)"
     return f"{head} · {cost}{tail}"
 

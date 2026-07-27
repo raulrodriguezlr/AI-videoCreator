@@ -143,7 +143,7 @@ class FfmpegShortComposer:
         Returns an ffmpeg-escaped path, or `None` when no segment has a caption
         and no ASR audio was supplied.
         """
-        from videocreator.infrastructure.video.ass_captions import (  # noqa: PLC0415
+        from videocreator.infrastructure.video.ass_captions import (
             WordTiming,
             build_ass,
             build_captions_from_asr,
@@ -464,12 +464,12 @@ def _drawtext(textfile_path: str, height: int) -> str:
     """A bottom-centered, boxed caption drawtext filter reading from a file."""
     font_size = max(28, round(height * 0.030))   # ~58 on a 1920-tall frame
     margin = round(height * 0.10)                # keep clear of platform UI
-    
-    # Añadimos la fuente Arial explícitamente para evitar los cuadrados ("tofu boxes") 
-    # cuando FFmpeg intenta renderizar saltos de línea \n o caracteres especiales 
+
+    # Añadimos la fuente Arial explícitamente para evitar los cuadrados ("tofu boxes")
+    # cuando FFmpeg intenta renderizar saltos de línea \n o caracteres especiales
     # con su fuente bitmap por defecto.
     font = "fontfile='C\\:/Windows/Fonts/arial.ttf'"
-    
+
     return (
         f"drawtext=textfile='{textfile_path}':{font}:fontcolor=white:fontsize={font_size}:"
         f"line_spacing=8:box=1:boxcolor=black@0.5:boxborderw=16:"
@@ -518,7 +518,7 @@ def _snap_timeline_to_beats(
 
     Captions are recalculated AFTER snapping (order from §6 regression table).
     """
-    from videocreator.domain.value_objects import TimelineSegment  # noqa: PLC0415
+    from videocreator.domain.value_objects import TimelineSegment
 
     snapped: list[TimelineSegment] = []
     for i, seg in enumerate(timeline.segments):

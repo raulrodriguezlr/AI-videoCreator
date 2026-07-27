@@ -23,7 +23,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from videocreator.domain.entities import Character, Scene, Script
-from videocreator.domain.value_objects import NarrationStyle, SettingMode
 from videocreator.domain.ports import (
     CharacterRepository,
     EpisodeRepository,
@@ -32,6 +31,7 @@ from videocreator.domain.ports import (
     ScriptRepository,
     TopicRepository,
 )
+from videocreator.domain.value_objects import NarrationStyle, SettingMode
 from videocreator.shared.errors import (
     ConflictError,
     ForbiddenError,
@@ -329,14 +329,21 @@ morphing during pose/camera changes. When in doubt, ALWAYS use 'cut'.
 FORBIDDEN transition value: 'extend'.
 
 ### LIP-SYNC RULES (CRITICAL)
-- visual_prompt MUST NOT contain dialogue or quotes. Do not write 'X says ...' or ANY 'X says "..."' pattern inside visual_prompt.
-- visual_prompt contains ONLY physical descriptions: actions, environment, expressions, poses. ZERO dialogue text.
-- All spoken dialogue goes EXCLUSIVELY in the audio_text field. YOU MUST WRITE DIALOGUE (audio_text) for the characters to speak! Do NOT leave it empty.
+- visual_prompt MUST NOT contain dialogue or quotes. Do not write 'X says ...' or ANY 'X says \
+"..."' pattern inside visual_prompt.
+- visual_prompt contains ONLY physical descriptions: actions, environment, expressions, poses. \
+ZERO dialogue text.
+- All spoken dialogue goes EXCLUSIVELY in the audio_text field. YOU MUST WRITE DIALOGUE \
+(audio_text) for the characters to speak! Do NOT leave it empty.
 - When a character speaks, prefer 'close-up' or 'medium' shots.
 
 ### VISUAL CONTINUITY
 - ALWAYS describe the full physical appearance of ALL characters and entities in EVERY \
-visual_prompt (clothing, colors, species, accessories). If there is a secondary character or creature (like an animal, monster, or friends), describe them explicitly in EVERY scene they appear so they don't change appearance or turn into humans. For established characters, you MUST strictly follow their provided [look: ...] description. If their look description does not mention specific clothing, DO NOT invent clothing for them.
+visual_prompt (clothing, colors, species, accessories). If there is a secondary character or \
+creature (like an animal, monster, or friends), describe them explicitly in EVERY scene they \
+appear so they don't change appearance or turn into humans. For established characters, you MUST \
+strictly follow their provided [look: ...] description. If their look description does not \
+mention specific clothing, DO NOT invent clothing for them.
 - ABSOLUTELY PROHIBITED to include text, subtitles, watermarks, or any \
 written content in visual_prompt. Always append: 'absolutely no text, \
 no subtitles, no letters, no watermarks, no written words'.
@@ -438,7 +445,8 @@ def _render_storyteller_prompt(
         f"## TOPIC OF THIS EPISODE\n{topic_title}\n{desc}\n\n"
         f"## STRUCTURE (3 acts)\n"
         f"- Act 1 (~10%): a short, fresh hook that drops us into the topic. ONE "
-        f"greeting at most (if the main character usually introduces themselves, e.g. 'Hola amigos, soy...', keep that personality!).\n"
+        f"greeting at most (if the main character usually introduces themselves, e.g. 'Hola "
+        f"amigos, soy...', keep that personality!).\n"
         f"- Act 2 (~70%): the heart. The characters explore the topic in DEPTH "
         f"through real dialogue and a genuine obstacle/mystery/challenge. They "
         f"ask questions, reason, struggle, and learn. This is where the value is.\n"
@@ -499,7 +507,8 @@ _SCENE_SCHEMA: dict[str, Any] = {
                     },
                     "character": {
                         "type": "string",
-                        "description": "The exact name of the character speaking this line. If it is general narration not tied to a specific character, use 'Narrador'.",
+                        "description": "The exact name of the character speaking this line. If it "
+                        "is general narration not tied to a specific character, use 'Narrador'.",
                     },
                     "voice_direction": {"type": "string"},
                     "camera": {
@@ -798,7 +807,7 @@ def _render_script_prompt(
     ctx = series_context.strip() if series_context else "(no extra context)"
     desc = topic_description.strip() if topic_description else "(no description)"
     style = art_style or "3D animation"
-    min_scenes, typical_scenes = _scene_count_targets(target_duration_s, max_clip_seconds)
+    _min_scenes, typical_scenes = _scene_count_targets(target_duration_s, max_clip_seconds)
     char_block = _format_characters(characters)
     if episode_memory and episode_memory.strip():
         memory_block = (
@@ -827,7 +836,11 @@ def _render_script_prompt(
             "but NEVER replace it with empty exclamations or simplify it). Keep its "
             "narrative weight: do not collapse the middle (Act 2) and do not expand "
             "the greeting or farewell.\n"
-            "CRITICAL FOR VISUALS: Since you don't have to invent the story, focus your effort on making the `visual_prompt` extremely detailed. Explicitly describe the physical appearance of ALL entities (including new creatures, animals, or friends) in EVERY scene they appear to ensure visual consistency.\n"
+            "CRITICAL FOR VISUALS: Since you don't have to invent the story, "
+            "focus your effort on making the `visual_prompt` extremely detailed. "
+            "Explicitly describe the physical appearance of ALL entities (including "
+            "new creatures, animals, or friends) in EVERY scene they appear to "
+            "ensure visual consistency.\n"
         )
     else:
         role = (
@@ -851,19 +864,32 @@ def _render_script_prompt(
         f"## ART STYLE\n{style}\n"
         f"Every visual_prompt MUST start with this art style prefix.\n\n"
         f"## DURATION (STRICT — NON-NEGOTIABLE)\n"
-        f"- The episode MUST total between {target_duration_s} and {int(target_duration_s * 1.15)} seconds of video.\n"
-        f"- You MUST generate around {typical_scenes} scenes. Do not generate significantly fewer or many more.\n"
+        f"- The episode MUST total between {target_duration_s} and {int(target_duration_s * 1.15)}"
+        f" seconds of video.\n"
+        f"- You MUST generate around {typical_scenes} scenes. Do not generate significantly fewer"
+        f" or many more.\n"
         f"- Each scene should be between 4 and {max_clip_seconds} seconds long.\n"
-        f"- VARY the `duration_seconds` narratively! Do NOT make every scene the exact same length (e.g. don't make them all 5). Use shorter times (4 or 5) for quick dialogue/action and longer times (7 or 8) for establishing/complex shots. The value MUST be a single number.\n"
-        f"- The SUM of every scene's `duration_seconds` MUST be >= {target_duration_s} AND <= {int(target_duration_s * 1.15)}.\n"
+        f"- VARY the `duration_seconds` narratively! Do NOT make every scene the exact same length"
+        f" (e.g. don't make them all 5). Use shorter times (4 or 5) for quick dialogue/action"
+        f" and longer times (7 or 8) for establishing/complex shots. The value MUST be a single"
+        f" number.\n"
+        f"- The SUM of every scene's `duration_seconds` MUST be >= {target_duration_s} AND <="
+        f" {int(target_duration_s * 1.15)}.\n"
         f"- No single scene may exceed {max_clip_seconds} seconds.\n"
-        f"- A script below {target_duration_s}s or above {int(target_duration_s * 1.15)}s is INVALID. Tell the story across EXACTLY {typical_scenes} short, dynamic scenes.\n"
+        f"- A script below {target_duration_s}s or above {int(target_duration_s * 1.15)}s is"
+        f" INVALID. Tell the story across EXACTLY {typical_scenes} short, dynamic scenes.\n"
         f"- Each scene needs a vivid visual_prompt and audio_text.\n"
         f"## PER-SCENE SPEECH BUDGET (STRICT)\n"
-        f"- audio_text MUST be speakable within its duration_seconds at ~{SPOKEN_WORDS_PER_SECOND:g} words/sec: "
-        f"max words ≈ {SPOKEN_WORDS_PER_SECOND:g} × duration_seconds (5s≈11, 6s≈13, 8s≈17 words).\n"
-        f"- If a line is longer, SPLIT it across consecutive scenes with transition_to_next='continue' and the SAME visual_prompt — never cram a paragraph into one short clip.\n"
-        f"- NEVER repeat the same audio_text in two scenes. Do NOT pad with duplicate greeting/farewell scenes to reach the scene count; if you need more scenes, split real dialogue.\n\n"
+        f"- audio_text MUST be speakable within its duration_seconds at"
+        f" ~{SPOKEN_WORDS_PER_SECOND:g} words/sec: "
+        f"max words ≈ {SPOKEN_WORDS_PER_SECOND:g} ×"  # noqa: RUF001 -- prompt text, keep verbatim
+        f" duration_seconds (5s≈11, 6s≈13, 8s≈17 words).\n"
+        f"- If a line is longer, SPLIT it across consecutive scenes with"
+        f" transition_to_next='continue' and the SAME visual_prompt — never cram a paragraph into"
+        f" one short clip.\n"
+        f"- NEVER repeat the same audio_text in two scenes. Do NOT pad with duplicate"
+        f" greeting/farewell scenes to reach the scene count; if you need more scenes, split real"
+        f" dialogue.\n\n"
         f"## MANDATORY NARRATIVE STRUCTURE\n"
         f"Scenes MUST progress through: introduction -> establishing -> "
         f"rising_action -> climax -> falling_action -> resolution.\n"
@@ -882,7 +908,8 @@ def _render_script_prompt(
         f"Set transition_to_next for every scene. Read the transition rules above "
         f"carefully — 'cut' is the main transition, 'continue' only for static.\n\n"
         f"## EXTRA FIELDS (required at the top level of your JSON)\n"
-        f"- `moral`: one sentence stating the concrete lesson of THIS episode's actual events (from the SOURCE STORY). Never a generic line unrelated to what happened.\n"
+        f"- `moral`: one sentence stating the concrete lesson of THIS episode's actual events"
+        f" (from the SOURCE STORY). Never a generic line unrelated to what happened.\n"
         f"- `ambient_audio_prompt`: short English music prompt describing the "
         f"episode's overall ambient mood (e.g. 'soft orchestral adventure music "
         f"with gentle woodwinds, warm and uplifting').\n\n"
@@ -970,7 +997,9 @@ class WriteStory:
             interactive_questions=pod.config.interactive_questions,
             narration_style=pod.config.narration_style,
             setting_mode=pod.config.setting_mode,
-            prompt_story_suffix=pod.config.extra.get("script_overrides", {}).get("prompt_story_suffix", ""),
+            prompt_story_suffix=pod.config.extra.get("script_overrides", {}).get(
+                "prompt_story_suffix", ""
+            ),
         )
         # No response_schema: we want free prose, not JSON. Higher temperature
         # for creativity. Returned verbatim and fed into GenerateScript.
@@ -1047,7 +1076,9 @@ class GenerateScript:
             data = json.loads(_clean_json(raw))
         except json.JSONDecodeError as exc:
             # Add a bit of the raw output to the error message for easier debugging
-            raise ProviderError(f"LLM returned invalid JSON. Snippet: {raw[:100]}... Error: {exc}") from exc
+            raise ProviderError(
+                f"LLM returned invalid JSON. Snippet: {raw[:100]}... Error: {exc}"
+            ) from exc
 
         # Deterministic guard: the LLM doesn't reliably honour the per-scene
         # speech budget or the no-duplicates rule, so repair the raw scenes here.
@@ -1091,7 +1122,7 @@ class GenerateScript:
                 entry += f" [moral: {moral[:80].rstrip()}]"
             existing_memory = pod.config.universe_memory or ""
             # Keep the last ~10 entries (trim from the top if too long).
-            lines = [l for l in existing_memory.splitlines() if l.strip()]
+            lines = [line for line in existing_memory.splitlines() if line.strip()]
             lines.append(entry)
             lines = lines[-10:]
             updated_config = pod.config.model_copy(
@@ -1157,7 +1188,9 @@ async def _strip_universe_memory(pod_repo, pod, title: str | None) -> None:
     mem = pod.config.universe_memory or ""
     if not (mem and title):
         return
-    kept = [l for l in mem.splitlines() if not l.lstrip().startswith(f'- "{title}"')]
+    kept = [
+        line for line in mem.splitlines() if not line.lstrip().startswith(f'- "{title}"')
+    ]
     new_mem = "\n".join(kept)
     if new_mem != mem:
         await pod_repo.save(pod.model_copy(
@@ -1181,13 +1214,19 @@ def _render_review_prompt(*, draft_json: str, language: str, typical_scenes: int
         f"1. Enforce the video rules below perfectly.\n"
         f"2. Fix transitions: Use 'cut' strictly for action changes. "
         f"Use 'continue' only for static moments.\n"
-        f"3. Make sure `audio_text` is pure spoken dialogue in {language}. DO NOT leave it empty if the character is speaking!\n"
+        f"3. Make sure `audio_text` is pure spoken dialogue in {language}. DO NOT leave it empty"
+        f" if the character is speaking!\n"
         f"4. Make sure `visual_prompt` is pure physical description in ENGLISH "
-        f"with NO DIALOGUE text inside. Replace any dialogue in `visual_prompt` with silent actions.\n"
-        f"5. Improve pacing (`duration_seconds`). VARY the durations narratively (e.g. 4 or 5 for dialogue/action, 7 or 8 for establishing shots). Do NOT leave every scene exactly the same length. The value MUST be a single number.\n"
+        f"with NO DIALOGUE text inside. Replace any dialogue in `visual_prompt` with silent"
+        f" actions.\n"
+        f"5. Improve pacing (`duration_seconds`). VARY the durations narratively (e.g. 4 or 5 for"
+        f" dialogue/action, 7 or 8 for establishing shots). Do NOT leave every scene exactly the"
+        f" same length. The value MUST be a single number.\n"
         f"6. Improve camera usage — vary shot_type, movement, and angle "
         f"narratively; match them to mood and narrative_phase.\n"
-        f"7. You MUST ensure there are EXACTLY {typical_scenes} scenes in the final script. If the draft has fewer, EXPAND the story. If it has more, KEEP them or combine them to reach exactly {typical_scenes}.\n"
+        f"7. You MUST ensure there are EXACTLY {typical_scenes} scenes in the final script. If"
+        f" the draft has fewer, EXPAND the story. If it has more, KEEP them or combine them to"
+        f" reach exactly {typical_scenes}.\n"
         f"8. UPGRADE weak dialogue: replace any empty exclamation-only `audio_text` "
         f"('¡Sí!', '¡Pum!', '¡Gol!'…) with a real, meaningful line. Collapse extra "
         f"greeting/farewell scenes so at most ONE of each remains.\n\n"
@@ -1272,7 +1311,9 @@ class ReviewScript:
         try:
             data = json.loads(_clean_json(raw))
         except json.JSONDecodeError as exc:
-            raise ProviderError(f"LLM returned invalid JSON. Snippet: {raw[:100]}... Error: {exc}") from exc
+            raise ProviderError(
+                f"LLM returned invalid JSON. Snippet: {raw[:100]}... Error: {exc}"
+            ) from exc
 
         reviewed_scenes = [
             _to_scene(i, s)

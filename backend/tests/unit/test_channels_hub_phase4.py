@@ -14,10 +14,9 @@ import pytest
 from videocreator.domain.entities import PublishAccount
 from videocreator.domain.value_objects import AccountStatus, PublishPlatform, PublishStatus
 from videocreator.infrastructure.publish.channel_accounts import (
-    OAuthAccountService,
     SECRET_ACCESS,
     SECRET_IG_USER_ID,
-    _key,
+    OAuthAccountService,
 )
 from videocreator.infrastructure.publish.channel_publishers import (
     ChannelPublisher,
@@ -79,7 +78,6 @@ def test_tiktok_poll_times_out_when_never_settling(monkeypatch: pytest.MonkeyPat
 
 def test_tiktok_upload_full_flow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """init -> PUT -> poll, all faked at the httpx call boundary."""
-    import videocreator.infrastructure.publish.channel_publishers as mod
 
     video = tmp_path / "v.mp4"
     video.write_bytes(b"\x00\x00\x00")
@@ -522,8 +520,9 @@ async def test_verify_router_marks_expired_and_returns_dto() -> None:
 
 
 async def test_verify_router_404_for_other_users_account() -> None:
-    from videocreator.interfaces.rest.routers import channels as channels_router
     from fastapi import HTTPException
+
+    from videocreator.interfaces.rest.routers import channels as channels_router
 
     vault, repo = _FakeVault(), _FakeAccountRepo()
     oauth = OAuthAccountService(vault, repo, auth_code_flow=lambda *_a: {"access_token": "at-0"})

@@ -96,7 +96,7 @@ class PexelsClient:
     ) -> list[_Candidate]:
         if not self._key:
             return []
-        import httpx  # noqa: PLC0415 — optional/heavy
+        import httpx
 
         params = {
             "query": query,
@@ -109,7 +109,7 @@ class PexelsClient:
                 r = await c.get(self._ENDPOINT, params=params, headers=headers)
                 r.raise_for_status()
                 data = r.json()
-        except Exception as exc:  # noqa: BLE001 — best-effort
+        except Exception as exc:
             log.warning("cc0.pexels.search_failed", query=query, error=str(exc))
             return []
 
@@ -154,7 +154,7 @@ class PixabayClient:
     ) -> list[_Candidate]:
         if not self._key:
             return []
-        import httpx  # noqa: PLC0415
+        import httpx
 
         params = {"key": self._key, "q": query, "per_page": str(max(3, limit))}
         try:
@@ -162,7 +162,7 @@ class PixabayClient:
                 r = await c.get(self._ENDPOINT, params=params)
                 r.raise_for_status()
                 data = r.json()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("cc0.pixabay.search_failed", query=query, error=str(exc))
             return []
 
@@ -225,7 +225,7 @@ class CC0BrollLibrary:
         for client in (self._pexels, self._pixabay):
             try:
                 candidates = await client.search_videos(query, max_duration_s=max_duration_s)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.warning("cc0.broll.search_error", query=query, error=str(exc))
                 candidates = []
             if candidates:
@@ -242,7 +242,7 @@ class CC0BrollLibrary:
         return None
 
     async def _download(self, query: str, cand: _Candidate) -> MediaAsset | None:
-        import httpx  # noqa: PLC0415
+        import httpx
 
         self._dir.mkdir(parents=True, exist_ok=True)
         safe = "".join(ch if ch.isalnum() else "_" for ch in query)[:40]
@@ -254,7 +254,7 @@ class CC0BrollLibrary:
                     r = await c.get(cand.url)
                     r.raise_for_status()
                     await asyncio.to_thread(dest.write_bytes, r.content)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.warning("cc0.broll.download_failed", url=cand.url, error=str(exc))
                 return None
         _write_license_sidecar(dest, cand.license)
@@ -286,7 +286,7 @@ class MusicLibrary:
             return
         try:
             raw: dict[str, list[str]] = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("music.catalog.corrupt", path=str(path), error=str(exc))
             return
         music_dir = path.parent
@@ -320,7 +320,7 @@ def _load_license(media_path: Path) -> AssetLicense | None:
         return None
     try:
         data: dict[str, Any] = json.loads(side.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
     return AssetLicense(
         source=str(data.get("source") or ""),
@@ -332,9 +332,9 @@ def _load_license(media_path: Path) -> AssetLicense | None:
 
 __all__ = [
     "AssetLicense",
+    "CC0BrollLibrary",
     "MediaAsset",
+    "MusicLibrary",
     "PexelsClient",
     "PixabayClient",
-    "CC0BrollLibrary",
-    "MusicLibrary",
 ]
