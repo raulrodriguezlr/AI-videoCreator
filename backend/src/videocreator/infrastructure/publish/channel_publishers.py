@@ -224,7 +224,9 @@ def _upload_tiktok(
     status = _poll_tiktok_publish_status(
         access, publish_id, status_poller=status_poller, sleep=sleep or time.sleep,
     )
-    video_id = str(status.get("publicaly_available_post_id") or status.get("publish_id") or publish_id)
+    video_id = str(
+        status.get("publicaly_available_post_id") or status.get("publish_id") or publish_id
+    )
     # TikTok's status payload doesn't reliably include a share URL for
     # FILE_UPLOAD posts; fall back to the generic app URL if none is given.
     url = status.get("share_url") or "https://www.tiktok.com/"
@@ -232,7 +234,9 @@ def _upload_tiktok(
     return UploadResult(video_id=video_id, url=url)
 
 
-def _default_instagram_container_poll(access_token: str, container_id: str) -> dict[str, Any]:  # pragma: no cover - network
+def _default_instagram_container_poll(  # pragma: no cover - network
+    access_token: str, container_id: str
+) -> dict[str, Any]:
     """GET the container's `status_code` (Graph media-container status check)."""
     import httpx  # lazy
 
