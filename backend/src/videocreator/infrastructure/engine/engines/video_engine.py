@@ -16,8 +16,6 @@ import json
 import structlog
 from videocreator.infrastructure.engine.providers import get_provider
 from videocreator.infrastructure.engine.variables import VIDEO_PROVIDER
-from videocreator.infrastructure.engine.providers.lyria_provider import LyriaProvider
-from videocreator.infrastructure.engine.utils.audio_mixer import AudioMixer
 
 log = structlog.get_logger(__name__)
 
@@ -75,39 +73,8 @@ class VideoEngine:
             progress_manager=progress_manager,
         )
 
-        # --- BACKGROUND AUDIO DISABLED ---
-        # El usuario ha reportado que la música de fondo (cancioncita de ~22s) no aporta y raya.
-        # Se ha deshabilitado la generación y mezcla de audio de fondo.
-        """
-        # 2. Generate ambient background music using Lyria
-        audio_prompt = script.get("ambient_audio_prompt", "").strip()
-        
-        if audio_prompt and os.path.exists(final_video_path):
-            audio_dir = os.path.join(episode_dir, "audio") if episode_dir else self.output_dir
-            lyria = LyriaProvider(output_dir=audio_dir)
-            
-            audio_file = f"bg_{os.path.basename(output_path).replace('.mp4', '.wav')}"
-            
-            generated_audio_path = lyria.generate_ambient_audio(audio_prompt, audio_file)
-            
-            # 3. Mix audio and video together
-            if generated_audio_path:
-                mixed_output = final_video_path.replace(".mp4", "_mixed.mp4")
-                mixed_video_path = AudioMixer.mix_background_audio(
-                    video_path=final_video_path,
-                    audio_path=generated_audio_path,
-                    output_path=mixed_output,
-                    bg_volume=0.15  # Background volume level
-                )
-                
-                # Replace the original video output with the mixed one
-                if os.path.exists(mixed_video_path) and mixed_video_path != final_video_path:
-                    try:
-                        os.replace(mixed_video_path, final_video_path)
-                        log.info("video_engine_bg_audio_mixed", output=os.path.basename(final_video_path))
-                    except OSError as e:
-                        log.warning("video_engine_bg_audio_rename_failed", error=str(e))
-        """
+        # Ambient background music (Lyria) was deliberately dropped: the ~22s
+        # loop added nothing and distracted from the dialogue.
         return final_video_path
 
     def check_provider(self) -> bool:

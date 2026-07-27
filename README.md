@@ -407,6 +407,7 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1          # Windows PowerShell
 # source .venv/bin/activate          # macOS/Linux
 pip install -e ".[dev]"
+pip install -e ".[all,dev]"
 
 # Inicializar BD y directorios
 python -m videocreator.interfaces.cli.main init
@@ -478,7 +479,7 @@ Ver [STATUS.md](STATUS.md) para la matriz completa de estado (✅/⚠️/☐) fr
 - [x] **Provider SDK (§9)** — manifest + registry dinámico (`providers.d/`), 4 tipos de adapter, hot-reload, catálogo SDK
 - [x] **DAG Orchestrator (§11)** — `DagSpec` + executor (paralelo, retries, resume, cancel), SSE, capability router con circuit breaker + cost ledger
 - [x] **FAISS Asset Library + Format Library (§10.4/§12.4)** — embeddings + genome clustering + veto de formatos quemados
-- [x] **Cerebro Viral (§12.4)** — Video Analyst, benchmark harness, trending audio, content moderation
+- [x] **Cerebro Viral (§12.4)** — Video Analyst, brain agent (MCP), benchmark harness, trending audio, daily briefing, content moderation
 - [x] **Multiplicación de contenido (§13)** — shorts/carousel/thumbnails/thread/dubbing + publicación YouTube + métricas
 - [x] **Scene Recreation / V2V (§3.3)** — fair-use advisor, planner, trend match, Runway, `RecreationPage`
 - [x] Suite de tests: 99+ tests unitarios, 0 fallos · ruff clean
@@ -486,6 +487,7 @@ Ver [STATUS.md](STATUS.md) para la matriz completa de estado (✅/⚠️/☐) fr
 ### Siguientes pasos (ver STATUS.md para detalle completo)
 
 - [ ] Convergencia `infrastructure/engine/` (VideoEngine legacy) → Provider SDK / DAG para episodios completos
+- [ ] Cablear `BrainScheduler` (daily_briefing / rebenchmark) en el lifespan de FastAPI
 - [ ] Auto-benchmark al instalar un provider nuevo (`registry.discover()`)
 - [ ] Proxy workflow (preview barato → render caro), actualmente `PROXY_WORKFLOW_ENABLED=False`
 - [ ] Node canvas (§10.1) + timeline frame-accurate (§10.3)
