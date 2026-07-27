@@ -15,6 +15,10 @@ ShortId = NewType("ShortId", str)
 JobId = NewType("JobId", str)
 UserId = NewType("UserId", str)
 VariantId = NewType("VariantId", str)
+SeoId = NewType("SeoId", str)
+RecreationId = NewType("RecreationId", str)
+PublishAccountId = NewType("PublishAccountId", str)
+PublishJobId = NewType("PublishJobId", str)
 
 
 _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # Crockford base32
@@ -79,3 +83,20 @@ def new_user_id() -> UserId:
 
 def new_variant_id() -> VariantId:
     return VariantId(generate_id("var"))
+
+
+def new_seo_id() -> SeoId:
+    return SeoId(generate_id("seo"))
+
+
+def new_recreation_id() -> RecreationId:
+    return RecreationId(generate_id("rec"))
+
+
+def new_publish_account_id() -> PublishAccountId:
+    return PublishAccountId(generate_id("acc"))
+
+
+def new_publish_job_id() -> PublishJobId:
+    return PublishJobId(generate_id("pub"))
+

@@ -57,7 +57,7 @@ class InMemoryEventBus:
 class JobContext:
     """Handed to JobHandlers so they can publish progress without coupling to repo."""
 
-    def __init__(self, queue: "InProcessJobQueue", job_id: JobId) -> None:
+    def __init__(self, queue: InProcessJobQueue, job_id: JobId) -> None:
         self._queue = queue
         self.job_id = job_id
 
@@ -97,7 +97,10 @@ class InProcessJobQueue:
             log.error("queue.no_handler", kind=kind.value)
             job.mark_failed(f"no handler registered for {kind.value}")
             await self._jobs.save(job)
-            await self._bus.publish(f"job:{job.id}", {"event": "failed", "job_id": job.id, "error": job.error})
+            await self._bus.publish(
+                f"job:{job.id}",
+                {"event": "failed", "job_id": job.id, "error": job.error},
+            )
             return job.id
 
         task = asyncio.create_task(self._run(job, handler), name=f"job:{job.id}")
@@ -143,7 +146,7 @@ class InProcessJobQueue:
         except asyncio.CancelledError:
             log.info("job.cancelled", job_id=job.id)
             raise
-        except Exception as exc:  # noqa: BLE001 — surface to caller via job state
+        except Exception as exc:
             log.exception("job.failed", job_id=job.id, kind=job.kind.value)
             job.mark_failed(str(exc))
             await self._jobs.save(job)

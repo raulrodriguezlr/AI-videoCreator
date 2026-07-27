@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "prompts": [
+    {"id": "motion-01", "dimension": "motion", "prompt": "A skateboarder performs a kickflip in slow motion, urban skatepark, golden hour", "expected_text": null},
+    {"id": "motion-02", "dimension": "motion", "prompt": "Waves crashing against rocks, spray flying, stormy sea", "expected_text": null},
+    {"id": "motion-03", "dimension": "motion", "prompt": "A hummingbird hovering at a red flower, wings blurred", "expected_text": null},
+    {"id": "motion-04", "dimension": "motion", "prompt": "Sprinter exploding out of starting blocks, track and field", "expected_text": null},
+    {"id": "faces-01", "dimension": "faces", "prompt": "Close-up portrait of an elderly woman smiling, wrinkles visible, warm light", "expected_text": null},
+    {"id": "faces-02", "dimension": "faces", "prompt": "A child laughing while blowing dandelion seeds, shallow depth of field", "expected_text": null},
+    {"id": "faces-03", "dimension": "faces", "prompt": "Two friends having an animated conversation at a cafe table", "expected_text": null},
+    {"id": "faces-04", "dimension": "faces", "prompt": "A chef tasting soup and reacting with surprise, kitchen background", "expected_text": null},
+    {"id": "text-01", "dimension": "text_render", "prompt": "A neon sign that says OPEN 24 HOURS on a brick wall at night", "expected_text": "OPEN 24 HOURS"},
+    {"id": "text-02", "dimension": "text_render", "prompt": "A chalkboard with the words DAILY SPECIAL written in white chalk", "expected_text": "DAILY SPECIAL"},
+    {"id": "text-03", "dimension": "text_render", "prompt": "A street sign reading MAIN STREET against a blue sky", "expected_text": "MAIN STREET"},
+    {"id": "text-04", "dimension": "text_render", "prompt": "A coffee cup with the word MONDAY printed on it, office desk", "expected_text": "MONDAY"},
+    {"id": "physics-01", "dimension": "physics", "prompt": "A glass of water tipping over and spilling across a wooden table", "expected_text": null},
+    {"id": "physics-02", "dimension": "physics", "prompt": "Dominoes falling in a chain reaction, white background", "expected_text": null},
+    {"id": "physics-03", "dimension": "physics", "prompt": "A basketball bouncing down a staircase outdoors", "expected_text": null},
+    {"id": "physics-04", "dimension": "physics", "prompt": "Honey dripping slowly from a spoon onto toast", "expected_text": null},
+    {"id": "consistency-01", "dimension": "consistency", "prompt": "A red vintage car driving along a coastal road, camera following", "expected_text": null},
+    {"id": "consistency-02", "dimension": "consistency", "prompt": "A woman in a yellow dress walking through a wheat field, steady cam", "expected_text": null},
+    {"id": "consistency-03", "dimension": "consistency", "prompt": "A golden retriever running across a park lawn toward camera", "expected_text": null},
+    {"id": "consistency-04", "dimension": "consistency", "prompt": "A barista pouring latte art, overhead shot, cafe counter", "expected_text": null}
+  ]
+}

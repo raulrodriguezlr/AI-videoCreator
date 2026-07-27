@@ -1,0 +1,15 @@
+{
+  "id": "native-short-basic",
+  "name": "Native Short (basic)",
+  "description": "Concept to vertical short: structure, voice, AI clip, composed render.",
+  "tags": ["short", "vertical", "starter"],
+  "preview": null,
+  "dag": {
+    "nodes": [
+      {"id": "structure", "capability": "native_short", "params": {"content_type": "other"}},
+      {"id": "voice", "capability": "tts", "params": {"language": "es"}, "depends_on": ["structure"]},
+      {"id": "clips", "capability": "text_to_video", "params": {"width": 1080, "height": 1920}, "depends_on": ["structure"]},
+      {"id": "render", "capability": "compose_short", "params": {}, "depends_on": ["voice", "clips"]}
+    ]
+  }
+}

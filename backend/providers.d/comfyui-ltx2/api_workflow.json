@@ -1,0 +1,279 @@
+{
+  "5075": {
+    "_meta": {
+      "title": "Guardar video"
+    },
+    "class_type": "SaveVideo",
+    "inputs": {
+      "codec": "auto",
+      "filename_prefix": "video/LTX-2",
+      "format": "auto",
+      "video": [
+        "5229",
+        0
+      ]
+    }
+  },
+  "5217": {
+    "_meta": {
+      "title": "EmptyImage"
+    },
+    "class_type": "EmptyImage",
+    "inputs": {
+      "batch_size": 1,
+      "color": 0,
+      "height": 1088,
+      "width": 1920
+    }
+  },
+  "5218": {
+    "_meta": {
+      "title": "length"
+    },
+    "class_type": "PrimitiveInt",
+    "inputs": {
+      "value": 121
+    }
+  },
+  "5221": {
+    "_meta": {
+      "title": "Frame Rate"
+    },
+    "class_type": "PrimitiveFloat",
+    "inputs": {
+      "value": 24
+    }
+  },
+  "5222": {
+    "_meta": {
+      "title": "Positive Prompt"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "cinematic epic war movie scene shows a medium closeup shot of a fierce muscular Viking warrior standing in place, clad in weathered leather armor and gripping a battle-worn axe, his long, tangled hair billowing against the stormy sky. The scene is set under a foreboding, cloud-heavy sky, casting an eerie, dim light that reflects off his glinting axe. we hear him roar: \"prepare for battle, and eternal glory!\". the camera slowly zooms in on his determined face"
+    }
+  },
+  "5223": {
+    "_meta": {
+      "title": "Enhanced Prompt (Positive)"
+    },
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "5227",
+        0
+      ],
+      "text": [
+        "5222",
+        0
+      ]
+    }
+  },
+  "5224": {
+    "_meta": {
+      "title": "LTXVConditioning"
+    },
+    "class_type": "LTXVConditioning",
+    "inputs": {
+      "frame_rate": [
+        "5221",
+        0
+      ],
+      "negative": [
+        "5223",
+        0
+      ],
+      "positive": [
+        "5223",
+        0
+      ]
+    }
+  },
+  "5227": {
+    "inputs": {
+      "text_encoder": "gemma-3-12b-it-fp8\\model.safetensors",
+      "ckpt_name": "ltx-2-19b-distilled-fp8.safetensors",
+      "device": "cpu"
+    },
+    "class_type": "LTXAVTextEncoderLoader"
+  },
+  "5228": {
+    "_meta": {
+      "title": "Cargar Punto de Control"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "ltx-2-19b-distilled-fp8.safetensors"
+    }
+  },
+  "5229": {
+    "_meta": {
+      "title": "Crear video"
+    },
+    "class_type": "CreateVideo",
+    "inputs": {
+      "fps": [
+        "5221",
+        0
+      ],
+      "images": [
+        "5232:5185",
+        0
+      ]
+    }
+  },
+  "5232:5150": {
+    "_meta": {
+      "title": "KSamplerSelect"
+    },
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "5232:5151": {
+    "_meta": {
+      "title": "Gu\u00edaCFG"
+    },
+    "class_type": "STGGuiderNode",
+    "inputs": {
+      "cfg": 3.0,
+      "stg": 1.0,
+      "rescale": 0.7,
+      "model": [
+        "5228",
+        0
+      ],
+      "negative": [
+        "5224",
+        1
+      ],
+      "positive": [
+        "5224",
+        0
+      ]
+    }
+  },
+  "5232:5156": {
+    "_meta": {
+      "title": "LTXVSeparateAVLatent"
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "inputs": {
+      "av_latent": [
+        "5232:5159",
+        1
+      ]
+    }
+  },
+  "5232:5158": {
+    "_meta": {
+      "title": "Ruido aleatorio"
+    },
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 45
+    }
+  },
+  "5232:5159": {
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "guider": [
+        "5232:5151",
+        0
+      ],
+      "latent_image": [
+        "5232:5163",
+        0
+      ],
+      "noise": [
+        "5232:5158",
+        0
+      ],
+      "sampler": [
+        "5232:5150",
+        0
+      ],
+      "sigmas": [
+        "5232:5182",
+        0
+      ]
+    }
+  },
+  "5232:5163": {
+    "_meta": {
+      "title": "EmptyLTXVLatentVideo"
+    },
+    "class_type": "EmptyLTXVLatentVideo",
+    "inputs": {
+      "batch_size": 1,
+      "height": 512,
+      "length": [
+        "5218",
+        0
+      ],
+      "width": 768
+    }
+  },
+  "5232:5164": {
+    "_meta": {
+      "title": "Ampliar Imagen Por"
+    },
+    "class_type": "ImageScaleBy",
+    "inputs": {
+      "image": [
+        "5217",
+        0
+      ],
+      "scale_by": 0.5,
+      "upscale_method": "nearest-exact"
+    }
+  },
+  "5232:5165": {
+    "_meta": {
+      "title": "Obtener Tama\u00f1o de Imagen"
+    },
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "5232:5164",
+        0
+      ]
+    }
+  },
+  "5232:5182": {
+    "_meta": {
+      "title": "ManualSigmas"
+    },
+    "class_type": "ManualSigmas",
+    "inputs": {
+      "sigmas": "1., 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    }
+  },
+  "5232:5185": {
+    "_meta": {
+      "title": "\ud83c\udd5b\ud83c\udd63\ud83c\udd67 LTXV Spatio Temporal Tiled VAE Decode"
+    },
+    "class_type": "LTXVSpatioTemporalTiledVAEDecode",
+    "inputs": {
+      "last_frame_fix": false,
+      "latents": [
+        "5232:5159",
+        0
+      ],
+      "spatial_overlap": 4,
+      "spatial_tiles": 4,
+      "temporal_overlap": 4,
+      "temporal_tile_length": 16,
+      "vae": [
+        "5228",
+        2
+      ],
+      "working_device": "auto",
+      "working_dtype": "auto"
+    }
+  }
+}

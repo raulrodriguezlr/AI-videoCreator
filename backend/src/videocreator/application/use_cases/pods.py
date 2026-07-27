@@ -5,6 +5,7 @@ leaking persistence concerns to the interface layer.
 """
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 
 from videocreator.domain.entities import Pod, PodConfig
@@ -58,8 +59,56 @@ class UpdatePodConfig:
             raise PodNotFound(f"pod {pod_id} not found")
         if not pod.is_owned_by(requester_id):
             raise ForbiddenError("pod is owned by a different user")
+
+        new_name = config.series_name
+        if pod.name != new_name:
+            # Check if name is already taken
+            existing = await self.pod_repo.list_for_user(requester_id)
+            if any(p.name == new_name and p.id != pod.id for p in existing):
+                pass # Skip rename if conflict, just update config
+            else:
+                import shutil
+
+                from videocreator.shared.config import get_settings
+                settings = get_settings()
+
+                old_render = settings.var_dir / "render" / pod.name
+                new_render = settings.var_dir / "render" / new_name
+                if old_render.exists() and not new_render.exists():
+                    with contextlib.suppress(Exception):
+                        shutil.move(str(old_render), str(new_render))
+
+                old_pods_dir = settings.pods_dir / pod.name
+                new_pods_dir = settings.pods_dir / new_name
+                if old_pods_dir.exists() and not new_pods_dir.exists():
+                    with contextlib.suppress(Exception):
+                        shutil.move(str(old_pods_dir), str(new_pods_dir))
+
+                updated = pod.model_copy(update={"name": new_name, "config": config})
+                return await self.pod_repo.save(updated)
+
         updated = pod.model_copy(update={"config": config})
-        return await self.pod_repo.save(updated)
+        saved = await self.pod_repo.save(updated)
+
+        # Keep legacy config.json in sync
+        import json
+
+        from videocreator.shared.config import get_settings
+        settings = get_settings()
+        legacy_file = settings.pods_dir / saved.name / "config.json"
+        if legacy_file.exists():
+            try:
+                base = json.loads(legacy_file.read_text(encoding="utf-8"))
+                if isinstance(base, dict):
+                    cfg_dict = config.model_dump(exclude={"schema_version"})
+                    base.update({k: v for k, v in cfg_dict.items() if v is not None})
+                    legacy_file.write_text(
+                        json.dumps(base, indent=2, ensure_ascii=False), encoding="utf-8"
+                    )
+            except Exception:
+                pass
+
+        return saved
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,4 +124,4 @@ class DeletePod:
         await self.pod_repo.delete(pod_id)
 
 
-__all__ = ["CreatePod", "ListPods", "GetPod", "UpdatePodConfig", "DeletePod"]
+__all__ = ["CreatePod", "DeletePod", "GetPod", "ListPods", "UpdatePodConfig"]

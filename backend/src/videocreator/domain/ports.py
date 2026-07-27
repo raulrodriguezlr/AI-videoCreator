@@ -14,16 +14,22 @@ from videocreator.domain.entities import (
     Episode,
     Job,
     Pod,
+    PublishAccount,
+    PublishJob,
+    Recreation,
     Script,
+    SeoMetadata,
     Short,
     Topic,
     User,
 )
 from videocreator.domain.value_objects import (
     ClipArtifact,
+    EditingTimeline,
     ImageRef,
     JobKind,
     JobState,
+    MediaAsset,
     ProviderHealth,
     ScenePrompt,
 )
@@ -32,7 +38,11 @@ from videocreator.shared.ids import (
     EpisodeId,
     JobId,
     PodId,
+    PublishAccountId,
+    PublishJobId,
+    RecreationId,
     ScriptId,
+    SeoId,
     ShortId,
     TopicId,
     UserId,
@@ -71,6 +81,7 @@ class ScriptRepository(Protocol):
     async def get(self, script_id: ScriptId) -> Script | None: ...
     async def list_for_pod(self, pod_id: PodId) -> list[Script]: ...
     async def save(self, script: Script) -> Script: ...
+    async def delete(self, script_id: ScriptId) -> None: ...
 
 
 @runtime_checkable
@@ -78,6 +89,7 @@ class EpisodeRepository(Protocol):
     async def get(self, episode_id: EpisodeId) -> Episode | None: ...
     async def list_for_pod(self, pod_id: PodId) -> list[Episode]: ...
     async def save(self, episode: Episode) -> Episode: ...
+    async def delete(self, episode_id: EpisodeId) -> None: ...
     async def next_number(self, pod_id: PodId) -> int: ...
 
 
@@ -86,13 +98,53 @@ class ShortRepository(Protocol):
     async def get(self, short_id: ShortId) -> Short | None: ...
     async def list_for_pod(self, pod_id: PodId) -> list[Short]: ...
     async def save(self, short: Short) -> Short: ...
+    async def delete(self, short_id: ShortId) -> None: ...
+
+
+@runtime_checkable
+class SeoRepository(Protocol):
+    async def get(self, seo_id: SeoId) -> SeoMetadata | None: ...
+    async def get_for_episode(self, episode_id: EpisodeId) -> SeoMetadata | None: ...
+    async def list_for_pod(self, pod_id: PodId) -> list[SeoMetadata]: ...
+    async def save(self, metadata: SeoMetadata) -> SeoMetadata: ...
 
 
 @runtime_checkable
 class JobRepository(Protocol):
     async def get(self, job_id: JobId) -> Job | None: ...
     async def save(self, job: Job) -> Job: ...
+    async def delete(self, job_id: JobId) -> None: ...
     async def list_recent(self, owner_id: UserId, limit: int = 50) -> list[Job]: ...
+    async def reconcile_interrupted(self) -> int:
+        """Fail jobs left running/queued by a previous process. Returns the count."""
+        ...
+
+
+@runtime_checkable
+class RecreationRepository(Protocol):
+    async def get(self, recreation_id: RecreationId) -> Recreation | None: ...
+    async def list_for_user(self, user_id: UserId) -> list[Recreation]: ...
+    async def save(self, recreation: Recreation) -> Recreation: ...
+    async def delete(self, recreation_id: RecreationId) -> None: ...
+
+
+@runtime_checkable
+class PublishAccountRepository(Protocol):
+    async def get(self, account_id: PublishAccountId) -> PublishAccount | None: ...
+    async def list_for_user(self, user_id: UserId) -> list[PublishAccount]: ...
+    async def save(self, account: PublishAccount) -> PublishAccount: ...
+    async def delete(self, account_id: PublishAccountId) -> None: ...
+
+
+@runtime_checkable
+class PublishJobRepository(Protocol):
+    async def get(self, job_id: PublishJobId) -> PublishJob | None: ...
+    async def list_for_user(self, user_id: UserId, limit: int = 100) -> list[PublishJob]: ...
+    async def list_due(self, now: Any) -> list[PublishJob]:
+        """Pending jobs whose scheduled_at is None or already past `now`."""
+        ...
+    async def save(self, job: PublishJob) -> PublishJob: ...
+    async def delete(self, job_id: PublishJobId) -> None: ...
 
 
 @runtime_checkable
@@ -100,6 +152,13 @@ class UserRepository(Protocol):
     async def get(self, user_id: UserId) -> User | None: ...
     async def get_by_email(self, email: str) -> User | None: ...
     async def save(self, user: User) -> User: ...
+    async def save_with_password(self, user: User, password_hash: str) -> User:
+        """Persist a user together with its (already hashed) password."""
+        ...
+
+    async def get_credential(self, email: str) -> tuple[User, str] | None:
+        """Return (user, password_hash) for an email, or None if absent."""
+        ...
 
 
 # ============================================================================
@@ -118,8 +177,21 @@ class StoragePort(Protocol):
         ...
 
     async def delete(self, bucket: str, key: str) -> None: ...
+    async def delete_prefix(self, bucket: str, prefix: str) -> None:
+        """Delete all objects with the given prefix."""
+        ...
     async def url_for(self, bucket: str, key: str, expires_s: int = 3600) -> str: ...
     async def list_keys(self, bucket: str, prefix: str = "") -> list[str]: ...
+
+
+# ============================================================================
+# Media library (episode artifacts, all served from the object store)
+# ============================================================================
+@runtime_checkable
+class MediaLibraryPort(Protocol):
+    async def list_for_episode(self, episode: Episode) -> list[MediaAsset]:
+        """Enumerate every viewable artifact for an episode (clips, audio, render)."""
+        ...
 
 
 # ============================================================================
@@ -145,6 +217,9 @@ class SecretVaultPort(Protocol):
     async def get_secret(self, user_id: UserId, provider: str) -> str | None: ...
     async def set_secret(self, user_id: UserId, provider: str, value: str) -> None: ...
     async def delete_secret(self, user_id: UserId, provider: str) -> None: ...
+    async def list_providers(self, user_id: UserId) -> list[str]:
+        """Return the provider names this user has a stored key for (never the values)."""
+        ...
 
 
 # ============================================================================
@@ -164,6 +239,36 @@ class VideoProviderPort(Protocol):
     async def extend_clip(self, clip: ClipArtifact, prompt: ScenePrompt) -> ClipArtifact: ...
 
     async def availability(self) -> ProviderHealth: ...
+
+
+@runtime_checkable
+class VideoAssemblerPort(Protocol):
+    """Stitches per-scene clips into a single deliverable video.
+
+    Kept abstract so the orchestration layer never shells out to FFmpeg
+    directly — the local backend uses FFmpeg, a cloud backend might use a
+    media-services API behind the same contract.
+    """
+
+    async def concat(self, clip_paths: list[Path], output_path: Path) -> Path:
+        """Concatenate `clip_paths` in order into `output_path`. Returns it."""
+        ...
+
+
+@runtime_checkable
+class ShortComposerPort(Protocol):
+    """Reframes + trims a source video into a vertical short per an `EditingTimeline`.
+
+    Abstracted like `VideoAssemblerPort` so orchestration never shells out to
+    FFmpeg directly: the local backend uses FFmpeg, a cloud backend could use a
+    media-services API behind the same contract.
+    """
+
+    async def compose(
+        self, source_path: Path, timeline: EditingTimeline, output_path: Path
+    ) -> Path:
+        """Render `timeline`'s segments from `source_path` into `output_path`."""
+        ...
 
 
 @runtime_checkable
@@ -193,6 +298,16 @@ class LLMPort(Protocol):
 
 
 @runtime_checkable
+class TrendSourcePort(Protocol):
+    """Source of current trending search terms, for grounding topic ideas."""
+
+    async def fetch(self, *, language: str = "en", limit: int = 15) -> list[str]:
+        """Return trending terms for a locale. Best-effort: never raises, returns
+        an empty list when the source is unavailable."""
+        ...
+
+
+@runtime_checkable
 class ImageGenerationPort(Protocol):
     async def generate(
         self,
@@ -211,7 +326,7 @@ class ImageGenerationPort(Protocol):
 @runtime_checkable
 class TranscriptionPort(Protocol):
     async def transcribe(self, audio_path: Path, language: str | None = None) -> dict[str, Any]:
-        """Return `{"text": str, "segments": [{"start": float, "end": float, "text": str}, ...]}`."""
+        """Return `{"text": str, "segments": [{start, end, text}, ...]}` (floats + str)."""
         ...
 
 

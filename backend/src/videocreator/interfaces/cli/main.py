@@ -4,7 +4,7 @@ Available commands:
     videocreator serve            Start the FastAPI server.
     videocreator init             Create var/ tree and SQLite schema.
     videocreator pods list        List pods owned by the local user.
-    videocreator pods import      Import legacy `pods/*` directories.
+    videocreator pods import      Import filesystem `pods/*` directories.
     videocreator info             Print the active runtime configuration.
 """
 from __future__ import annotations
@@ -63,7 +63,7 @@ def info() -> None:
     typer.echo(f"storage_url  : {s.storage_url}")
     typer.echo(f"queue_backend: {s.queue_backend}")
     typer.echo(f"var_dir      : {s.var_dir}")
-    typer.echo(f"legacy_pods  : {s.legacy_pods_dir}")
+    typer.echo(f"pods_dir     : {s.pods_dir}")
     typer.echo(f"google_api   : {'set' if s.google_api_key else 'missing'}")
     typer.echo(f"elevenlabs   : {'set' if s.elevenlabs_api_key else 'missing'}")
     typer.echo(f"artlist      : {'set' if s.artlist_api_token else 'missing'}")
@@ -85,6 +85,14 @@ def serve(
     """Start the FastAPI server (uvicorn)."""
     _bootstrap_local()
     settings = get_settings()
+    # Hot-reload must watch ONLY our source tree. Without this, watchfiles walks
+    # the whole CWD — including .venv (torch/sympy/…, tens of thousands of files)
+    # — making every reload crawl and spawn re-import storms on Windows.
+    src_dir = Path(__file__).resolve().parents[3]  # …/backend/src
+    reload_kwargs = (
+        {"reload_dirs": [str(src_dir)], "reload_excludes": ["*.venv*", "var/*"]}
+        if reload else {}
+    )
     uvicorn.run(
         "videocreator.interfaces.rest.app:create_app",
         host=host or settings.host,
@@ -92,6 +100,7 @@ def serve(
         reload=reload,
         factory=True,
         log_level=settings.log_level.lower(),
+        **reload_kwargs,
     )
 
 
@@ -117,13 +126,15 @@ def pods_list() -> None:
 @pods_app.command("import")
 def pods_import(
     pods_dir: Path = typer.Option(
-        None, "--from", help="Directory containing legacy pods/ (default: settings.legacy_pods_dir).",
+        None,
+        "--from",
+        help="Directory with content pods/ (default: settings.pods_dir).",
     ),
 ) -> None:
-    """Import legacy filesystem pods (idempotent)."""
+    """Import filesystem pods (idempotent)."""
     _bootstrap_local()
     settings = get_settings()
-    source = pods_dir or settings.legacy_pods_dir
+    source = pods_dir or settings.pods_dir
     if not source.exists():
         typer.echo(f"error: directory not found: {source}", err=True)
         raise typer.Exit(code=1)
@@ -131,7 +142,7 @@ def pods_import(
     async def _run() -> None:
         container = get_container()
         uc = container.use_cases()
-        imported = await uc.legacy.import_pods.execute(pods_root=source)
+        imported = await uc.pod_sources.import_pods.execute(pods_root=source)
         typer.echo(f"imported {len(imported)} pod(s) from {source}")
         for p in imported:
             typer.echo(f"  - {p.name} ({p.id})")

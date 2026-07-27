@@ -1,126 +1,1188 @@
-import { Link, useParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type Episode, type Pod, type Script, type Topic } from "../api/client";
+import { useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import {
+  api, mediaUrl, subscribeToJob, getAppConfig, listChannels,
+  type Character, type Episode, type NarrationStyle, type Pod, type Script,
+  type SettingMode, type Short, type Topic, type VoiceOption,
+  type AppConfig, type Channel,
+} from "../api/client";
+import {
+  Badge, Button, Empty, ErrorState, Field, Loading, Modal, StateBadge, Tabs, useToast,
+} from "../ui/primitives";
+import { IcAlertTriangle, IcEdit, IcFile, IcImage, IcPlus, IcRocket, IcSparkles, IcTrash, IcUpload, IcWand } from "../ui/icons";
+import { JsonEditor } from "../components/JsonEditor";
+import { prettyStyle } from "./PodsListPage";
+
+type TabId = "episodes" | "topics" | "scripts" | "shorts" | "characters" | "config" | "settings";
+
+/** Run `fn` only after the user confirms a destructive action. */
+function confirmThen(message: string, fn: () => void): void {
+  if (window.confirm(message)) fn();
+}
 
 export function PodDetailPage() {
-  const { podId } = useParams<{ podId: string }>();
-  const queryClient = useQueryClient();
+  const { podId = "" } = useParams();
+  const [tab, setTab] = useState<TabId>("episodes");
+  const pod = useQuery<Pod>({ queryKey: ["pod", podId], queryFn: () => api.get(`/pods/${podId}`) });
+  const eps = useQuery<Episode[]>({ queryKey: ["episodes", podId], queryFn: () => api.get(`/pods/${podId}/episodes`) });
+  const topics = useQuery<Topic[]>({ queryKey: ["topics", podId], queryFn: () => api.get(`/pods/${podId}/topics`) });
+  const scripts = useQuery<Script[]>({ queryKey: ["scripts", podId], queryFn: () => api.get(`/pods/${podId}/scripts`) });
+  const shorts = useQuery<Short[]>({ queryKey: ["shorts", podId], queryFn: () => api.get(`/pods/${podId}/shorts`) });
+  const chars = useQuery<Character[]>({ queryKey: ["chars", podId], queryFn: () => api.get(`/pods/${podId}/characters`) });
 
-  const pod = useQuery<Pod>({
-    queryKey: ["pod", podId],
-    queryFn: () => api.get(`/pods/${podId}`),
-    enabled: !!podId,
+  if (pod.isLoading) return <div className="page"><Loading /></div>;
+  if (pod.isError || !pod.data) return <div className="page"><ErrorState error={pod.error} /></div>;
+
+  return (
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Pod</div>
+          <h1>{pod.data.config.series_name || pod.data.name}</h1>
+          <p className="sub">{pod.data.config.series_context || pod.data.config.target_audience}</p>
+          <div className="tag-list" style={{ marginTop: 12 }}>
+            <Badge tone="accent">{prettyStyle(pod.data.config.style_profile)}</Badge>
+            <Badge>{pod.data.config.language}</Badge>
+            <Badge>{pod.data.config.duration_seconds}s</Badge>
+            <span className="mono dim" style={{ fontSize: 11 }}>{pod.data.id}</span>
+          </div>
+        </div>
+      </div>
+
+      <Tabs<TabId> value={tab} onChange={setTab} tabs={[
+        { id: "episodes", label: "Episodios", count: eps.data?.length },
+        { id: "topics", label: "Temas", count: topics.data?.length },
+        { id: "scripts", label: "Guiones", count: scripts.data?.length },
+        { id: "shorts", label: "Shorts", count: shorts.data?.length },
+        { id: "characters", label: "Personajes", count: chars.data?.length },
+        { id: "config", label: "Configuración" },
+        { id: "settings", label: "Ajustes" },
+      ]} />
+
+      {tab === "episodes" && <EpisodesTab podId={podId} q={eps} />}
+      {tab === "topics" && <TopicsTab podId={podId} q={topics} />}
+      {tab === "scripts" && <ScriptsTab podId={podId} q={scripts} />}
+      {tab === "shorts" && <ShortsTab podId={podId} q={shorts} episodes={eps.data ?? []} />}
+      {tab === "characters" && <CharactersTab podId={podId} q={chars} />}
+      {tab === "config" && <ConfigTab podId={podId} pod={pod.data} />}
+      {tab === "settings" && <SettingsTab pod={pod.data} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Episodes
+function EpisodesTab({ podId, q }: { podId: string; q: UseQueryResult<Episode[]> }) {
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const del = useMutation({
+    mutationFn: (id: string) => api.delete(`/pods/${podId}/episodes/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["episodes", podId] }); toast.ok("Episodio borrado"); },
+    onError: (e) => toast.err("No se pudo borrar", (e as Error).message),
   });
-  const topics = useQuery<Topic[]>({
-    queryKey: ["topics", podId],
-    queryFn: () => api.get(`/pods/${podId}/topics`),
-    enabled: !!podId,
+  if (q.isLoading) return <Loading />;
+  if (q.isError) return <ErrorState error={q.error} />;
+  if (!q.data?.length) return <Empty emoji="🎞️" title="El primer episodio está por rodarse">Genera un guión desde un tema y créalo como episodio.</Empty>;
+  return (
+    <div className="stack">
+      {q.data.map((ep) => (
+        <div key={ep.id} className="card card-pad between" style={{ cursor: "pointer" }}
+          onClick={() => nav(`/pods/${podId}/episodes/${ep.id}`)}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+            <span className="mono dim" style={{ fontSize: 13 }}>#{String(ep.number).padStart(2, "0")}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ep.title}</div>
+              <div className="muted" style={{ fontSize: 12.5 }}>
+                {ep.video_model ? <span className="mono">{ep.video_model}</span> : "modelo por defecto"}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <StateBadge state={ep.state} />
+            <Button size="sm" variant="ghost" loading={del.isPending && del.variables === ep.id}
+              onClick={(e) => { e.stopPropagation(); confirmThen(`¿Borrar el episodio "${ep.title}"?`, () => del.mutate(ep.id)); }}>
+              <IcTrash />
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Topics
+const TOPIC_STATUSES = ["pending", "in_progress", "completed", "rejected"] as const;
+
+function TopicsTab({ podId, q }: { podId: string; q: UseQueryResult<Topic[]> }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [useTrends, setUseTrends] = useState(false);
+  const [editing, setEditing] = useState<Topic | null>(null);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["topics", podId] });
+  const gen = useMutation({
+    mutationFn: () => api.post<Topic[]>(`/pods/${podId}/topics/generate`, { count: 5, use_trends: useTrends }),
+    onSuccess: () => { invalidate(); toast.ok("Temas generados"); },
+    onError: (e) => toast.err("No se pudieron generar", (e as Error).message),
   });
-  const scripts = useQuery<Script[]>({
-    queryKey: ["scripts", podId],
-    queryFn: () => api.get(`/pods/${podId}/scripts`),
-    enabled: !!podId,
+  const makeScript = useMutation({
+    mutationFn: (topicId: string) => api.post<Script>(`/pods/${podId}/scripts/generate`, { topic_id: topicId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scripts", podId] }); toast.ok("Guión generado", "Míralo en la pestaña Guiones"); },
+    onError: (e) => toast.err("Falló la generación", (e as Error).message),
   });
-  const episodes = useQuery<Episode[]>({
-    queryKey: ["episodes", podId],
-    queryFn: () => api.get(`/pods/${podId}/episodes`),
-    enabled: !!podId,
+  const del = useMutation({
+    mutationFn: (topicId: string) => api.delete(`/pods/${podId}/topics/${topicId}`),
+    onSuccess: () => { invalidate(); toast.ok("Tema borrado"); },
+    onError: (e) => toast.err("No se pudo borrar", (e as Error).message),
+  });
+  return (
+    <div className="stack">
+      <div className="btn-row">
+        <Button variant="primary" loading={gen.isPending} onClick={() => gen.mutate()}><IcSparkles /> Generar temas (IA)</Button>
+        <label className="check">
+          <input type="checkbox" checked={useTrends} onChange={(e) => setUseTrends(e.target.checked)} />
+          <span>Usar tendencias actuales de internet</span>
+        </label>
+      </div>
+      {q.isLoading && <Loading />}
+      {!q.isLoading && !q.data?.length && <Empty emoji="💡" title="La lluvia de ideas no ha empezado">Pide a la IA una tanda de ideas de episodios.</Empty>}
+      {q.data?.map((t) => (
+        <div key={t.id} className="card card-pad between">
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 600 }}>{t.title}</div>
+            {t.description && <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{t.description}</div>}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <StateBadge state={t.status} />
+            <Button size="sm" loading={makeScript.isPending && makeScript.variables === t.id}
+              onClick={() => makeScript.mutate(t.id)}><IcWand /> Guión</Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(t)}><IcEdit /></Button>
+            <Button size="sm" variant="ghost" loading={del.isPending && del.variables === t.id}
+              onClick={() => confirmThen("¿Borrar este tema?", () => del.mutate(t.id))}><IcTrash /></Button>
+          </div>
+        </div>
+      ))}
+      {editing && <EditTopicModal podId={podId} topic={editing} onClose={() => setEditing(null)}
+        onSaved={() => { invalidate(); setEditing(null); }} />}
+    </div>
+  );
+}
+
+function EditTopicModal({ podId, topic, onClose, onSaved }: {
+  podId: string; topic: Topic; onClose: () => void; onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [title, setTitle] = useState(topic.title);
+  const [description, setDescription] = useState(topic.description ?? "");
+  const [status, setStatus] = useState(topic.status);
+  const save = useMutation({
+    mutationFn: () => api.patch<Topic>(`/pods/${podId}/topics/${topic.id}`, {
+      title, description: description || null, status,
+    }),
+    onSuccess: () => { toast.ok("Tema actualizado"); onSaved(); },
+    onError: (e) => toast.err("No se pudo guardar", (e as Error).message),
+  });
+  return (
+    <Modal title="Editar tema" onClose={onClose} footer={<>
+      <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+      <Button variant="primary" loading={save.isPending} disabled={!title.trim()} onClick={() => save.mutate()}>Guardar</Button>
+    </>}>
+      <Field label="Título"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
+      <Field label="Descripción"><textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+      <Field label="Estado">
+        <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
+          {TOPIC_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </Field>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------- Scripts
+function ScriptsTab({ podId, q }: { podId: string; q: UseQueryResult<Script[]> }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [viewing, setViewing] = useState<Script | null>(null);
+  const makeEp = useMutation({
+    mutationFn: (s: Script) => api.post<Episode>(`/pods/${podId}/episodes`, { script_id: s.id, title: s.title }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["episodes", podId] }); toast.ok("Episodio creado", "Disponible en Episodios"); },
+    onError: (e) => toast.err("No se pudo crear", (e as Error).message),
+  });
+  const del = useMutation({
+    mutationFn: (scriptId: string) => api.delete(`/pods/${podId}/scripts/${scriptId}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scripts", podId] }); toast.ok("Guión borrado"); },
+    onError: (e) => toast.err("No se pudo borrar", (e as Error).message),
+  });
+  if (q.isLoading) return <Loading />;
+  if (!q.data?.length) return <Empty emoji="📝" title="La página está en blanco">Genera un guión desde un tema y dale voz a tu historia.</Empty>;
+  return (
+    <div className="stack">
+      {q.data.map((s) => (
+        <div key={s.id} className="card card-pad between">
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 600 }}>{s.title} <span className="dim mono" style={{ fontSize: 11 }}>v{s.version}</span></div>
+            <div className="muted" style={{ fontSize: 13 }}>{s.scenes.length} escenas · {s.summary?.slice(0, 80)}</div>
+          </div>
+          <div className="btn-row">
+            <Button size="sm" variant="ghost" onClick={() => setViewing(s)}><IcFile /> Ver guión</Button>
+            <Button size="sm" variant="primary" loading={makeEp.isPending && makeEp.variables?.id === s.id}
+              onClick={() => makeEp.mutate(s)}><IcPlus /> Crear episodio</Button>
+            <Button size="sm" variant="ghost" loading={del.isPending && del.variables === s.id}
+              onClick={() => confirmThen("¿Borrar este guión?", () => del.mutate(s.id))}><IcTrash /></Button>
+          </div>
+        </div>
+      ))}
+      {viewing && <ScriptViewerModal script={viewing} onClose={() => setViewing(null)} />}
+    </div>
+  );
+}
+
+function ScriptViewerModal({ script, onClose }: { script: Script; onClose: () => void }) {
+  const [raw, setRaw] = useState(false);
+  return (
+    <Modal title={`Guión · ${script.title}`} onClose={onClose} footer={<Button variant="ghost" onClick={onClose}>Cerrar</Button>}>
+      <div className="stack">
+        <div className="between">
+          <span className="muted" style={{ fontSize: 13 }}>{script.scenes.length} escenas · v{script.version}</span>
+          <div className="seg">
+            <button className={!raw ? "on" : ""} onClick={() => setRaw(false)}>Escenas</button>
+            <button className={raw ? "on" : ""} onClick={() => setRaw(true)}>JSON</button>
+          </div>
+        </div>
+        {script.summary && <p className="muted" style={{ fontSize: 13, margin: 0 }}>{script.summary}</p>}
+        {raw ? (
+          <pre className="json-view">{JSON.stringify(script, null, 2)}</pre>
+        ) : (
+          <div className="stack">
+            {script.scenes.map((sc) => (
+              <div key={sc.id} className="card card-pad stack" style={{ gap: 6 }}>
+                <div className="between">
+                  <Badge tone="accent">Escena {sc.index}</Badge>
+                  <span className="dim mono" style={{ fontSize: 11 }}>
+                    {sc.duration_s}s{sc.camera_shot ? ` · ${sc.camera_shot}` : ""}{sc.transition ? ` · ${sc.transition}` : ""}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13 }}><b className="dim">Visual:</b> {sc.visual_prompt}</div>
+                {sc.audio_text && <div style={{ fontSize: 13 }}><b className="dim">Audio:</b> {sc.audio_text}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------- Shorts
+const PLATFORMS = ["shorts", "tiktok", "reels"] as const;
+
+function ShortsTab({ podId, q, episodes }: {
+  podId: string; q: UseQueryResult<Short[]>; episodes: Episode[];
+}) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [creating, setCreating] = useState(false);
+  const [renderFor, setRenderFor] = useState<Short | null>(null);
+  // Non-silent-degradation warnings from the last render job, per short id —
+  // e.g. "ASR captions unavailable", "split layout requested but no b-roll".
+  const [warningsByShort, setWarningsByShort] = useState<Record<string, string[]>>({});
+
+  const render = useMutation({
+    mutationFn: ({ shortId, opts }: { shortId: string; opts: RenderOpts }) =>
+      api.post<{ job_id: string }>(`/pods/${podId}/shorts/${shortId}/render`, opts),
+    onSuccess: (r, vars) => {
+      toast.ok("Render de short en curso", `Job ${r.job_id.slice(0, 12)}…`);
+      // Live-refresh the list when the render job reaches a terminal state.
+      const stop = subscribeToJob(r.job_id, {
+        onEvent: (e) => {
+          const done = !!e.result || !!e.error
+            || ["completed", "succeeded", "failed", "cancelled"].includes(e.event);
+          if (!done) return;
+          qc.invalidateQueries({ queryKey: ["shorts", podId] });
+          if (e.error) toast.err("El render falló", e.error);
+          const warnings = (e.result?.warnings as string[] | undefined) ?? [];
+          setWarningsByShort((prev) => ({ ...prev, [vars.shortId]: warnings }));
+          stop();
+        },
+      });
+    },
+    onError: (e) => toast.err("No se pudo renderizar", (e as Error).message),
   });
 
-  const generateTopics = useMutation({
-    mutationFn: () => api.post<Topic[]>(`/pods/${podId}/topics/generate`, { count: 5 }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["topics", podId] }),
+  const del = useMutation({
+    mutationFn: (shortId: string) => api.delete(`/pods/${podId}/shorts/${shortId}`),
+    onSuccess: () => {
+      toast.ok("Short eliminado");
+      qc.invalidateQueries({ queryKey: ["shorts", podId] });
+    },
+    onError: (e) => toast.err("No se pudo eliminar el short", (e as Error).message),
   });
 
-  if (pod.isLoading) return <div className="muted">Loading pod…</div>;
-  if (!pod.data) return <div className="card">Pod not found.</div>;
+  return (
+    <div className="stack">
+      <div className="btn-row">
+        <Button variant="primary" disabled={episodes.length === 0} onClick={() => setCreating(true)}>
+          <IcPlus /> Nuevo short
+        </Button>
+        {episodes.length === 0 && <span className="dim" style={{ fontSize: 13 }}>Necesitas al menos un episodio como fuente.</span>}
+      </div>
+
+      {q.isLoading && <Loading />}
+      {!q.isLoading && !q.data?.length && <Empty emoji="📱" title="Todavía nada para el móvil">Multiplica un episodio en verticales 9:16 listos para shorts.</Empty>}
+
+      <div className="grid cols">
+        {q.data?.map((s) => (
+          <div key={s.id} className="card card-pad stack">
+            <div className="between">
+              <Badge tone="accent">{s.target_platform}</Badge>
+              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                <span className="dim mono" style={{ fontSize: 11 }}>{s.aspect} · {s.duration_s}s</span>
+                <Button variant="ghost" size="sm" loading={del.isPending && del.variables === s.id}
+                  onClick={() => confirmThen("¿Borrar este short y su video asociado?", () => del.mutate(s.id))}>
+                  <IcTrash />
+                </Button>
+              </div>
+            </div>
+            {s.rendered_video_key ? (
+              <div className="stage" style={{ aspectRatio: "9/16", maxHeight: 320, margin: "0 auto" }}>
+                <video src={mediaUrl(`/storage/${s.rendered_video_key}`)} controls preload="metadata" style={{ height: "100%" }} />
+              </div>
+            ) : (
+              <div className="thumb" style={{ aspectRatio: "9/16", maxHeight: 240, margin: "0 auto", width: "auto" }}>
+                <IcRocket />
+              </div>
+            )}
+            {s.hook_text && <p className="muted" style={{ fontSize: 13, margin: 0 }}>“{s.hook_text}”</p>}
+            {!!warningsByShort[s.id]?.length && (
+              <div className="stack" style={{ gap: 4 }}>
+                {warningsByShort[s.id].map((w, i) => (
+                  <div key={i} className="row" style={{ gap: 6, alignItems: "flex-start", color: "#b8860b", fontSize: 12 }}>
+                    <IcAlertTriangle style={{ flexShrink: 0, marginTop: 1, width: 14, height: 14 }} />
+                    <span>{w}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="between">
+              <Badge tone={s.rendered_video_key ? "ok" : "default"}>{s.rendered_video_key ? "renderizado" : "pendiente"}</Badge>
+              <Button size="sm" loading={render.isPending && render.variables?.shortId === s.id} onClick={() => setRenderFor(s)}>
+                <IcRocket /> {s.rendered_video_key ? "Re-render" : "Renderizar"}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {creating && (
+        <CreateShortModal podId={podId} episodes={episodes} onClose={() => setCreating(false)}
+          onCreated={() => { qc.invalidateQueries({ queryKey: ["shorts", podId] }); setCreating(false); }} />
+      )}
+
+      {renderFor && (
+        <RenderShortModal
+          short={renderFor}
+          busy={render.isPending}
+          onClose={() => setRenderFor(null)}
+          onRender={(opts) => { render.mutate({ shortId: renderFor.id, opts }); setRenderFor(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Render options panel — mirrors ssemble's "Advanced Options" (template, layout,
+// captions, game-video b-roll, music). Forwarded as the /render request body.
+type RenderOpts = {
+  pipeline: "teaser" | "legacy";
+  template: string;
+  layout: string;
+  captions: boolean;
+  ken_burns: boolean;
+  game_video: boolean;
+  broll_query: string;
+  background_music: boolean;
+  music_vibe: string;
+};
+
+function RenderShortModal({ short, busy, onClose, onRender }: {
+  short: Short; busy: boolean; onClose: () => void; onRender: (o: RenderOpts) => void;
+}) {
+  const [pipeline, setPipeline] = useState<"teaser" | "legacy">("teaser");
+  const [template, setTemplate] = useState("teaser");
+  const [layout, setLayout] = useState("fit_blur");
+  const [captions, setCaptions] = useState(true);
+  const [kenBurns, setKenBurns] = useState(true);
+  const [gameVideo, setGameVideo] = useState(false);
+  const [brollQuery, setBrollQuery] = useState("satisfying");
+  const [music, setMusic] = useState(false);
+  const [musicVibe, setMusicVibe] = useState("energetic");
+  // The Game-video toggle is sugar for the split layout.
+  const effLayout = gameVideo ? "split" : layout;
+
+  return (
+    <Modal title={`Renderizar short${short.hook_text ? ` · “${short.hook_text}”` : ""}`} onClose={onClose} footer={
+      <>
+        <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+        <Button variant="mint" loading={busy} onClick={() => onRender({
+          pipeline, template, layout: effLayout, captions, ken_burns: kenBurns,
+          game_video: gameVideo, broll_query: brollQuery,
+          background_music: music, music_vibe: musicVibe,
+        })}><IcRocket /> Renderizar</Button>
+      </>
+    }>
+      <Field label="Pipeline" hint="Cómo se construye el timeline del short">
+        <div className="btn-row" role="radiogroup" aria-label="Pipeline">
+          <Button type="button" size="sm" variant={pipeline === "teaser" ? "mint" : "ghost"}
+            onClick={() => setPipeline("teaser")} aria-pressed={pipeline === "teaser"}>
+            Teaser (recomendado)
+          </Button>
+          <Button type="button" size="sm" variant={pipeline === "legacy" ? "mint" : "ghost"}
+            onClick={() => setPipeline("legacy")} aria-pressed={pipeline === "legacy"}>
+            Clásico (legacy)
+          </Button>
+        </div>
+      </Field>
+      <div className="row">
+        <Field label="Plantilla">
+          <select className="select" value={template} onChange={(e) => setTemplate(e.target.value)}>
+            <option value="teaser">Teaser (validada)</option>
+            <option value="hormozi1">Hormozi 1 (oro)</option>
+            <option value="hormozi2">Hormozi 2 (verde)</option>
+            <option value="karaoke">Karaoke (cian)</option>
+          </select>
+        </Field>
+        <Field label="Layout" hint="Encuadre vertical">
+          <select className="select" value={layout} disabled={gameVideo} onChange={(e) => setLayout(e.target.value)}>
+            <option value="fill">Fill — recorte 9:16</option>
+            <option value="fit_blur">Fit + blur — sin bandas</option>
+            <option value="split">Split-screen</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="Subtítulos">
+        <label className="row" style={{ gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={captions} onChange={(e) => setCaptions(e.target.checked)} /> Captions palabra a palabra
+        </label>
+      </Field>
+      <Field label="Zoom Ken-Burns">
+        <label className="row" style={{ gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={kenBurns} onChange={(e) => setKenBurns(e.target.checked)} /> Push-in lento
+        </label>
+      </Field>
+      <Field label="Game video" hint="Split-screen con b-roll CC0 (legal)">
+        <label className="row" style={{ gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={gameVideo} onChange={(e) => setGameVideo(e.target.checked)} /> Vídeo de fondo abajo
+        </label>
+      </Field>
+      {(gameVideo || effLayout === "split") && (
+        <Field label="Tema del b-roll" hint="Pexels/Pixabay CC0 — ej. hydraulic press, slime">
+          <input className="input" value={brollQuery} onChange={(e) => setBrollQuery(e.target.value)} placeholder="satisfying" />
+        </Field>
+      )}
+      <Field label="Música de fondo">
+        <label className="row" style={{ gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={music} onChange={(e) => setMusic(e.target.checked)} /> Cama royalty-free
+        </label>
+      </Field>
+      {music && (
+        <Field label="Vibe de música">
+          <input className="input" value={musicVibe} onChange={(e) => setMusicVibe(e.target.value)} placeholder="energetic" />
+        </Field>
+      )}
+    </Modal>
+  );
+}
+
+function CreateShortModal({ podId, episodes, onClose, onCreated }: {
+  podId: string; episodes: Episode[]; onClose: () => void; onCreated: () => void;
+}) {
+  const toast = useToast();
+  const [sourceId, setSourceId] = useState(episodes[0]?.id ?? "");
+  const [duration, setDuration] = useState(30);
+  const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]>("shorts");
+  const [hook, setHook] = useState("");
+
+  const create = useMutation({
+    mutationFn: () => api.post<Short>(`/pods/${podId}/shorts`, {
+      source_episode_id: sourceId, duration_s: duration, target_platform: platform,
+      hook_text: hook || null,
+    }),
+    onSuccess: () => { toast.ok("Short creado"); onCreated(); },
+    onError: (e) => toast.err("No se pudo crear", (e as Error).message),
+  });
+
+  return (
+    <Modal title="Nuevo short" onClose={onClose} footer={
+      <>
+        <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+        <Button variant="primary" loading={create.isPending} disabled={!sourceId} onClick={() => create.mutate()}>Crear short</Button>
+      </>
+    }>
+      <Field label="Episodio fuente">
+        <select className="select" value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
+          {episodes.map((ep) => <option key={ep.id} value={ep.id}>#{ep.number} · {ep.title}</option>)}
+        </select>
+      </Field>
+      <div className="row">
+        <Field label="Duración (s)"><input className="input" type="number" min={5} max={180} value={duration} onChange={(e) => setDuration(Number(e.target.value))} /></Field>
+        <Field label="Plataforma">
+          <select className="select" value={platform} onChange={(e) => setPlatform(e.target.value as (typeof PLATFORMS)[number])}>
+            {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </Field>
+      </div>
+      <Field label="Hook (texto de gancho)" hint="Opcional — aparece como overlay al inicio">
+        <input className="input" value={hook} onChange={(e) => setHook(e.target.value)} placeholder="¡No te vas a creer lo que pasó!" />
+      </Field>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------- Characters
+function CharactersTab({ podId, q }: { podId: string; q: UseQueryResult<Character[]> }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [assetsFor, setAssetsFor] = useState<Character | null>(null);
+  const [editing, setEditing] = useState<Character | null>(null);
+  const [creating, setCreating] = useState(false);
+  const del = useMutation({
+    mutationFn: (id: string) => api.delete(`/pods/${podId}/characters/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["chars", podId] }); toast.ok("Personaje borrado"); },
+    onError: (e) => toast.err("No se pudo borrar", (e as Error).message),
+  });
+  if (q.isLoading) return <Loading />;
+
+  // Keep the open modal in sync with refreshed query data.
+  const live = assetsFor && q.data?.find((c) => c.id === assetsFor.id);
 
   return (
     <>
-      <Link to="/" className="muted">
-        ← All pods
-      </Link>
-      <h2 style={{ marginTop: 8 }}>{pod.data.name}</h2>
-      <div className="muted" style={{ marginBottom: 24 }}>
-        {pod.data.config.series_name} · {pod.data.config.language} · target audience:{" "}
-        {pod.data.config.target_audience} · {pod.data.config.duration_seconds}s
+      <div className="between" style={{ marginBottom: 12 }}>
+        <span className="eyebrow">Reparto</span>
+        <Button size="sm" variant="primary" onClick={() => setCreating(true)}><IcWand /> Nuevo personaje</Button>
       </div>
+      {!q.data?.length ? (
+        <Empty emoji="🧑‍🎤" title="Sin personajes">Crea el reparto: marca a tu protagonista y añade secundarios o antagonistas.</Empty>
+      ) : (
+      <div className="grid cols">
+        {q.data.map((c) => (
+          <div key={c.id} className="card card-pad stack">
+            <div className="between">
+              <h3>{c.name}</h3>
+              <Badge tone="accent">{c.role}</Badge>
+            </div>
+            {c.personality && <p className="muted" style={{ fontSize: 13 }}>{c.personality}</p>}
+            {c.look_description && <p className="dim" style={{ fontSize: 12.5 }}>{c.look_description}</p>}
 
-      <Section title="Topics">
-        <button
-          onClick={() => generateTopics.mutate()}
-          disabled={generateTopics.isPending}
-          style={{ marginBottom: 12 }}
-        >
-          {generateTopics.isPending ? "Generating…" : "Generate 5 topics with LLM"}
-        </button>
-        {generateTopics.error && (
-          <div className="muted" style={{ color: "var(--err)", marginBottom: 8 }}>
-            {String(generateTopics.error)}
-          </div>
-        )}
-        {topics.data?.length === 0 && <div className="muted">No topics yet.</div>}
-        {topics.data?.map((t) => (
-          <div className="card" key={t.id}>
-            <div className="row">
-              <div>
-                <div style={{ fontWeight: 600 }}>{t.title}</div>
-                <div className="muted">{t.description ?? "(no description)"}</div>
+            {c.reference_image_keys.length > 0 && (
+              <div className="ref-strip">
+                {c.reference_image_keys.slice(0, 4).map((ref) => (
+                  <img key={ref} src={mediaUrl(`/storage/${ref}`)} alt="" loading="lazy" />
+                ))}
+                {c.reference_image_keys.length > 4 && (
+                  <span className="ref-more">+{c.reference_image_keys.length - 4}</span>
+                )}
               </div>
-              <span className="badge">{t.status}</span>
+            )}
+
+            <div className="btn-row" style={{ marginTop: "auto" }}>
+              <Button size="sm" variant="ghost" onClick={() => setAssetsFor(c)}>
+                <IcImage /> Referencias{c.reference_image_keys.length ? ` (${c.reference_image_keys.length})` : ""}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(c)}><IcEdit /></Button>
+              <Button size="sm" variant="ghost" loading={del.isPending && del.variables === c.id}
+                onClick={() => confirmThen(`¿Borrar a "${c.name}"?`, () => del.mutate(c.id))}><IcTrash /></Button>
             </div>
           </div>
         ))}
-      </Section>
+      </div>
+      )}
 
-      <Section title="Scripts">
-        {scripts.data?.length === 0 && <div className="muted">No scripts yet.</div>}
-        {scripts.data?.map((s) => (
-          <div className="card" key={s.id}>
-            <div className="row">
-              <div>
-                <div style={{ fontWeight: 600 }}>{s.title}</div>
-                <div className="muted">
-                  v{s.version} · {s.scenes.length} scenes
-                </div>
-              </div>
-              <span className="badge">{s.reviewed ? "reviewed" : "draft"}</span>
-            </div>
-          </div>
-        ))}
-      </Section>
-
-      <Section title="Episodes">
-        {episodes.data?.length === 0 && <div className="muted">No episodes yet.</div>}
-        {episodes.data?.map((ep) => (
-          <div className="card" key={ep.id}>
-            <div className="row">
-              <div>
-                <div style={{ fontWeight: 600 }}>
-                  #{ep.number} · {ep.title}
-                </div>
-                <div className="muted">{ep.id}</div>
-              </div>
-              <span
-                className={`badge ${
-                  ep.state === "ready" ? "ok" : ep.state === "failed" ? "err" : ""
-                }`}
-              >
-                {ep.state}
-              </span>
-            </div>
-          </div>
-        ))}
-      </Section>
+      {live && (
+        <CharacterAssetsModal podId={podId} character={live} onClose={() => setAssetsFor(null)} />
+      )}
+      {editing && <EditCharacterModal podId={podId} character={editing} onClose={() => setEditing(null)}
+        onSaved={() => { qc.invalidateQueries({ queryKey: ["chars", podId] }); setEditing(null); }} />}
+      {creating && <CreateCharacterModal podId={podId} onClose={() => setCreating(false)}
+        onSaved={() => { qc.invalidateQueries({ queryKey: ["chars", podId] }); setCreating(false); }} />}
     </>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+const ROLE_OPTIONS: { value: string; label: string }[] = [
+  { value: "protagonist", label: "Protagonista (siempre sale)" },
+  { value: "secondary", label: "Secundario (sale a veces)" },
+  { value: "antagonist", label: "Antagonista" },
+];
+
+// Create a new character in the pod. Role drives the script generator: the
+// protagonist anchors every episode; secondary/antagonist appear only when the
+// LLM decides they fit. Voice/reference images are assigned later (edit/assets).
+function CreateCharacterModal({ podId, onClose, onSaved }: {
+  podId: string; onClose: () => void; onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("secondary");
+  const [personality, setPersonality] = useState("");
+  const [look, setLook] = useState("");
+  const create = useMutation({
+    mutationFn: () => api.post<Character>(`/pods/${podId}/characters`, {
+      name, role, personality: personality || null, look_description: look || null,
+    }),
+    onSuccess: () => { toast.ok("Personaje creado"); onSaved(); },
+    onError: (e) => toast.err("No se pudo crear", (e as Error).message),
+  });
   return (
-    <section style={{ marginBottom: 32 }}>
-      <h3 style={{ marginBottom: 8 }}>{title}</h3>
-      {children}
-    </section>
+    <Modal title="Nuevo personaje" onClose={onClose} footer={<>
+      <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+      <Button variant="primary" loading={create.isPending} disabled={!name.trim()} onClick={() => create.mutate()}>Crear</Button>
+    </>}>
+      <div className="row">
+        <Field label="Nombre"><input className="input" value={name} autoFocus onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Rol">
+          <select className="select" value={role} onChange={(e) => setRole(e.target.value)}>
+            {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </Field>
+      </div>
+      <Field label="Personalidad"><textarea className="textarea" value={personality} placeholder="curioso, valiente, aprende de sus errores…" onChange={(e) => setPersonality(e.target.value)} /></Field>
+      <Field label="Aspecto (look)"><textarea className="textarea" value={look} placeholder="ardilla naranja, casco espacial plateado…" onChange={(e) => setLook(e.target.value)} /></Field>
+    </Modal>
+  );
+}
+
+function EditCharacterModal({ podId, character, onClose, onSaved }: {
+  podId: string; character: Character; onClose: () => void; onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [name, setName] = useState(character.name);
+  const [role, setRole] = useState(character.role);
+  const [personality, setPersonality] = useState(character.personality ?? "");
+  const [look, setLook] = useState(character.look_description ?? "");
+  const [voiceId, setVoiceId] = useState<string>((character.voice as { voice_id?: string } | null)?.voice_id ?? "");
+  const [query, setQuery] = useState("");
+
+  const search = useMutation({
+    mutationFn: () => api.post<VoiceOption[]>(`/pods/${podId}/characters/${character.id}/voices/search`, { query }),
+    onError: (e) => toast.err("No se pudo buscar voces", (e as Error).message),
+  });
+  const save = useMutation({
+    mutationFn: () => api.patch<Character>(`/pods/${podId}/characters/${character.id}`, {
+      name, role, personality: personality || null, look_description: look || null,
+      voice: voiceId ? { voice_id: voiceId } : undefined,
+    }),
+    onSuccess: () => { toast.ok("Personaje actualizado"); onSaved(); },
+    onError: (e) => toast.err("No se pudo guardar", (e as Error).message),
+  });
+
+  return (
+    <Modal title={`Editar · ${character.name}`} onClose={onClose} footer={<>
+      <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+      <Button variant="primary" loading={save.isPending} disabled={!name.trim()} onClick={() => save.mutate()}>Guardar</Button>
+    </>}>
+      <div className="row">
+        <Field label="Nombre"><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Rol">
+          <select className="select" value={ROLE_OPTIONS.some((r) => r.value === role) ? role : "secondary"}
+            onChange={(e) => setRole(e.target.value)}>
+            {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </Field>
+      </div>
+      <Field label="Personalidad"><textarea className="textarea" value={personality} onChange={(e) => setPersonality(e.target.value)} /></Field>
+      <Field label="Aspecto (look)"><textarea className="textarea" value={look} onChange={(e) => setLook(e.target.value)} /></Field>
+
+      <div className="divider" />
+      <Field label="Voz (ElevenLabs)" hint={voiceId ? `Asignada: ${voiceId}` : "Sin voz asignada"}>
+        <div className="btn-row" style={{ marginBottom: 8 }}>
+          <input className="input" placeholder="ID manual (ej. MrYL6RcsgiFzIIWDirbQ)"
+            value={voiceId} onChange={(e) => setVoiceId(e.target.value)} />
+        </div>
+        <div className="btn-row">
+          <input className="input" placeholder="O busca por descripción: niña dulce, épico…"
+            value={query} onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && query.trim().length > 1) search.mutate(); }} />
+          <Button variant="default" loading={search.isPending} disabled={query.trim().length < 2}
+            onClick={() => search.mutate()}><IcSparkles /> Buscar</Button>
+        </div>
+      </Field>
+      {search.data && search.data.length === 0 && <p className="dim" style={{ fontSize: 12.5 }}>Sin resultados — prueba otra descripción.</p>}
+      <div className="stack" style={{ gap: 8 }}>
+        {search.data?.map((v) => (
+          <div key={v.voice_id} className={`voice-row ${v.voice_id === voiceId ? "sel" : ""}`}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{v.name}</div>
+              <div className="dim" style={{ fontSize: 11.5 }}>
+                {[v.gender, v.age, v.accent, v.description].filter(Boolean).join(" · ").slice(0, 70) || "—"}
+              </div>
+            </div>
+            {v.preview_url && <audio src={v.preview_url} controls preload="none" style={{ height: 30 }} />}
+            <Button size="sm" variant={v.voice_id === voiceId ? "mint" : "ghost"}
+              onClick={() => setVoiceId(v.voice_id)}>{v.voice_id === voiceId ? "✓" : "Asignar"}</Button>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+function CharacterAssetsModal({ podId, character, onClose }: {
+  podId: string; character: Character; onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [prompt, setPrompt] = useState("");
+  // Image engine: Gemini/Imagen (default) or Higgsfield's image models.
+  const [engine, setEngine] = useState<"gemini" | "higgsfield">("gemini");
+  const [hfModel, setHfModel] = useState("soul");
+  const base = `/pods/${podId}/characters/${character.id}/references`;
+  const refresh = () => qc.invalidateQueries({ queryKey: ["chars", podId] });
+
+  const uploadM = useMutation({
+    mutationFn: (files: File[]) => api.upload<Character>(base, files),
+    onSuccess: () => { toast.ok("Imágenes subidas"); refresh(); },
+    onError: (e) => toast.err("No se pudo subir", (e as Error).message),
+  });
+  const genM = useMutation({
+    mutationFn: () => api.post<Character>(`${base}/generate`, {
+      prompt,
+      engine,
+      model: engine === "higgsfield" ? hfModel : undefined,
+    }),
+    onSuccess: () => { toast.ok("Imagen generada"); setPrompt(""); refresh(); },
+    onError: (e) => toast.err("No se pudo generar", (e as Error).message),
+  });
+  const delM = useMutation({
+    mutationFn: (ref: string) => api.delete<Character>(`${base}?ref=${encodeURIComponent(ref)}`),
+    onSuccess: () => refresh(),
+    onError: (e) => toast.err("No se pudo borrar", (e as Error).message),
+  });
+  const anchorM = useMutation({
+    mutationFn: () => api.post<{ character: Character; synced: boolean; detail: string }>(
+      `/pods/${podId}/characters/${character.id}/anchor`, {}),
+    onSuccess: (r) => {
+      if (r.synced) toast.ok("Personaje anclado en Higgsfield");
+      else toast.err("Anclaje pendiente", r.detail);
+      refresh();
+    },
+    onError: (e) => toast.err("No se pudo anclar", (e as Error).message),
+  });
+
+  const refs = character.reference_image_keys;
+  const lookPrompt = character.look_description
+    ? `${character.name}, ${character.look_description}`
+    : character.name;
+
+  return (
+    <Modal title={`Assets · ${character.name}`} onClose={onClose} footer={
+      <Button variant="ghost" onClick={onClose}>Cerrar</Button>
+    }>
+      <div className="stack">
+        <div className="between">
+          <span className="eyebrow">Imágenes de referencia</span>
+          <Badge>{refs.length}</Badge>
+        </div>
+
+        {refs.length === 0 ? (
+          <Empty emoji="🖼️" title="Sin referencias">Sube imágenes o genera una con IA para fijar el look del personaje.</Empty>
+        ) : (
+          <div className="asset-grid">
+            {refs.map((ref) => (
+              <figure key={ref} className="asset-cell">
+                <img src={mediaUrl(`/storage/${ref}`)} alt="" loading="lazy" />
+                <button className="asset-del" title="Eliminar"
+                  disabled={delM.isPending && delM.variables === ref}
+                  onClick={() => delM.mutate(ref)}>
+                  <IcTrash />
+                </button>
+              </figure>
+            ))}
+          </div>
+        )}
+
+        <div className="divider" />
+
+        <input ref={fileInput} type="file" accept="image/*" multiple hidden
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            if (files.length) uploadM.mutate(files);
+            e.target.value = "";
+          }} />
+        <div className="btn-row">
+          <Button variant="default" loading={uploadM.isPending} onClick={() => fileInput.current?.click()}>
+            <IcUpload /> Subir imágenes
+          </Button>
+        </div>
+
+        <div className="divider" />
+
+        <Field label="Generar con IA" hint="Describe el aspecto; se añade como referencia">
+          <textarea className="input" rows={2} value={prompt}
+            placeholder={lookPrompt}
+            onChange={(e) => setPrompt(e.target.value)} />
+        </Field>
+        <div className="row" style={{ gap: 8 }}>
+          <Field label="Motor">
+            <select className="select" value={engine}
+              onChange={(e) => setEngine(e.target.value as "gemini" | "higgsfield")}>
+              <option value="gemini">Gemini · Imagen</option>
+              <option value="higgsfield">Higgsfield</option>
+            </select>
+          </Field>
+          {engine === "higgsfield" && (
+            <Field label="Modelo">
+              <select className="select" value={hfModel}
+                onChange={(e) => setHfModel(e.target.value)}>
+                <option value="soul">Soul · fotorrealista (~2 cr)</option>
+                <option value="seedream-v4">Seedream v4 · ilustración (~2 cr)</option>
+                <option value="nano-banana-2">Nano-Banana 2 · ilimitado (exp.)</option>
+              </select>
+            </Field>
+          )}
+        </div>
+        <div className="btn-row">
+          <Button variant="ghost" onClick={() => setPrompt(lookPrompt)}><IcWand /> Usar descripción</Button>
+          <Button variant="primary" loading={genM.isPending}
+            disabled={prompt.trim().length < 3}
+            onClick={() => genM.mutate()}>
+            <IcSparkles /> Generar
+          </Button>
+        </div>
+
+        <div className="divider" />
+
+        <div className="between">
+          <span className="eyebrow">Anclaje Higgsfield</span>
+          {character.higgsfield_ref_id
+            ? <Badge>{character.higgsfield_ref_kind ?? "element"}</Badge>
+            : <span className="dim" style={{ fontSize: 11.5 }}>sin anclar</span>}
+        </div>
+        <p className="dim" style={{ fontSize: 12 }}>
+          Entrena un «Soul» de Higgsfield (identidad reutilizable, ~10 min) a partir
+          de sus imágenes de referencia. Necesita 3 o más imágenes.
+        </p>
+        <div className="btn-row">
+          <Button variant="default" loading={anchorM.isPending}
+            disabled={refs.length === 0}
+            onClick={() => anchorM.mutate()}>
+            <IcSparkles /> {character.higgsfield_ref_id ? "Re-sincronizar" : "Anclar en Higgsfield"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------- Config (series context + universe memory + legacy files)
+function ConfigTab({ podId, pod }: { podId: string; pod: Pod }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [seriesCtx, setSeriesCtx] = useState(pod.config.series_context ?? "");
+  const [univMem, setUnivMem] = useState(pod.config.universe_memory ?? "");
+  const overrides = (pod.config.extra?.script_overrides ?? {}) as Record<string, string>;
+  const [storySuffix, setStorySuffix] = useState(overrides.prompt_story_suffix ?? "");
+  const [scriptSuffix, setScriptSuffix] = useState(overrides.prompt_suffix ?? "");
+  const [defaultAccounts, setDefaultAccounts] = useState<string[]>(() => {
+    const v = pod.config.extra?.publishing_accounts;
+    return Array.isArray(v) ? (v as string[]) : [];
+  });
+
+  const appCfg = useQuery<AppConfig>({ queryKey: ["app-config"], queryFn: getAppConfig });
+  const channelsEnabled = appCfg.data?.channels_feature_enabled ?? false;
+  const channels = useQuery<Channel[]>({
+    queryKey: ["channels"], queryFn: listChannels, enabled: channelsEnabled,
+  });
+
+  const save = useMutation({
+    mutationFn: () => api.put<Pod>(`/pods/${podId}/config`, {
+      config: {
+        ...pod.config,
+        series_context: seriesCtx || null,
+        universe_memory: univMem || null,
+        extra: {
+          ...pod.config.extra,
+          publishing_accounts: defaultAccounts,
+          script_overrides: {
+            ...overrides,
+            prompt_story_suffix: storySuffix || undefined,
+            prompt_suffix: scriptSuffix || undefined,
+          },
+        },
+      },
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["pod", podId] }); toast.ok("Guardado"); },
+    onError: (e) => toast.err("No se pudo guardar", (e as Error).message),
+  });
+
+  const files = useQuery<{ files: string[] }>({
+    queryKey: ["pod-files", podId], queryFn: () => api.get(`/pods/${podId}/files`),
+  });
+  const list = files.data?.files ?? [];
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const currentFile = activeFile ?? list[0] ?? null;
+
+  return (
+    <div className="stack">
+      <div className="field">
+        <label>Contexto de la serie</label>
+        <span className="hint">Descripción larga de la serie — se inyecta en cada guión</span>
+        <textarea
+          className="input" rows={5} value={seriesCtx}
+          onChange={(e) => setSeriesCtx(e.target.value)}
+          style={{ resize: "vertical", fontFamily: "inherit" }}
+          placeholder="Describe el arco narrativo, el tono y el propósito de la serie…"
+        />
+      </div>
+      <div className="field">
+        <label>Memoria del universo</label>
+        <span className="hint">Resumen acumulado de episodios pasados — mantenido automáticamente, editable</span>
+        <textarea
+          className="input" rows={8} value={univMem}
+          onChange={(e) => setUnivMem(e.target.value)}
+          style={{ resize: "vertical", fontFamily: "inherit" }}
+          placeholder="Ningún episodio registrado aún."
+        />
+      </div>
+      {channelsEnabled && (
+        <div className="field">
+          <label>Canales por defecto</label>
+          <span className="hint">Cuentas preseleccionadas al publicar episodios/shorts de este pod</span>
+          {(channels.data ?? []).length === 0 ? (
+            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+              No hay cuentas conectadas. Conéctalas en <strong>Canales</strong>.
+            </p>
+          ) : (
+            <div className="stack" style={{ gap: 6 }}>
+              {(channels.data ?? []).map((a) => (
+                <label key={a.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={defaultAccounts.includes(a.id)}
+                    onChange={(e) => setDefaultAccounts((s) =>
+                      e.target.checked ? [...s, a.id] : s.filter((x) => x !== a.id))}
+                  />
+                  <span>{a.display_name} <span className="muted">· {a.platform}</span></span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <div className="btn-row" style={{ justifyContent: "flex-end" }}>
+        <Button variant="mint" size="sm" loading={save.isPending} onClick={() => save.mutate()}>
+          Guardar
+        </Button>
+      </div>
+
+      <details style={{ marginTop: 8 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+          Estructura del guión
+        </summary>
+        <div style={{ marginTop: 8, overflowX: "auto" }}>
+          <table className="mini-table" style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid var(--c-border)" }}>Campo</th>
+                <th style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid var(--c-border)" }}>Tipo</th>
+                <th style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid var(--c-border)" }}>Valores</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["visual_prompt", "string", "Descripción visual en inglés"],
+                ["audio_text", "string", "Diálogo/narración en idioma del pod"],
+                ["duration_seconds", "number", "4–max_clip_seconds"],
+                ["transition_to_next", "enum", "continue, cut, scene_change"],
+                ["camera.shot_type", "enum", "wide, medium, close-up, extreme_close_up, aerial, over_the_shoulder"],
+                ["camera.movement", "enum", "static, pan_left, pan_right, tracking, dolly_in, dolly_out, crane_up"],
+                ["camera.angle", "enum", "eye_level, low_angle, high_angle, bird_eye, dutch_angle"],
+                ["mood", "enum", "warm, tense, joyful, mysterious, triumphant, calm, exciting"],
+                ["lighting", "enum", "golden_hour, soft_diffused, dramatic_shadows, bright_daylight, moonlit"],
+                ["character", "string", "Nombre exacto del personaje"],
+                ["narrative_phase", "enum", "introduction, establishing, rising_action, climax, falling_action, resolution, transition"],
+              ].map(([campo, tipo, valores]) => (
+                <tr key={campo}>
+                  <td style={{ padding: "3px 8px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{campo}</td>
+                  <td style={{ padding: "3px 8px", opacity: 0.7 }}>{tipo}</td>
+                  <td style={{ padding: "3px 8px", fontSize: 11 }}>{valores}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="stack" style={{ marginTop: 12, gap: 10 }}>
+          <div className="field">
+            <label style={{ fontSize: 13 }}>Instrucciones extra para la historia</label>
+            <span className="hint">Se añaden al prompt de WriteStory (narración)</span>
+            <textarea
+              className="input" rows={3} value={storySuffix}
+              onChange={(e) => setStorySuffix(e.target.value)}
+              style={{ resize: "vertical", fontFamily: "inherit", fontSize: 13 }}
+              placeholder="Ej: No menciones marcas reales. Usa metáforas con animales."
+            />
+          </div>
+          <div className="field">
+            <label style={{ fontSize: 13 }}>Instrucciones extra para el guión</label>
+            <span className="hint">Se añaden al prompt de GenerateScript (escenas + cámara)</span>
+            <textarea
+              className="input" rows={3} value={scriptSuffix}
+              onChange={(e) => setScriptSuffix(e.target.value)}
+              style={{ resize: "vertical", fontFamily: "inherit", fontSize: 13 }}
+              placeholder="Ej: Máximo 3 continues seguidos. Prefiere planos medios."
+            />
+          </div>
+        </div>
+      </details>
+
+      {list.length > 0 && (
+        <div className="stack" style={{ marginTop: 16 }}>
+          <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+            <IcFile /> Archivos JSON heredados
+          </p>
+          <div className="file-pills">
+            {list.map((f) => (
+              <button key={f} className={f === currentFile ? "on" : ""} onClick={() => setActiveFile(f)}>{f}</button>
+            ))}
+          </div>
+          {currentFile && (
+            <div className="card card-pad">
+              <JsonEditor
+                key={currentFile}
+                getPath={`/pods/${podId}/files/${currentFile}`}
+                putPath={`/pods/${podId}/files/${currentFile}`}
+                queryKey={["pod-file", podId, currentFile]}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Settings
+const STYLES = ["cinematic_3d", "kids_3d", "anime_2d", "photoreal_doc", "talking_head_avatar", "stock_montage"];
+
+function SettingsTab({ pod }: { pod: Pod }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [cfg, setCfg] = useState(pod.config);
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [jsonText, setJsonText] = useState(JSON.stringify(pod.config, null, 2));
+  const providers = useQuery<string[]>({ queryKey: ["providers"], queryFn: () => api.get("/providers") });
+  const save = useMutation({
+    mutationFn: (newCfg?: any) => api.put<Pod>(`/pods/${pod.id}/config`, { config: newCfg || cfg }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pod", pod.id] });
+      qc.invalidateQueries({ queryKey: ["pods"] });
+      toast.ok("Ajustes guardados");
+    },
+    onError: (e) => toast.err("No se pudo guardar", (e as Error).message),
+  });
+  const set = <K extends keyof typeof cfg>(k: K, v: (typeof cfg)[K]) => setCfg({ ...cfg, [k]: v });
+
+  const toggleMode = () => {
+    if (!advancedMode) {
+      setJsonText(JSON.stringify(cfg, null, 2));
+    } else {
+      try {
+        const parsed = JSON.parse(jsonText);
+        setCfg(parsed);
+      } catch (e) {
+        // If JSON is invalid, don't update cfg
+      }
+    }
+    setAdvancedMode(!advancedMode);
+  };
+
+  const handleSaveJson = () => {
+    try {
+      const parsed = JSON.parse(jsonText);
+      setCfg(parsed);
+      save.mutate(parsed);
+    } catch (e) {
+      toast.err("JSON inválido", "No se puede guardar un formato incorrecto");
+    }
+  };
+
+  return (
+    <div className="card card-pad" style={{ maxWidth: 720 }}>
+      <div className="between" style={{ marginBottom: 16 }}>
+        <span className="eyebrow">Configuración del pod</span>
+        <button className="text-btn" onClick={toggleMode}>
+          {advancedMode ? "Volver a vista normal" : "Modo Avanzado (JSON)"}
+        </button>
+      </div>
+
+      {advancedMode ? (
+        <div className="stack">
+          <textarea
+            className="input mono json-editor"
+            style={{ minHeight: 400 }}
+            spellCheck={false}
+            value={jsonText}
+            onChange={(e) => setJsonText(e.target.value)}
+          />
+          <div className="btn-row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+            <Button variant="primary" loading={save.isPending} onClick={handleSaveJson}>Guardar JSON</Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="row">
+            <Field label="Nombre de la serie"><input className="input" value={cfg.series_name} onChange={(e) => set("series_name", e.target.value)} /></Field>
+            <Field label="Idioma"><input className="input" value={cfg.language} onChange={(e) => set("language", e.target.value)} /></Field>
+          </div>
+          <div className="row">
+            <Field label="Audiencia"><input className="input" value={cfg.target_audience} onChange={(e) => set("target_audience", e.target.value)} /></Field>
+            <Field label="Duración (s)"><input className="input" type="number" value={cfg.duration_seconds} onChange={(e) => set("duration_seconds", Number(e.target.value))} /></Field>
+          </div>
+          <div className="row">
+            <Field label="Duración máx. por clip (s)" hint="Tope por escena (Veo=8). Otros motores pueden más">
+              <input className="input" type="number" value={cfg.max_clip_seconds} onChange={(e) => set("max_clip_seconds", Number(e.target.value))} />
+            </Field>
+            <Field label="Preguntas al público" hint="0 = ninguna. Para contenido infantil/educativo">
+              <input className="input" type="number" min={0} value={cfg.interactive_questions} onChange={(e) => set("interactive_questions", Number(e.target.value))} />
+            </Field>
+          </div>
+          <div className="row">
+            <Field label="Voz narrativa" hint="Cómo se dirige al público (arregla a Tico/Piña: presentador 4ª pared)">
+              <select className="select" value={cfg.narration_style ?? "fourth_wall"} onChange={(e) => set("narration_style", e.target.value as NarrationStyle)}>
+                <option value="fourth_wall">Presentador (rompe 4ª pared)</option>
+                <option value="immersive">Inmersivo (personajes entre sí)</option>
+                <option value="voiceover">Voz en off (narrador)</option>
+              </select>
+            </Field>
+            <Field label="Dónde narra" hint="Piña: 'En la acción' = en el espacio, no en la Tierra con pizarra">
+              <select className="select" value={cfg.setting_mode ?? "in_scene"} onChange={(e) => set("setting_mode", e.target.value as SettingMode)}>
+                <option value="in_scene">En la acción (p.ej. en el espacio)</option>
+                <option value="framing_device">Plató/aula (marco fijo)</option>
+              </select>
+            </Field>
+          </div>
+          <div className="row">
+            <Field label="Estilo visual">
+              <select className="select" value={cfg.style_profile} onChange={(e) => set("style_profile", e.target.value)}>
+                {STYLES.map((s) => <option key={s} value={s}>{prettyStyle(s)}</option>)}
+              </select>
+            </Field>
+            <Field label="Proveedor de vídeo por defecto" hint="Se puede sobreescribir por episodio">
+              <select className="select" value={cfg.provider_preferences?.primary ?? ""}
+                onChange={(e) => set("provider_preferences", { ...cfg.provider_preferences, primary: e.target.value })}>
+                <option value="">(automático según estilo)</option>
+                {(providers.data ?? []).map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </Field>
+          </div>
+          <Field label="Estilo de arte (texto libre)"><input className="input" value={cfg.art_style ?? ""} onChange={(e) => set("art_style", e.target.value || null)} /></Field>
+          <Field label="Contexto de la serie"><textarea className="textarea" value={cfg.series_context ?? ""} onChange={(e) => set("series_context", e.target.value || null)} /></Field>
+          <div className="btn-row" style={{ justifyContent: "flex-end" }}>
+            <Button variant="primary" loading={save.isPending} onClick={() => save.mutate(cfg)}>Guardar cambios</Button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

@@ -11,10 +11,19 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from videocreator.domain.value_objects import (
+    AccountStatus,
+    BanditPolicy,
+    CharacterMode,
+    ContentType,
     EpisodeState,
     JobKind,
     JobState,
+    NarrationStyle,
     ProviderPreferences,
+    PublishPlatform,
+    PublishStatus,
+    RecreationState,
+    SettingMode,
     StyleProfile,
     TopicStatus,
     TransitionType,
@@ -25,8 +34,12 @@ from videocreator.shared.ids import (
     EpisodeId,
     JobId,
     PodId,
+    PublishAccountId,
+    PublishJobId,
+    RecreationId,
     SceneId,
     ScriptId,
+    SeoId,
     ShortId,
     TopicId,
     UserId,
@@ -47,6 +60,10 @@ class Character(BaseModel):
     reference_image_keys: list[str] = Field(default_factory=list)
     wardrobe: list[str] = Field(default_factory=list)
     props: list[str] = Field(default_factory=list)
+    #: Higgsfield anchor mapping — the reusable identity this character is bound
+    #: to on Higgsfield (an "element" or trained "soul"). None until synced.
+    higgsfield_ref_id: str | None = None
+    higgsfield_ref_kind: str | None = None  # "element" | "soul"
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -61,9 +78,35 @@ class PodConfig(BaseModel):
     language: str = "es"
     art_style: str | None = None
     style_profile: StyleProfile = StyleProfile.CINEMATIC_3D
+    # What kind of series this pod produces (story/meme/recreation/educational).
+    # Derives the duration + generation + character strategy via content_profile().
+    content_type: ContentType = ContentType.STORY
+    # How characters appear (reference images / none / narrator picture-in-picture
+    # / scene-native for V2V). Chosen in the wizard within the type's allowed set.
+    character_mode: CharacterMode = CharacterMode.REFERENCE
     duration_seconds: int = 120
+    # Maximum length of a single generated clip/scene, in seconds. Drives the
+    # scene-count maths and the pacing instructions in the script prompt. The
+    # default (8s) matches Veo's per-clip ceiling; LTX/other engines may differ,
+    # so it is configurable per pod instead of hardcoded (regression #5).
+    max_clip_seconds: int = 8
+    # How many direct questions to the audience the script should weave into the
+    # dialogue (0 = none). Kids/educational pods set this >0 to address the
+    # viewer ("¿Qué creéis que pasará?"); restores legacy behavior (regression #1).
+    interactive_questions: int = 0
+    # How the show addresses the viewer (4th-wall host / immersive / voiceover)
+    # and where it narrates (in the action's setting vs. a host framing device).
+    # Chosen in the wizard; the script generator honors them instead of forcing
+    # 4th-wall on every pod. Defaults match the legacy behavior AND the Tico/Piña
+    # presenter format, so existing pods are corrected on load with no migration.
+    narration_style: NarrationStyle = NarrationStyle.FOURTH_WALL
+    setting_mode: SettingMode = SettingMode.IN_SCENE
     provider_preferences: ProviderPreferences = Field(default_factory=ProviderPreferences)
     series_context: str | None = None
+    # Accumulated narrative memory — summaries of past episodes injected into
+    # each new script prompt so the LLM maintains continuity across the series.
+    # Appended automatically by GenerateScript; editable via PATCH /pods/{id}.
+    universe_memory: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -107,6 +150,9 @@ class Scene(BaseModel):
     camera_angle: str | None = None
     clip_storage_key: str | None = None
     rendered: bool = False
+    # Original engine-shaped scene data (character, voice_direction, mood,
+    # lighting, narrative_phase…) preserved so a render reproduces it faithfully.
+    raw: dict[str, Any] = Field(default_factory=dict)
 
 
 class Script(BaseModel):
@@ -118,6 +164,11 @@ class Script(BaseModel):
     version: int = 1
     title: str
     summary: str | None = None
+    # Educational lesson of the episode — used in universe_memory and SEO copy.
+    moral: str | None = None
+    # Music/ambient audio prompt for the episode — can be used to generate
+    # background music that matches the episode's mood.
+    ambient_audio_prompt: str | None = None
     scenes: list[Scene] = Field(default_factory=list)
     reviewed: bool = False
     created_at: datetime = Field(default_factory=utcnow)
@@ -136,6 +187,13 @@ class Episode(BaseModel):
     final_video_key: str | None = None
     dubbed_video_key: str | None = None
     youtube_video_id: str | None = None
+    # Per-episode render overrides — when None the pod's provider_preferences win.
+    # The list of selectable values is served by GET /providers.
+    video_provider: str | None = None
+    video_model: str | None = None
+    # Free-form bag for adapter-specific data (e.g. filesystem-pod provenance:
+    # {"media_pod": "kids_story", "media_dir": "ep_001_…"}).
+    extra: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -152,6 +210,30 @@ class Short(BaseModel):
     rendered_video_key: str | None = None
     target_platform: Literal["tiktok", "reels", "shorts"] = "shorts"
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class SeoMetadata(BaseModel):
+    """LLM-generated publishing metadata + the bandit that optimizes its title.
+
+    A video (episode) gets several candidate titles; `policy` is the LinUCB
+    state that learns which one performs best from observed engagement, while
+    `selected_title` caches the latest recommendation for display. Description,
+    tags and hashtags round out the publish payload for the target platform.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: SeoId
+    pod_id: PodId
+    episode_id: EpisodeId
+    description: str = ""
+    tags: list[str] = Field(default_factory=list)
+    hashtags: list[str] = Field(default_factory=list)
+    title_variants: list[str] = Field(default_factory=list)
+    policy: BanditPolicy | None = None
+    selected_title: str | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
 
 class Job(BaseModel):
@@ -200,6 +282,69 @@ class User(BaseModel):
     email: str
     role: Literal["admin", "creator", "viewer"] = "creator"
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class Recreation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: RecreationId
+    owner_id: UserId
+    state: RecreationState = RecreationState.DRAFT
+    run_id: str | None = None
+    title: str
+    original: str
+    niche: str = "general"
+    twist: str
+    v2v_prompt: str
+    beats: list[dict[str, Any]] = Field(default_factory=list)
+    audio_note: str = ""
+    reference_description: str = ""
+    fair_use: dict[str, Any] = Field(default_factory=dict)
+    provider: str | None = None
+    model: str | None = None
+    #: Opaque id (minted by the Alternate-Ending ingest endpoints) of a real
+    #: clip ingested for this recreation. When set and the file is still on
+    #: disk, `run_recreation` edits THAT footage through `video_to_video`
+    #: (e.g. Gemini Omni Flash) instead of generating a clip from scratch.
+    source_id: str | None = None
+    result: dict[str, Any] | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class PublishAccount(BaseModel):
+    """A connected social account a user can publish to."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: PublishAccountId
+    user_id: UserId
+    platform: PublishPlatform
+    display_name: str = ""
+    handle: str | None = None
+    status: AccountStatus = AccountStatus.CONNECTED
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class PublishJob(BaseModel):
+    """One upload of an episode/short to one account, optionally scheduled."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: PublishJobId
+    user_id: UserId
+    account_id: PublishAccountId
+    platform: PublishPlatform
+    source: Literal["episode", "short"]
+    source_id: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    scheduled_at: datetime | None = None
+    status: PublishStatus = PublishStatus.PENDING
+    result_url: str | None = None
+    error: str | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
 
 LOCAL_USER_ID = UserId("usr_LOCAL000000000000000000")

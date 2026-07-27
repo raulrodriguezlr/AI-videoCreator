@@ -1,0 +1,15 @@
+{
+  "id": "multiply-full",
+  "name": "Multiplication matrix (local)",
+  "description": "One master episode into carousel and thread using local resources. No generative AI.",
+  "tags": ["multiply", "publish"],
+  "preview": null,
+  "dag": {
+    "nodes": [
+      {"id": "master", "capability": "load_master", "params": {}},
+      {"id": "carousel-slides", "capability": "llm_text", "params": {"task": "carousel_slides"}, "depends_on": ["master"]},
+      {"id": "carousel-render", "capability": "carousel_render", "params": {}, "depends_on": ["carousel-slides"]},
+      {"id": "thread", "capability": "llm_text", "params": {"task": "thread"}, "depends_on": ["master"]}
+    ]
+  }
+}

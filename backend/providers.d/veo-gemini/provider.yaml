@@ -1,0 +1,23 @@
+id: veo-gemini
+name: Google Veo 3.1 (Gemini API)
+version: "1.0.0"
+description: Veo text-to-video via the Gemini API (ai.google.dev) — preview model ids.
+capabilities:
+  - text_to_video
+models:
+  - id: veo-3.1-generate-preview
+    family: veo
+    capabilities: [text_to_video]
+    max_duration_s: 8
+    max_resolution: [1920, 1080]
+    cost: { per_second_usd: 0.40, per_request_usd: 0.0, currency: USD }
+    latency: { p50_s: 90.0, p95_s: 300.0, timeout_s: 600.0 }
+    strengths: [native audio, dialogue, overall quality]
+cost: { per_second_usd: 0.40, per_request_usd: 0.0, currency: USD }
+latency: { p50_s: 90.0, p95_s: 300.0, timeout_s: 600.0 }
+auth:
+  vault_key: google_api_key
+adapter:
+  type: python
+  entrypoint: adapter.py
+tags: [cloud, video, premium]

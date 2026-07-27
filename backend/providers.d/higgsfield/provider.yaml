@@ -1,0 +1,196 @@
+id: higgsfield
+name: Higgsfield AI
+version: "2.0.0"
+description: >-
+  Higgsfield multi-model hub, credit-billed. Two backends: the official API
+  (platform.higgsfield.ai — documented, stable: DoP, Soul, Seedance v1, Kling
+  v2.1, Gemini Omni Flash) and an opt-in WEB backend (cloud.higgsfield.ai — the
+  full hub: Wan 2.6, Seedance 2.0, Kling 3.0, Veo, Sora; reverse-engineered,
+  undocumented, may break). `backend: web` models are EXPERIMENTAL. Credit
+  costs are APPROXIMATE (Plus plan, ~5s clip / ~8s edit for Omni, 2026-06) —
+  verify in your dashboard and edit here.
+capabilities:
+  - text_to_video
+  - image_to_video
+  - video_to_video
+  - text_to_image
+cost: { per_second_usd: 0.0, per_request_usd: 0.0, credits: 7.0, currency: USD }
+latency: { p50_s: 60.0, p95_s: 240.0, timeout_s: 600.0 }
+auth:
+  vault_key: higgsfield_credentials
+  header: Authorization
+  prefix: Key
+adapter:
+  type: python
+  entrypoint: adapter.py
+tags: [cloud, video, subscription, multi-model]
+models:
+  # ======================================================================
+  # OFFICIAL API (platform.higgsfield.ai) — documented, stable
+  # ======================================================================
+  - id: dop-standard
+    family: dop
+    capabilities: [text_to_video, image_to_video]
+    endpoint: higgsfield-ai/dop/standard
+    backend: api
+    max_duration_s: 5
+    max_resolution: [1920, 1080]
+    cost: { credits: 12.0, currency: USD }
+    strengths: [cinematic camera control, high quality, motion presets]
+    good_for: [cinematic, realistic, animation_3d]
+  - id: dop-preview
+    family: dop
+    capabilities: [text_to_video, image_to_video]
+    endpoint: higgsfield-ai/dop/preview
+    backend: api
+    max_duration_s: 5
+    max_resolution: [1280, 720]
+    cost: { credits: 6.0, currency: USD }
+    strengths: [fast, cheap drafts, motion presets]
+    good_for: [quick_draft, cinematic]
+  - id: seedance-v1-pro
+    family: seedance
+    capabilities: [image_to_video]
+    endpoint: bytedance/seedance/v1/pro/image-to-video
+    cli_type: seedance1_5
+    backend: api
+    max_duration_s: 5
+    max_resolution: [1920, 1080]
+    cost: { credits: 18.0, currency: USD }
+    strengths: [character consistency, animation, image-to-video]
+    good_for: [animation_3d, animation_2d, cinematic]
+  - id: kling-v2.1-pro
+    family: kling
+    capabilities: [image_to_video]
+    endpoint: kling-video/v2.1/pro/image-to-video
+    cli_type: kling2_6
+    backend: api
+    max_duration_s: 5
+    max_resolution: [1920, 1080]
+    cost: { credits: 15.0, currency: USD }
+    strengths: [motion physics, image-to-video, 1080p]
+    good_for: [realistic, animation_3d]
+  - id: soul
+    family: soul
+    capabilities: [text_to_image]
+    endpoint: higgsfield-ai/soul/standard
+    cli_type: text2image_soul_v2
+    backend: api
+    cost: { credits: 2.0, currency: USD }
+    strengths: [photoreal stills, character frames]
+    good_for: [realistic]
+  - id: seedream-v4
+    family: seedream
+    capabilities: [text_to_image]
+    endpoint: bytedance/seedream/v4/text-to-image
+    cli_type: seedream_v4_5
+    backend: api
+    cost: { credits: 2.0, currency: USD }
+    strengths: [stylized stills, illustration]
+    good_for: [animation_2d, animation_3d]
+  - id: gemini-omni-flash
+    family: omni
+    capabilities: [video_to_video, image_to_video, text_to_video]
+    endpoint: gemini-omni
+    cli_type: gemini_omni
+    backend: api
+    max_duration_s: 10
+    valid_durations: [4, 6, 8, 10]
+    max_resolution: [1280, 720]
+    cost: { credits: 10.0, currency: USD }
+    strengths: [video editing, keeps original footage, scene manipulation]
+    good_for: [recreation, alternate_ending, magic_edit]
+  # ======================================================================
+  # WEB BACKEND (cloud.higgsfield.ai) — EXPERIMENTAL, undocumented
+  # ======================================================================
+  - id: wan-2.6
+    family: wan
+    capabilities: [text_to_video, image_to_video]
+    endpoint: wan2-6
+    cli_type: wan2_6
+    backend: web
+    max_duration_s: 15
+    max_resolution: [1920, 1080]
+    cost: { credits: 7.0, currency: USD }
+    strengths: [native audio, lip-sync, long clips up to 15s, very cheap]
+    good_for: [animation_3d, animation_2d, talking_head]
+  - id: kling-3.0
+    family: kling
+    capabilities: [text_to_video, image_to_video]
+    endpoint: kling3
+    cli_type: kling3_0
+    backend: web
+    max_duration_s: 15
+    max_resolution: [1920, 1080]
+    cost: { credits: 9.0, currency: USD }
+    strengths: [strong motion physics, 1080p, character consistency, up to 15s]
+    good_for: [realistic, animation_3d]
+  - id: seedance-2.0-fast
+    family: seedance
+    capabilities: [text_to_video, image_to_video]
+    endpoint: seedance2-fast
+    cli_type: seedance_2_0
+    backend: web
+    max_duration_s: 5
+    max_resolution: [1280, 720]
+    cost: { credits: 18.0, currency: USD }
+    strengths: [character consistency, mass production, artistic prompts]
+    good_for: [animation_3d, animation_2d]
+  - id: seedance-2.0
+    family: seedance
+    capabilities: [text_to_video, image_to_video]
+    endpoint: seedance2
+    cli_type: seedance_2_0
+    backend: web
+    max_duration_s: 15
+    max_resolution: [1920, 1080]
+    cost: { credits: 23.0, currency: USD }
+    strengths: [Pixar-grade lighting, hero shots, cloth/hair detail, up to 15s]
+    good_for: [cinematic, animation_3d]
+  - id: veo-3.1
+    family: veo
+    capabilities: [text_to_video, image_to_video]
+    endpoint: veo3
+    cli_type: veo3_1
+    backend: web
+    max_duration_s: 8
+    valid_durations: [4, 6, 8]
+    max_resolution: [1920, 1080]
+    cost: { credits: 55.0, currency: USD }
+    strengths: [native audio, dialogue, photoreal]
+    good_for: [realistic, cinematic]
+    copyright_strict: true
+  - id: sora-2
+    family: sora
+    capabilities: [text_to_video, image_to_video]
+    endpoint: sora2-video
+    backend: web
+    max_duration_s: 12
+    valid_durations: [4, 8, 12]
+    max_resolution: [1920, 1080]
+    cost: { credits: 55.0, currency: USD }
+    strengths: [photoreal, world physics]
+    good_for: [realistic, cinematic]
+    copyright_strict: true
+  - id: soul-v2
+    family: soul
+    capabilities: [text_to_video, image_to_video]
+    endpoint: soul-v2
+    cli_type: soul_cast
+    backend: web
+    max_duration_s: 5
+    max_resolution: [1280, 720]
+    cost: { credits: 0.0, currency: USD }
+    strengths: [fast motion tests, unlimited on Plus]
+    good_for: [quick_draft]
+    unlimited: true
+  - id: nano-banana-2
+    family: nano-banana
+    capabilities: [text_to_image]
+    endpoint: nano-banana-2
+    cli_type: nano_banana_2
+    backend: web
+    cost: { credits: 0.0, currency: USD }
+    strengths: [Disney character sheets, turnarounds, unlimited on Plus]
+    good_for: [animation_3d, animation_2d]
+    unlimited: true

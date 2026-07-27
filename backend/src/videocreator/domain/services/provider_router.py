@@ -21,12 +21,12 @@ from videocreator.domain.value_objects import (
 _STYLE_DEFAULTS: dict[StyleProfile, ProviderSelection] = {
     StyleProfile.CINEMATIC_3D: ProviderSelection(
         provider="artlist",
-        fallback_chain=("veo", "ltx"),
+        fallback_chain=("veo", "ltx_desktop"),
         model_hints=("kling-3.0", "veo-2"),
     ),
     StyleProfile.ANIME_2D: ProviderSelection(
         provider="artlist",
-        fallback_chain=("ltx",),
+        fallback_chain=("ltx_desktop",),
         model_hints=("pixverse-v3",),
     ),
     StyleProfile.PHOTOREAL_DOC: ProviderSelection(
@@ -42,18 +42,18 @@ _STYLE_DEFAULTS: dict[StyleProfile, ProviderSelection] = {
     ),
     StyleProfile.STOCK_MONTAGE: ProviderSelection(
         provider="artlist",
-        fallback_chain=("ltx",),
+        fallback_chain=("ltx_desktop",),
         model_hints=("minimax-hailuo",),
         params={"prefer_cheapest": True},
     ),
     StyleProfile.KIDS_3D: ProviderSelection(
         provider="artlist",
-        fallback_chain=("veo", "ltx"),
+        fallback_chain=("veo", "ltx_desktop"),
         model_hints=("kling-3.0",),
     ),
 }
 
-_FALLBACK_SELECTION = ProviderSelection(provider="veo", fallback_chain=("ltx",))
+_FALLBACK_SELECTION = ProviderSelection(provider="veo", fallback_chain=("ltx_desktop",))
 
 
 class ProviderRouter:

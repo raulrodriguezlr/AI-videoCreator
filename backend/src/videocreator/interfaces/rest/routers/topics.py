@@ -1,14 +1,15 @@
 """Topic endpoints — list + LLM-driven generation."""
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 
 from videocreator.interfaces.rest.deps import UseCasesDep, UserIdDep
 from videocreator.interfaces.rest.schemas import (
     GenerateTopicsRequest,
     TopicResponse,
+    UpdateTopicRequest,
 )
-from videocreator.shared.ids import PodId
+from videocreator.shared.ids import PodId, TopicId
 
 router = APIRouter(prefix="/pods/{pod_id}/topics", tags=["topics"])
 
@@ -37,8 +38,33 @@ async def generate_topics(
 ) -> list[TopicResponse]:
     topics = await uc.topics.generate.execute(
         pod_id=PodId(pod_id), requester_id=user_id, count=body.count,
+        use_trends=body.use_trends,
     )
     return [_to_response(t) for t in topics]
+
+
+@router.patch("/{topic_id}", response_model=TopicResponse, summary="Edit a topic")
+async def update_topic(
+    pod_id: str, topic_id: str, body: UpdateTopicRequest,
+    uc: UseCasesDep, user_id: UserIdDep,
+) -> TopicResponse:
+    del pod_id
+    topic = await uc.topics.update.execute(
+        topic_id=TopicId(topic_id), requester_id=user_id,
+        title=body.title, description=body.description,
+        educational_value=body.educational_value, status=body.status,
+    )
+    return _to_response(topic)
+
+
+@router.delete(
+    "/{topic_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a topic",
+)
+async def delete_topic(
+    pod_id: str, topic_id: str, uc: UseCasesDep, user_id: UserIdDep,
+) -> None:
+    del pod_id
+    await uc.topics.delete.execute(topic_id=TopicId(topic_id), requester_id=user_id)
 
 
 __all__ = ["router"]

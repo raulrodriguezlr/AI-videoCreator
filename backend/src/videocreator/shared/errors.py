@@ -78,6 +78,20 @@ class ProviderSafetyError(ProviderError):
     error_code = "provider_safety_rejected"
 
 
+class TransientProviderError(ProviderError):
+    """Retryable provider failure (network blip, 5xx, rate limit)."""
+
+    http_status = 502
+    error_code = "provider_transient"
+
+
+class AllProvidersFailedError(ProviderError):
+    """Every provider in the fallback chain failed."""
+
+    http_status = 502
+    error_code = "all_providers_failed"
+
+
 class ProviderTimeoutError(ProviderError):
     """Provider job did not complete within the allotted polling window."""
 
@@ -124,5 +138,25 @@ class JobNotFound(NotFoundError):
     error_code = "job_not_found"
 
 
+class ScriptNotFound(NotFoundError):
+    error_code = "script_not_found"
+
+
+class ShortNotFound(NotFoundError):
+    error_code = "short_not_found"
+
+
+class SeoMetadataNotFound(NotFoundError):
+    error_code = "seo_metadata_not_found"
+
+
 class InvalidScript(ValidationError):
     error_code = "invalid_script"
+
+
+# --- Higgsfield specific ---
+class HiggsfieldNeedsAuthError(ProviderError):
+    """higgsfield CLI requires auth — user must run `hf auth login`."""
+
+    http_status = 401
+    error_code = "higgsfield_needs_auth"

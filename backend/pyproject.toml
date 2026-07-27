@@ -15,6 +15,7 @@ dependencies = [
     # web framework
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",  # multipart/form-data uploads (reference images)
     "pydantic>=2.6.0",
     "pydantic-settings>=2.2.0",
     # cli
@@ -22,13 +23,13 @@ dependencies = [
     # async db
     "sqlalchemy[asyncio]>=2.0.30",
     "aiosqlite>=0.20.0",
-    "alembic>=1.13.0",
+    "asyncpg>=0.29.0",  # Postgres driver for server mode (postgresql+asyncpg)
     # http + utils
     "httpx>=0.27.0",
+    "psutil>=5.9.0",  # discover the LTX-Desktop backend (port+token) + job process mgmt
     "python-dotenv>=1.0.0",
     "structlog>=24.1.0",
-    "rich>=13.7.0",
-    "dependency-injector>=4.41.0",
+    "rich>=13.7.0",  # not imported directly — typer uses it to format CLI output
     # auth / crypto
     "argon2-cffi>=23.1.0",
     "cryptography>=42.0.0",
@@ -40,6 +41,7 @@ dependencies = [
     "google-api-python-client>=2.0.0",
     "google-auth-oauthlib>=1.0.0",
     "requests>=2.31.0",
+    "mediapipe>=0.10",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +54,36 @@ local = [
     "demucs>=4.0.0",
     "soundfile>=0.13.0",
     "librosa>=0.10.0",
+]
+audio = [
+    "librosa>=0.10.0",
+    "soundfile>=0.13.0",
+    "pyloudnorm>=0.1.0",
+]
+captions = [
+    "pysubs2>=1.6.0",
+]
+brain = [
+    "yt-dlp>=2026.1",
+    "faster-whisper>=1.0.0",
+]
+vector = [
+    "faiss-cpu>=1.8.0",
+    "sentence-transformers>=3.0.0",
+]
+resilience = [
+    "tenacity>=8.2.0",
+]
+bench = [
+    "open-clip-torch>=2.24.0",
+    "pytesseract>=0.3.0",
+]
+reframe = [
+    # Auto-Reframe (smart cropping) subject tracking. opencv-python-headless is
+    # already a base dependency; listed here too so this group is self-describing
+    # if that ever changes. mediapipe adds face detection on top of OpenCV's
+    # bundled HOG person detector.
+    "opencv-python-headless>=4.9.0",
 ]
 server = [
     # postgres + redis + s3 stack
@@ -75,6 +107,12 @@ dev = [
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
 ]
+# One-shot install of EVERY runtime feature (shorts engine, b-roll/music library,
+# Whisper, beat-snap, vector, server stack, …). Recursive extras (PEP 508) so a
+# single `pip install -e ".[all]"` pulls them all. Add `,dev` for the test stack.
+all = [
+    "videocreator[local,audio,captions,brain,vector,resilience,reframe,server]",
+]
 
 [project.scripts]
 videocreator = "videocreator.interfaces.cli.main:app"
@@ -90,10 +128,29 @@ packages = ["src/videocreator"]
 line-length = 100
 target-version = "py310"
 src = ["src"]
+# The ported render engine is incrementally refactored into clean provider
+# adapters; it's not held to the strict lint until each piece is rewritten.
+extend-exclude = ["src/videocreator/infrastructure/engine"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "B", "UP", "SIM", "RUF", "C90", "PL"]
-ignore = ["PLR0913"]  # too-many-arguments — common in use cases
+ignore = [
+    "PLR0913",  # too-many-arguments — common in use cases / DI wiring
+    "N818",     # domain exceptions use intent-revealing names (PodNotFound); base is DomainError
+    "B008",     # Typer/FastAPI deliberately call Option()/Depends() in arg defaults
+    "PLW0603",  # lazy module-singleton caches (DB engine, settings) legitimately use `global`
+    "PLC0415",  # lazy imports of optional/heavy SDKs (e.g. google-genai) are intentional
+    # --- shape-of-the-code opinions, not defects -------------------------------
+    # These flag working, tested code (ffmpeg filtergraph builders, provider
+    # adapters, planners) and can only be "fixed" by splitting functions that
+    # read fine as one unit. Revisit deliberately during a refactor, not as a
+    # merge gate.
+    "PLR2004",  # magic-value-comparison — HTTP codes, ffmpeg thresholds, ratios
+    "C901",     # complex-structure
+    "PLR0915",  # too-many-statements
+    "PLR0912",  # too-many-branches
+    "PLR0911",  # too-many-return-statements
+]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
@@ -115,7 +172,7 @@ warn_redundant_casts = true
 disallow_untyped_decorators = false  # FastAPI/Typer decorators
 
 [[tool.mypy.overrides]]
-module = ["google.*", "cv2.*", "demucs.*", "librosa.*", "soundfile.*", "faster_whisper.*", "faiss.*", "lightgbm.*"]
+module = ["google.*", "cv2.*", "mediapipe.*", "demucs.*", "librosa.*", "soundfile.*", "faster_whisper.*", "faiss.*", "lightgbm.*", "pyloudnorm.*", "pysubs2.*", "yt_dlp.*", "tenacity.*", "open_clip.*", "pytesseract.*"]
 ignore_missing_imports = true
 
 # ---------------- Pytest ----------------

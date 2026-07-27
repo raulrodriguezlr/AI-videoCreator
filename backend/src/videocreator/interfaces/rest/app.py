@@ -6,8 +6,10 @@
 """
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,15 +18,27 @@ from videocreator.infrastructure.container import get_container
 from videocreator.infrastructure.persistence.database import dispose_db, init_db
 from videocreator.interfaces.rest.errors import install_error_handlers
 from videocreator.interfaces.rest.routers import (
+    auth,
+    brain,
+    channels,
     characters,
+    dashboard,
     episodes,
     health,
     jobs,
+    pod_files,
     pods,
     providers,
+    publish,
+    recipes,
     scripts,
+    secrets,
+    seo,
+    shorts,
     storage,
+    system,
     topics,
+    wizard,
 )
 from videocreator.shared.config import Settings, get_settings
 from videocreator.shared.logging import configure_logging, get_logger
@@ -41,12 +55,47 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await init_db(settings)
     log.info("app.startup", mode=settings.app_mode, db=settings.database_url)
     # Eagerly warm the container so DB connectivity issues surface at startup.
-    get_container()
+    container = get_container()
+    # Reconcile jobs orphaned by a previous run: the in-process queue dies with
+    # the app, so anything still 'running'/'queued' isn't actually executing.
+    try:
+        reconciled = await container.job_repo().reconcile_interrupted()
+        if reconciled:
+            log.info("app.startup.jobs_reconciled", count=reconciled)
+    except Exception:
+        log.warning("app.startup.jobs_reconcile_failed", exc_info=True)
+
+    publish_tick = asyncio.create_task(_publish_scheduler(container))
     try:
         yield
     finally:
+        publish_tick.cancel()
         await dispose_db()
         log.info("app.shutdown")
+
+
+async def _publish_scheduler(container: Any, *, interval_s: float = 30.0) -> None:
+    """Tick the Channels Hub upload queue: process due/scheduled uploads.
+
+    Cheap no-op while the feature is off (no accounts, no jobs). Each tick only
+    posts already-rendered videos — it never generates anything.
+
+    Assumes a single app process (local-first): jobs flip to UPLOADING before the
+    next list_due, so there is no in-process double-upload. Running multiple
+    uvicorn workers would need a DB-level lock to avoid duplicate posts.
+    """
+    while True:
+        try:
+            await asyncio.sleep(interval_s)
+            if not bool(container.runtime_config().get().get("channels_feature_enabled", False)):
+                continue
+            processed = await container.publish_service().process_due()
+            if processed:
+                log.info("publish.scheduler.processed", count=processed)
+        except asyncio.CancelledError:  # graceful shutdown
+            break
+        except Exception:
+            log.warning("publish.scheduler.tick_failed", exc_info=True)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -78,15 +127,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
 
     app.include_router(health.router, prefix=API_PREFIX)
+    app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(pods.router, prefix=API_PREFIX)
     app.include_router(characters.router, prefix=API_PREFIX)
     app.include_router(topics.router, prefix=API_PREFIX)
     app.include_router(scripts.router, prefix=API_PREFIX)
     app.include_router(episodes.router, prefix=API_PREFIX)
+    app.include_router(seo.router, prefix=API_PREFIX)
+    app.include_router(shorts.router, prefix=API_PREFIX)
     app.include_router(jobs.router, prefix=API_PREFIX)
+    app.include_router(secrets.router, prefix=API_PREFIX)
     app.include_router(providers.router, prefix=API_PREFIX)
     app.include_router(storage.router, prefix=API_PREFIX)
+    app.include_router(system.router, prefix=API_PREFIX)
+    app.include_router(pod_files.router, prefix=API_PREFIX)
+    app.include_router(wizard.router, prefix=API_PREFIX)
+    app.include_router(brain.router, prefix=API_PREFIX)
+    app.include_router(recipes.router, prefix=API_PREFIX)
+    app.include_router(publish.router, prefix=API_PREFIX)
+    app.include_router(channels.router, prefix=API_PREFIX)
+    app.include_router(dashboard.router, prefix=API_PREFIX)
     return app
 
 
-__all__ = ["create_app", "API_PREFIX"]
+__all__ = ["API_PREFIX", "create_app"]

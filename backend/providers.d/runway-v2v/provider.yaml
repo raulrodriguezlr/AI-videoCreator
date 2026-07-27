@@ -1,0 +1,37 @@
+id: runway-v2v
+name: Runway Gen-4 Video-to-Video
+version: "1.0.0"
+description: Runway video transformation with reference control — scene recreation engine (section 3.3).
+capabilities:
+  - video_to_video
+  - text_to_video
+models:
+  - id: gen4-turbo
+    family: runway
+    capabilities: [video_to_video, text_to_video]
+    max_duration_s: 10
+    max_resolution: [1280, 768]
+    cost: { per_second_usd: 0.25, per_request_usd: 0.0, currency: USD }
+    latency: { p50_s: 60.0, p95_s: 300.0, timeout_s: 600.0 }
+    strengths: [reference control, brand consistency, scene transformation]
+cost: { per_second_usd: 0.25, per_request_usd: 0.0, currency: USD }
+latency: { p50_s: 60.0, p95_s: 300.0, timeout_s: 600.0 }
+auth:
+  vault_key: runway_api_key
+  header: Authorization
+  prefix: "Bearer "
+adapter:
+  type: openapi
+  config:
+    base_url: https://api.dev.runwayml.com/v1
+    generate_path: /video_to_video
+    field_map:
+      prompt: promptText
+      duration_s: duration
+      seed: seed
+      model_id: model
+    poll_path: /tasks/{id}
+    poll_interval_s: 5
+    result_field: output.0
+    model_id: gen4_turbo
+tags: [cloud, video, v2v, scene-recreation]

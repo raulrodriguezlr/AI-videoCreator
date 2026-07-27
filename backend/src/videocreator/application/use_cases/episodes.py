@@ -6,17 +6,21 @@ the dependencies (script → providers → storage) from the DI container.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import contextlib
+from dataclasses import dataclass, field
 from typing import Any
 
-from videocreator.domain.entities import Episode
+from videocreator.domain.entities import Episode, Script, SeoMetadata
 from videocreator.domain.ports import (
     EpisodeRepository,
     JobQueuePort,
+    MediaLibraryPort,
     PodRepository,
     ScriptRepository,
+    SeoRepository,
+    StoragePort,
 )
-from videocreator.domain.value_objects import EpisodeState, JobKind
+from videocreator.domain.value_objects import EpisodeState, JobKind, MediaAsset
 from videocreator.shared.errors import (
     EpisodeNotFound,
     ForbiddenError,
@@ -31,6 +35,10 @@ from videocreator.shared.ids import (
     UserId,
     new_episode_id,
 )
+from videocreator.shared.time import utcnow
+
+# Sentinel distinguishing "leave unchanged" from "clear to None" in patches.
+_UNSET: Any = object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,9 +136,135 @@ class GetEpisode:
         return episode
 
 
+@dataclass(frozen=True, slots=True)
+class EpisodeDetail:
+    """Everything the episode workspace needs in one round-trip."""
+
+    episode: Episode
+    script: Script | None
+    seo: SeoMetadata | None
+    media: list[MediaAsset] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class GetEpisodeDetail:
+    """Aggregate an episode with its script, SEO and viewable media."""
+
+    pod_repo: PodRepository
+    episode_repo: EpisodeRepository
+    script_repo: ScriptRepository
+    seo_repo: SeoRepository
+    media: MediaLibraryPort
+
+    async def execute(self, *, episode_id: EpisodeId, requester_id: UserId) -> EpisodeDetail:
+        episode = await self.episode_repo.get(episode_id)
+        if episode is None:
+            raise EpisodeNotFound(f"episode {episode_id} not found")
+        pod = await self.pod_repo.get(episode.pod_id)
+        if pod is None or not pod.is_owned_by(requester_id):
+            raise ForbiddenError("episode is owned by a different user")
+
+        script = await self.script_repo.get(episode.script_id) if episode.script_id else None
+        seo = await self.seo_repo.get_for_episode(episode_id)
+        media = await self.media.list_for_episode(episode)
+        return EpisodeDetail(episode=episode, script=script, seo=seo, media=media)
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateEpisode:
+    """Patch editable episode fields (title, state, per-episode provider/model)."""
+
+    pod_repo: PodRepository
+    episode_repo: EpisodeRepository
+
+    async def execute(
+        self,
+        *,
+        episode_id: EpisodeId,
+        requester_id: UserId,
+        title: str | None = None,
+        state: EpisodeState | None = None,
+        video_provider: str | None = _UNSET,
+        video_model: str | None = _UNSET,
+    ) -> Episode:
+        episode = await self.episode_repo.get(episode_id)
+        if episode is None:
+            raise EpisodeNotFound(f"episode {episode_id} not found")
+        pod = await self.pod_repo.get(episode.pod_id)
+        if pod is None or not pod.is_owned_by(requester_id):
+            raise ForbiddenError("episode is owned by a different user")
+
+        if title is not None:
+            cleaned = title.strip()
+            if not cleaned:
+                raise InvalidScript("title must not be empty")
+            episode.title = cleaned
+        if state is not None:
+            episode.state = state
+        if video_provider is not _UNSET:
+            episode.video_provider = (video_provider or None)
+        if video_model is not _UNSET:
+            episode.video_model = (video_model or None)
+        episode.updated_at = utcnow()
+        return await self.episode_repo.save(episode)
+
+
+@dataclass(frozen=True, slots=True)
+class DeleteEpisode:
+    pod_repo: PodRepository
+    episode_repo: EpisodeRepository
+    storage: StoragePort
+
+    async def execute(self, *, episode_id: EpisodeId, requester_id: UserId) -> None:
+        episode = await self.episode_repo.get(episode_id)
+        if episode is None:
+            raise EpisodeNotFound(f"episode {episode_id} not found")
+        pod = await self.pod_repo.get(episode.pod_id)
+        if pod is None or not pod.is_owned_by(requester_id):
+            raise ForbiddenError("episode is owned by a different user")
+        await self.episode_repo.delete(episode_id)
+        # Purge the episode's media from storage too (clips/finals/audio/frames
+        # under episodes/<id>/…) — a DB-only delete left them orphaned on disk.
+        with contextlib.suppress(Exception):
+            await self.storage.delete_prefix("episodes", str(episode_id))
+
+
+@dataclass(frozen=True, slots=True)
+class DeleteEpisodeMedia:
+    """Delete one media artifact (e.g. a single scene clip) from the object store.
+
+    The media library keys every artifact ``episodes/<id>/<rel>`` (a clip is
+    ``clips/clip_NN.mp4``). This removes just that object — the finished final is
+    untouched, so to drop a clip from the deliverable the user joins the rest
+    afterwards (`join_clips`). `rel` is the asset's ``name`` from `/media`.
+    """
+
+    pod_repo: PodRepository
+    episode_repo: EpisodeRepository
+    storage: StoragePort
+
+    async def execute(self, *, episode_id: EpisodeId, rel: str, requester_id: UserId) -> None:
+        episode = await self.episode_repo.get(episode_id)
+        if episode is None:
+            raise EpisodeNotFound(f"episode {episode_id} not found")
+        pod = await self.pod_repo.get(episode.pod_id)
+        if pod is None or not pod.is_owned_by(requester_id):
+            raise ForbiddenError("episode is owned by a different user")
+        # Reject traversal / absolute paths — the key must stay inside this episode.
+        clean = rel.strip().lstrip("/")
+        if not clean or ".." in clean.split("/"):
+            raise InvalidScript(f"invalid media path: {rel!r}")
+        await self.storage.delete("episodes", f"{episode_id}/{clean}")
+
+
 __all__ = [
     "CreateEpisodeFromScript",
+    "DeleteEpisode",
+    "DeleteEpisodeMedia",
     "EnqueueEpisodeRender",
-    "ListEpisodes",
+    "EpisodeDetail",
     "GetEpisode",
+    "GetEpisodeDetail",
+    "ListEpisodes",
+    "UpdateEpisode",
 ]
